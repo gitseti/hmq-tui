@@ -19,4 +19,5 @@ openapi-generator generate -i hivemq-4.21.0-openapi.yaml -g rust --additional-pr
 - [ ] Retrieve the client details of a given client id
 - [ ] Have a expendable UI mock for the TUI
 - [ ] Implement the TUI frontend & wire in the REST API calls
+- [ ] Design and implement CLI options
 - [ ] CI/CD the TUI
