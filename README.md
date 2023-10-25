@@ -1,6 +1,9 @@
 # Goals
 hmq-tui sets out to give easy access to [HiveMQ  REST API](https://docs.hivemq.com/hivemq/4.21/rest-api/specification/).
 
+```
+hmq-tui -h localhost:8888
+```
 ![tui_vision](tui_vision.png)
 
 # Libaries
