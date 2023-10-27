@@ -91,4 +91,32 @@ mod tests {
 
         client_details_mock.assert_hits(1);
     }
+
+    #[tokio::test]
+    async fn test_fetch_client_details_error() {
+        let response = r#"
+            {
+              "errors": [
+                {
+                  "title": "Required parameter missing",
+                  "detail": "Required URL parameter 'parameterName' is missing"
+                }
+              ]
+            }
+        "#;
+
+        let broker = MockServer::start();
+        let client_details_mock = broker.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/mqtt/clients/my-client");
+            then.status(400)
+                .header("content-type", "application/json")
+                .body(response);
+        });
+
+        let client_details = fetch_client_details("my-client".to_string(), broker.base_url()).await;
+
+        assert!(client_details.is_err());
+        client_details.expect_err("Failed to fetch client details for client my-client: error in response: status code 400 Bad Request");
+    }
 }
