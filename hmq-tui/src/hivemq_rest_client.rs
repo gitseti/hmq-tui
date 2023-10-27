@@ -4,33 +4,20 @@ use hivemq_openapi::apis::mqtt_clients_api::GetMqttClientDetailsParams;
 use hivemq_openapi::models::ClientDetails;
 use mqtt_clients_api::get_mqtt_client_details;
 
-async fn fetch_client_details(client_id: String, host: String) -> Box<ClientDetails> {
-    let configuration = Configuration {
-        base_path: host,
-        user_agent: None,
-        client: Default::default(),
-        basic_auth: None,
-        oauth_access_token: None,
-        bearer_access_token: None,
-        api_key: None,
-    };
+async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
 
     let params = GetMqttClientDetailsParams {
-        client_id
+        client_id: client_id.clone()
     };
 
-    let details = match get_mqtt_client_details(&configuration, params).await {
-        Ok(item) => {
-            item.client
-        }
-        Err(e) => {
-            panic!("Could not fetch mqtt client details for client: {}", e);
-            todo!(); // How to handle the error?
-        }
-    };
+    let details = get_mqtt_client_details(&configuration, params)
+        .await
+        .or_else(|error| Err(format!("Failed to fetch client details for client {client_id}: {error}")))?;
 
-
-    return details.expect("details must be present"); // Is there a better way to handle the error?
+    let details = details.client.expect(format!("Client details for client {client_id} were empty").as_str());
+    Ok(*details)
 }
 
 #[cfg(test)]
@@ -77,6 +64,7 @@ mod tests {
         });
 
         let client_details = fetch_client_details("my-client".to_string(), broker.base_url()).await;
+        let client_details = client_details.unwrap();
 
         // assert top level client details
         assert_eq!("my-client", client_details.id.unwrap().as_str());
