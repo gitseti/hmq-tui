@@ -6,4 +6,5 @@ edition = "2018"
 
 [dependencies]
 hivemq-openapi = { version = "4.21.0", path = "../hivemq-openapi" }
-
+tokio = { version = "1.33.0", features = ["full"] }
+httpmock = "0.6"
