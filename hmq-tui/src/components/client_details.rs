@@ -36,7 +36,11 @@ impl ClientDetails {
     fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
-                i + 1
+                if i < self.items.len() - 1 {
+                    i + 1
+                } else {
+                    return;
+                }
             }
             None => {
                 0
