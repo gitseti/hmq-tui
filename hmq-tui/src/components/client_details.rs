@@ -60,7 +60,7 @@ impl ClientDetails {
     }
 
     fn reset(&mut self) {
-        self.state = ListState::default()
+        self.state.select(None)
     }
 
     fn download_details(&mut self) {
