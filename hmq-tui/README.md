@@ -18,6 +18,11 @@ cd hivemq-openapi
 openapi-generator generate -i hivemq-4.21.0-openapi.yaml -g rust --additional-properties=useSingleRequestParameter=true
 ```
 
+To start up HiveMQ with a running REST API in order to test the tui use the following command:
+```
+docker run --env HIVEMQ_REST_API_ENABLED=true --ulimit nofile=500000:500000 -p 8080:8080 -p 8000:8000 -p 1883:1883 -p 8888:8888 hivemq/hivemq4
+```
+
 # Milestones
 
 - [ ] Retrieve a snapshot of all available clients

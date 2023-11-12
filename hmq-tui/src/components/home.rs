@@ -7,13 +7,13 @@ use ratatui::{prelude::*, widgets::*};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::span;
-use client_details::ClientDetails;
+use clients::Clients;
 
 use super::{Component, Frame};
 use crate::{
     action::Action,
     config::{Config, KeyBindings},
-    components::client_details,
+    components::clients,
 };
 use crate::components::policies::Policies;
 use crate::components::tab_components::TabComponent;
@@ -32,7 +32,7 @@ impl Home {
         return Home {
             command_tx: None,
             config: Config::default(),
-            tabs: [Box::new(ClientDetails::new()), Box::new(Policies::new())],
+            tabs: [Box::new(Clients::new()), Box::new(Policies::new())],
             is_loading: false,
             active_tab: 0
         };
@@ -155,7 +155,7 @@ impl Component for Home {
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
 
-        f.render_widget(Paragraph::new("[Q] Quit | [Tab] Next Tab | [Backtab] Previous Tab"),    layout[2]);
+        f.render_widget(Paragraph::new("[Q] Quit | [R] Reload | [Tab] Next Tab | [Backtab] Previous Tab"),    layout[2]);
 
         Ok(())
     }

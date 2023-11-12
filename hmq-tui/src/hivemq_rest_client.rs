@@ -1,10 +1,10 @@
 use hivemq_openapi::apis::mqtt_clients_api;
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::mqtt_clients_api::GetMqttClientDetailsParams;
-use hivemq_openapi::models::ClientDetails;
+use hivemq_openapi::apis::mqtt_clients_api::{get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
+use hivemq_openapi::models::{ClientDetails, PaginationCursor};
 use mqtt_clients_api::get_mqtt_client_details;
 
-async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
+pub async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -20,11 +20,45 @@ async fn fetch_client_details(client_id: String, host: String) -> Result<ClientD
     Ok(*details)
 }
 
+pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+    let mut client_ids = vec![];
+
+    let mut params = GetAllMqttClientsParams {
+        limit: Some(2_500),
+        cursor: None,
+    };
+
+    loop {
+        let response = get_all_mqtt_clients(&configuration, params.clone())
+            .await
+            .or_else(|error| Err(format!("Failed to fetch clients: {error}")))?;
+
+        for client in response.items.unwrap() {
+            client_ids.push(client.id.unwrap())
+        }
+
+        let cursor = match response._links {
+            None => {
+                break;
+            }
+            Some(cursor) => {
+                cursor.unwrap().next
+            }
+        };
+        params.cursor = cursor;
+    }
+
+    Ok(client_ids)
+}
+
 #[cfg(test)]
 mod tests {
     use httpmock::Method::GET;
     use httpmock::MockServer;
-    use crate::hivemq_rest_client::fetch_client_details;
+    use tracing_subscriber::fmt::format;
+    use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 
     #[tokio::test]
     async fn test_fetch_client_details_online_client() {
@@ -118,5 +152,126 @@ mod tests {
 
         assert!(client_details.is_err());
         client_details.expect_err("Failed to fetch client details for client my-client: error in response: status code 400 Bad Request");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_client_ids() {
+        let response = r#"
+        {
+            "items": [
+            {
+              "id": "client-12"
+            },
+            {
+              "id": "client-5"
+            },
+            {
+              "id": "client-32"
+            },
+            {
+              "id": "my-client-id2"
+            },
+            {
+              "id": "my-client-id"
+            }
+            ]
+        }
+        "#;
+
+        let broker = MockServer::start();
+        let clients_mock = broker.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/mqtt/clients");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(response);
+        });
+
+        let client_ids = fetch_client_ids(broker.base_url()).await;
+        let client_ids = client_ids.unwrap();
+
+        clients_mock.assert_hits(1);
+        assert!(client_ids.contains(&"client-12".to_string()));
+        assert!(client_ids.contains(&"client-5".to_string()));
+        assert!(client_ids.contains(&"client-32".to_string()));
+        assert!(client_ids.contains(&"my-client-id2".to_string()));
+        assert!(client_ids.contains(&"my-client-id".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_client_ids_with_cursor() {
+        let response1 = r#"
+        {
+          "items": [
+            {
+              "id": "client-1"
+            },
+            {
+              "id": "client-2"
+            },
+            {
+              "id": "client-3"
+            },
+            {
+              "id": "client-4"
+            },
+            {
+              "id": "client-5"
+            }
+          ],
+          "_links": {
+            "next": "/api/v1/mqtt/clients?cursor=a-MvelExpd5y0SrXBxDhBvnGmohbpzwGDQFdUyOYWBACqs1TgI4-cUo-A=&limit=2500"
+          }
+        }
+        "#;
+
+        let response2 = r#"
+        {
+            "items": [
+            {
+              "id": "client-6"
+            },
+            {
+              "id": "client-7"
+            },
+            {
+              "id": "client-8"
+            },
+            {
+              "id": "client-9"
+            },
+            {
+              "id": "client-10"
+            }
+          ]
+        }
+        "#;
+
+        let broker = MockServer::start();
+        let clients_mock2 = broker.mock(|when, then| {
+            when.method(GET)
+                .query_param_exists("cursor")
+                .path("/api/v1/mqtt/clients");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(response2);
+        });
+        let clients_mock1 = broker.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/mqtt/clients");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(response1);
+        });
+
+        let client_ids = fetch_client_ids(broker.base_url()).await;
+        let client_ids = client_ids.unwrap();
+
+        clients_mock1.assert_hits(1);
+        clients_mock2.assert_hits(1);
+        for i in 1..=10 {
+            let client_id = format! {"client-{i}"}.to_string();
+            assert!(client_ids.contains(&client_id));
+        }
     }
 }

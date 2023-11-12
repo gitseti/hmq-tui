@@ -11,7 +11,7 @@ use crate::{
 
 pub mod fps;
 pub mod home;
-pub mod client_details;
+pub mod clients;
 pub mod tab_components;
 pub mod policies;
 

@@ -1,4 +1,5 @@
 use std::fmt;
+use hivemq_openapi::models::ClientDetails;
 
 use serde::{
     de::{self, Deserializer, Visitor},
@@ -20,9 +21,15 @@ pub enum Action {
     Down,
     NextTab,
     PrevTab,
-    Loaded(Vec<String>),
-    Loading,
     Escape,
+    Reload,
+
+    // Clients view
+    ClientsLoading,
+    ClientsLoadingFailed(String),
+    ClientsLoaded(Vec<String>),
+    ClientDetailsLoaded(String, String),
+    ClientDetailsLoadingFailed(String, String)
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -51,6 +58,7 @@ impl<'de> Deserialize<'de> for Action {
                     "Quit" => Ok(Action::Quit),
                     "Refresh" => Ok(Action::Refresh),
                     "Help" => Ok(Action::Help),
+                    "Reload" => Ok(Action::Reload),
                     "Up" => Ok(Action::Up),
                     "Down" => Ok(Action::Down),
                     "NextTab" => Ok(Action::NextTab),
