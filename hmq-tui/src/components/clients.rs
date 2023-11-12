@@ -252,6 +252,6 @@ impl Component for Clients {
 
 impl TabComponent for Clients {
     fn get_name(&self) -> String {
-        "Client Details".to_string()
+        "Clients".to_string()
     }
 }
