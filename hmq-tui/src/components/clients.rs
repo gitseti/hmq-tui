@@ -21,28 +21,28 @@ use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 
 
 pub struct Clients {
-    command_tx: Option<UnboundedSender<Action>>,
-    state: ListState,
+    tx: Option<UnboundedSender<Action>>,
+    selected_client: ListState,
     client_ids: Vec<String>,
     client_details: HashMap<String, Result<String, String>>,
     is_loading_client_ids: bool,
-    clients_loading_error: Option<String>
+    client_ids_loading_error: Option<String>
 }
 
 impl Clients {
     pub fn new() -> Self {
         Clients {
-            command_tx: None,
-            state: ListState::default(),
+            tx: None,
+            selected_client: ListState::default(),
             client_ids: vec![],
             client_details: HashMap::new(),
             is_loading_client_ids: false,
-            clients_loading_error: None
+            client_ids_loading_error: None
         }
     }
 
     fn next(&mut self) {
-        let i = match self.state.selected() {
+        let i = match self.selected_client.selected() {
             Some(i) => {
                 if i < self.client_ids.len() - 1 {
                     i + 1
@@ -57,12 +57,12 @@ impl Clients {
                 0
             }
         };
-        self.state.select(Some(i))
+        self.selected_client.select(Some(i))
     }
 
     fn prev(&mut self) {
 
-        let i = match self.state.selected() {
+        let i = match self.selected_client.selected() {
             Some(i) => if i == 0 {
                 0
             } else {
@@ -75,32 +75,32 @@ impl Clients {
                 0
             }
         };
-        self.state.select(Some(i))
+        self.selected_client.select(Some(i))
     }
 
     fn reset(&mut self) {
-        self.state.select(None)
+        self.selected_client.select(None)
     }
 
     fn load_client_ids(&mut self) {
-        let tx = self.command_tx.clone().unwrap();
+        let tx = self.tx.clone().unwrap();
         let handle = tokio::spawn(async move {
-            tx.send(Action::ClientsLoading).expect("Could not send loading action"); // The action channel is expected to be open
+            tx.send(Action::ClientIdsLoading).expect("Could not send loading action"); // The action channel is expected to be open
             let client_ids = fetch_client_ids(String::from("http://localhost:8888")).await;
 
             match client_ids {
                 Ok(ids) => {
-                    tx.send(Action::ClientsLoaded(ids)).expect("Could not send loaded action");
+                    tx.send(Action::ClientIdsLoaded(ids)).expect("Could not send loaded action");
                 }
                 Err(err) => {
-                    tx.send(Action::ClientsLoadingFailed(err)).expect("Could not send loading failed action");
+                    tx.send(Action::ClientIdsLoadingFailed(err)).expect("Could not send loading failed action");
                 }
             }
         });
     }
 
     fn load_client_details(&mut self, client_id: &String) {
-        let tx = self.command_tx.clone().unwrap();
+        let tx = self.tx.clone().unwrap();
         let client_id = client_id.clone();
         let handle = tokio::spawn(async move {
             let client_details = fetch_client_details(client_id.clone(),String::from("http://localhost:8888")).await;
@@ -119,7 +119,7 @@ impl Clients {
 
 impl Component for Clients {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
+        self.tx = Some(tx);
         Ok(())
     }
 
@@ -128,7 +128,7 @@ impl Component for Clients {
             match action {
                 Action::Reload => {
                     self.client_details.clear();
-                    self.clients_loading_error = None;
+                    self.client_ids_loading_error = None;
                     self.load_client_ids();
                 }
                 Action::Up => {
@@ -140,7 +140,7 @@ impl Component for Clients {
                 Action::Escape => {
                     self.reset()
                 }
-                Action::ClientsLoading => {
+                Action::ClientIdsLoading => {
                     self.is_loading_client_ids = true;
                 }
                 Action::ClientDetailsLoaded(client_id, details) => {
@@ -153,12 +153,12 @@ impl Component for Clients {
             };
         } else {
             match action {
-                Action::ClientsLoaded(items) => {
+                Action::ClientIdsLoaded(items) => {
                     self.client_ids = items;
                     self.is_loading_client_ids = false;
                 }
-                Action::ClientsLoadingFailed(err) => {
-                    self.clients_loading_error = Some(err);
+                Action::ClientIdsLoadingFailed(err) => {
+                    self.client_ids_loading_error = Some(err);
                     self.is_loading_client_ids = false;
                 }
                 _ => ()
@@ -181,8 +181,8 @@ impl Component for Clients {
         if self.is_loading_client_ids {
             f.render_widget(Block::default().borders(Borders::ALL).title("Loading Clients..."), client_details_view[0]);
             f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
-        } else if self.clients_loading_error.is_some() {
-            let msg = self.clients_loading_error.clone().unwrap();
+        } else if self.client_ids_loading_error.is_some() {
+            let msg = self.client_ids_loading_error.clone().unwrap();
             let p = Paragraph::new(msg.as_str())
                 .style(Style::default().fg(Color::Red))
                 .wrap(Wrap { trim: true });
@@ -194,7 +194,7 @@ impl Component for Clients {
             for item in &self.client_ids {
                 list_items.push(ListItem::new(item.as_str()));
             }
-            let selected_client = match self.state.selected() {
+            let selected_client = match self.selected_client.selected() {
                 None => {
                     0
                 }
@@ -212,10 +212,10 @@ impl Component for Clients {
                         .add_modifier(Modifier::BOLD),
                 );
 
-            f.render_stateful_widget(items, client_details_view[0], &mut self.state);
+            f.render_stateful_widget(items, client_details_view[0], &mut self.selected_client);
 
             // client details
-            match self.state.selected() {
+            match self.selected_client.selected() {
                 None => {
                     f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
                 }

@@ -25,9 +25,9 @@ pub enum Action {
     Reload,
 
     // Clients view
-    ClientsLoading,
-    ClientsLoadingFailed(String),
-    ClientsLoaded(Vec<String>),
+    ClientIdsLoading,
+    ClientIdsLoadingFailed(String),
+    ClientIdsLoaded(Vec<String>),
     ClientDetailsLoaded(String, String),
     ClientDetailsLoadingFailed(String, String)
 }
