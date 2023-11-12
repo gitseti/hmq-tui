@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::rc::Rc;
 use std::time::Duration;
 use clap::builder::Str;
 use color_eyre::eyre::Result;
@@ -115,6 +116,20 @@ impl Clients {
             }
         });
     }
+
+    fn draw_loading_client_ids(&self, f: &mut Frame, layout: &Rc<[Rect]>) {
+        f.render_widget(Block::default().borders(Borders::ALL).title("Loading Clients..."), layout[0]);
+        f.render_widget(Block::default().borders(Borders::ALL).title("Details"), layout[1]);
+    }
+
+    fn draw_loading_error(&mut self, f: &mut Frame, layout: &Rc<[Rect]>) {
+        let msg = self.client_ids_loading_error.clone().unwrap();
+        let p = Paragraph::new(msg.as_str())
+            .style(Style::default().fg(Color::Red))
+            .wrap(Wrap { trim: true });
+        f.render_widget(p.block(Block::default().borders(Borders::ALL).title("Loading Clients failed")), layout[0]);
+        f.render_widget(Block::default().borders(Borders::ALL).title("Details"), layout[1]);
+    }
 }
 
 impl Component for Clients {
@@ -170,30 +185,25 @@ impl Component for Clients {
 
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let client_details_view = Layout::default()
+
+        let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
-                Constraint::Percentage(25),
-                Constraint::Percentage(75),
+                Constraint::Ratio(1,3),
+                Constraint::Ratio(2, 3),
             ])
             .split(area);
 
         if self.is_loading_client_ids {
-            f.render_widget(Block::default().borders(Borders::ALL).title("Loading Clients..."), client_details_view[0]);
-            f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
+            self.draw_loading_client_ids(f, &layout);
         } else if self.client_ids_loading_error.is_some() {
-            let msg = self.client_ids_loading_error.clone().unwrap();
-            let p = Paragraph::new(msg.as_str())
-                .style(Style::default().fg(Color::Red))
-                .wrap(Wrap { trim: true });
-            f.render_widget(p.block(Block::default().borders(Borders::ALL).title("Loading Clients failed")), client_details_view[0]);
-            f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
+            self.draw_loading_error(f, &layout);
         } else {
-            // client id list
             let mut list_items = vec![];
             for item in &self.client_ids {
                 list_items.push(ListItem::new(item.as_str()));
             }
+
             let selected_client = match self.selected_client.selected() {
                 None => {
                     0
@@ -212,31 +222,31 @@ impl Component for Clients {
                         .add_modifier(Modifier::BOLD),
                 );
 
-            f.render_stateful_widget(items, client_details_view[0], &mut self.selected_client);
+            f.render_stateful_widget(items, layout[0], &mut self.selected_client);
 
             // client details
             match self.selected_client.selected() {
                 None => {
-                    f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
+                    f.render_widget(Block::default().borders(Borders::ALL).title("Details"), layout[1]);
                 }
                 Some(selected) => {
                     match self.client_details.get(self.client_ids[selected].as_str()) {
                         None => {
                             self.load_client_details(&self.client_ids[selected].clone());
-                            f.render_widget(Block::default().borders(Borders::ALL).title("Details"), client_details_view[1]);
+                            f.render_widget(Block::default().borders(Borders::ALL).title("Details"), layout[1]);
                         }
                         Some(details) => {
 
                             match details {
                                 Ok(details) => {
                                     let paragraph = Paragraph::new(details.as_str()).block(Block::default().borders(Borders::ALL).title("Details"));
-                                    f.render_widget(paragraph, client_details_view[1]);
+                                    f.render_widget(paragraph, layout[1]);
                                 }
                                 Err(err) => {
                                     let p = Paragraph::new(err.as_str())
                                         .style(Style::default().fg(Color::Red))
                                         .wrap(Wrap { trim: true });
-                                    f.render_widget(p.block(Block::default().borders(Borders::ALL).title("Loading Client Details failed")), client_details_view[1]);
+                                    f.render_widget(p.block(Block::default().borders(Borders::ALL).title("Loading Client Details failed")), layout[1]);
                                 }
                             }
 

@@ -21,6 +21,7 @@ pub enum Action {
     Down,
     NextTab,
     PrevTab,
+    SelectTab(usize),
     Escape,
     Reload,
 
@@ -29,7 +30,7 @@ pub enum Action {
     ClientIdsLoadingFailed(String),
     ClientIdsLoaded(Vec<String>),
     ClientDetailsLoaded(String, String),
-    ClientDetailsLoadingFailed(String, String)
+    ClientDetailsLoadingFailed(String, String),
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -63,6 +64,9 @@ impl<'de> Deserialize<'de> for Action {
                     "Down" => Ok(Action::Down),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),
+                    "Tab1" => Ok(Action::SelectTab(0)),
+                    "Tab2" => Ok(Action::SelectTab(1)),
+                    "Tab3" => Ok(Action::SelectTab(2)),
                     "Escape" => Ok(Action::Escape),
                     data if data.starts_with("Error(") => {
                         let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");

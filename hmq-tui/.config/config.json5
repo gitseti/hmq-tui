@@ -10,6 +10,9 @@
       "<down>": "Down",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
+      "<1>": "Tab1",
+      "<2>": "Tab2",
+      "<3>": "Tab3",
       "<esc>": "Escape"
     },
   }

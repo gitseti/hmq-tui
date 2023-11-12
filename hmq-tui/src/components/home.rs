@@ -38,6 +38,12 @@ impl Home {
         };
     }
 
+    pub fn select_tab(&mut self, index: usize) {
+        if index != self.active_tab && index < self.tabs.len() {
+            self.active_tab = index;
+        }
+    }
+
     pub fn next_tab(&mut self) {
         if self.active_tab < self.tabs.len() - 1 {
             self.active_tab = self.active_tab + 1;
@@ -109,6 +115,9 @@ impl Component for Home {
         }
 
         match action {
+            Action::SelectTab(tab) => {
+                self.select_tab(tab);
+            }
             Action::NextTab => {
                 self.next_tab()
             }
@@ -139,15 +148,15 @@ impl Component for Home {
                 spans.push(Span::raw(format!("|"),))
             }
 
-
             let style = if i == self.active_tab  {
                 Style::default().bg(Color::Green).bold()
             } else {
                 Style::default()
             };
 
+            let index = i + 1;
             let name = tab.get_name();
-            let text = Span::styled(format!(" {name} [{i}] "), style);
+            let text = Span::styled(format!(" [{index}] {name} "), style);
             spans.push(text)
         }
         f.render_widget(Paragraph::new(Line::from(spans)), layout[0]);
