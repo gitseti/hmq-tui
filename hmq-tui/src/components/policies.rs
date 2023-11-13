@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListState};
 use tokio::sync::mpsc::UnboundedSender;
@@ -35,5 +36,9 @@ impl Component for Policies {
 impl TabComponent for Policies {
     fn get_name(&self) -> String {
         "Policies".to_string()
+    }
+
+    fn get_key_hints(&self) -> Vec<(&str, &str)> {
+        vec![]
     }
 }

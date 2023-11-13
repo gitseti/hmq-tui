@@ -162,7 +162,15 @@ impl Component for Home {
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
 
-        f.render_widget(Paragraph::new("[Q] Quit | [R] Reload | [Tab] Next Tab | [Backtab] Previous Tab"),    layout[2]);
+        let mut mappings = String::new();
+        mappings.push_str("[Q] Quit | [Tab] Next Tab | [Backtab] Previous Tab ");
+        for mapping in active_tab.get_key_hints() {
+            let key = mapping.0;
+            let value = mapping.1;
+            mappings.push_str(format!("| [{key}] {value} ").as_str());
+        }
+
+        f.render_widget(Paragraph::new(mappings),layout[2]);
 
         Ok(())
     }
