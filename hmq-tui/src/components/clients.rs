@@ -87,6 +87,9 @@ impl Clients {
     }
 
     fn load_client_ids(&mut self) {
+        self.client_details.clear();
+        self.client_ids_loading_error = None;
+
         let tx = self.tx.clone().unwrap();
         let hivemq_address = self.hivemq_address.clone();
         let handle = tokio::spawn(async move {
@@ -102,6 +105,16 @@ impl Clients {
                 }
             }
         });
+    }
+
+    fn client_ids_loaded(&mut self, client_ids: Vec<String>) {
+        self.client_ids = client_ids;
+        self.is_loading_client_ids = false;
+    }
+
+    fn client_ids_loading_failed(&mut self, err: String) {
+        self.client_ids_loading_error = Some(err);
+        self.is_loading_client_ids = false;
     }
 
     fn load_client_details(&mut self, client_id: &String) {
@@ -192,8 +205,6 @@ impl Component for Clients {
         } else if !self.is_loading_client_ids {
             match action {
                 Action::Reload => {
-                    self.client_details.clear();
-                    self.client_ids_loading_error = None;
                     self.load_client_ids();
                 }
                 Action::Up => {
@@ -215,21 +226,17 @@ impl Component for Clients {
                     self.client_details.insert(client_id, Err(err));
                 }
                 Action::Right => {
-                    if self.selected_client.selected().is_some() {
-                        self.focus();
-                    }
+                    self.focus();
                 }
                 _ => ()
             };
         } else {
             match action {
                 Action::ClientIdsLoaded(items) => {
-                    self.client_ids = items;
-                    self.is_loading_client_ids = false;
+                    self.client_ids_loaded(items);
                 }
                 Action::ClientIdsLoadingFailed(err) => {
-                    self.client_ids_loading_error = Some(err);
-                    self.is_loading_client_ids = false;
+                    self.client_ids_loading_failed(err);
                 }
                 _ => ()
             }
