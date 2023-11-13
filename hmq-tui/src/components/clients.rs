@@ -317,8 +317,8 @@ impl Component for Clients {
 }
 
 impl TabComponent for Clients {
-    fn get_name(&self) -> String {
-        "Clients".to_string()
+    fn get_name(&self) -> &str {
+        "Clients"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {

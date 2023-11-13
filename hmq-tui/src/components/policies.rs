@@ -34,8 +34,8 @@ impl Component for Policies {
 }
 
 impl TabComponent for Policies {
-    fn get_name(&self) -> String {
-        "Policies".to_string()
+    fn get_name(&self) -> &str {
+        "Policies"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
