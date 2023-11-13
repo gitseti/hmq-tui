@@ -27,7 +27,8 @@ async fn tokio_main() -> Result<()> {
     initialize_panic_handler()?;
 
     let args = Cli::parse();
-    let mut app = App::new(args.tick_rate, args.frame_rate)?;
+    let hivemq_address = args.host + ":" + args.port.to_string().as_str();
+    let mut app = App::new(args.tick_rate, args.frame_rate, hivemq_address)?;
     app.run().await?;
 
     Ok(())

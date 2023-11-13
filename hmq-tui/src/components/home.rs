@@ -23,17 +23,15 @@ pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     tabs: [Box<dyn TabComponent>; 2],
-    is_loading: bool,
     active_tab: usize
 }
 
 impl Home {
-    pub fn new() -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         return Home {
             command_tx: None,
             config: Config::default(),
-            tabs: [Box::new(Clients::new()), Box::new(Policies::new())],
-            is_loading: false,
+            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(Policies::new())],
             active_tab: 0
         };
     }

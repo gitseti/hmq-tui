@@ -23,22 +23,26 @@ use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 
 pub struct Clients {
     tx: Option<UnboundedSender<Action>>,
+    hivemq_address: String,
     selected_client: ListState,
     client_ids: Vec<String>,
     client_details: HashMap<String, Result<String, String>>,
     is_loading_client_ids: bool,
-    client_ids_loading_error: Option<String>
+    client_ids_loading_error: Option<String>,
+    is_focus_details: bool,
 }
 
 impl Clients {
-    pub fn new() -> Self {
+    pub fn new(hivemq_address: &String) -> Self {
         Clients {
             tx: None,
+            hivemq_address: hivemq_address.clone(),
             selected_client: ListState::default(),
             client_ids: vec![],
             client_details: HashMap::new(),
             is_loading_client_ids: false,
-            client_ids_loading_error: None
+            client_ids_loading_error: None,
+            is_focus_details: false,
         }
     }
 
@@ -62,7 +66,6 @@ impl Clients {
     }
 
     fn prev(&mut self) {
-
         let i = match self.selected_client.selected() {
             Some(i) => if i == 0 {
                 0
@@ -85,9 +88,10 @@ impl Clients {
 
     fn load_client_ids(&mut self) {
         let tx = self.tx.clone().unwrap();
+        let hivemq_address = self.hivemq_address.clone();
         let handle = tokio::spawn(async move {
             tx.send(Action::ClientIdsLoading).expect("Could not send loading action"); // The action channel is expected to be open
-            let client_ids = fetch_client_ids(String::from("http://localhost:8888")).await;
+            let client_ids = fetch_client_ids(hivemq_address).await;
 
             match client_ids {
                 Ok(ids) => {
@@ -102,9 +106,10 @@ impl Clients {
 
     fn load_client_details(&mut self, client_id: &String) {
         let tx = self.tx.clone().unwrap();
+        let hivemq_address = self.hivemq_address.clone();
         let client_id = client_id.clone();
         let handle = tokio::spawn(async move {
-            let client_details = fetch_client_details(client_id.clone(),String::from("http://localhost:8888")).await;
+            let client_details = fetch_client_details(client_id.clone(), hivemq_address).await;
 
             match client_details {
                 Ok(ref details) => {
@@ -115,6 +120,41 @@ impl Clients {
                 }
             }
         });
+    }
+
+    fn focus(&mut self) {
+        let selected = match self.selected_client.selected() {
+            None => {
+                return;
+            }
+            Some(selected) => {
+                selected
+            }
+        };
+
+        let result = match self.client_details.get(self.client_ids[selected].as_str()) {
+            None => {
+                return;
+            }
+            Some(result) => {
+                result
+            }
+        };
+
+        let details = match result {
+            Ok(details) => {
+                details
+            }
+            Err(_) => {
+                return;
+            }
+        };
+
+        self.is_focus_details = true;
+    }
+
+    fn unfocus(&mut self) {
+        self.is_focus_details = false;
     }
 
     fn draw_loading_client_ids(&self, f: &mut Frame, layout: &Rc<[Rect]>) {
@@ -139,7 +179,17 @@ impl Component for Clients {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if !self.is_loading_client_ids {
+        if self.is_focus_details {
+            match action {
+                Action::Escape => {
+                    self.unfocus();
+                }
+                Action::Left => {
+                    self.unfocus();
+                }
+                _ => ()
+            }
+        } else if !self.is_loading_client_ids {
             match action {
                 Action::Reload => {
                     self.client_details.clear();
@@ -164,6 +214,11 @@ impl Component for Clients {
                 Action::ClientDetailsLoadingFailed(client_id, err) => {
                     self.client_details.insert(client_id, Err(err));
                 }
+                Action::Right => {
+                    if self.selected_client.selected().is_some() {
+                        self.focus();
+                    }
+                }
                 _ => ()
             };
         } else {
@@ -185,11 +240,10 @@ impl Component for Clients {
 
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
-                Constraint::Ratio(1,3),
+                Constraint::Ratio(1, 3),
                 Constraint::Ratio(2, 3),
             ])
             .split(area);
@@ -214,8 +268,9 @@ impl Component for Clients {
             };
             let total_clients = self.client_ids.len();
             let items = List::new(list_items)
-                .block(Block::default().borders(Borders::ALL)
-                .title(format!("Clients ({selected_client}/{total_clients})")))
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!("Clients ({selected_client}/{total_clients})")))
                 .highlight_style(
                     Style::default()
                         .bg(Color::Green)
@@ -236,10 +291,12 @@ impl Component for Clients {
                             f.render_widget(Block::default().borders(Borders::ALL).title("Details"), layout[1]);
                         }
                         Some(details) => {
-
                             match details {
                                 Ok(details) => {
-                                    let paragraph = Paragraph::new(details.as_str()).block(Block::default().borders(Borders::ALL).title("Details"));
+                                    let paragraph = Paragraph::new(details.as_str())
+                                        .block(Block::default()
+                                            .borders(Borders::ALL)
+                                            .title("Details"));
                                     f.render_widget(paragraph, layout[1]);
                                 }
                                 Err(err) => {
@@ -249,7 +306,6 @@ impl Component for Clients {
                                     f.render_widget(p.block(Block::default().borders(Borders::ALL).title("Loading Client Details failed")), layout[1]);
                                 }
                             }
-
                         }
                     }
                 }

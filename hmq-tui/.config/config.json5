@@ -8,6 +8,8 @@
       "<r>": "Reload",
       "<up>": "Up",
       "<down>": "Down",
+      "<left>": "Left",
+      "<right>": "Right",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
       "<1>": "Tab1",

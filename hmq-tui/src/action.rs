@@ -17,8 +17,12 @@ pub enum Action {
     Refresh,
     Error(String),
     Help,
+
+    // Key Events
     Up,
     Down,
+    Left,
+    Right,
     NextTab,
     PrevTab,
     SelectTab(usize),
@@ -62,6 +66,8 @@ impl<'de> Deserialize<'de> for Action {
                     "Reload" => Ok(Action::Reload),
                     "Up" => Ok(Action::Up),
                     "Down" => Ok(Action::Down),
+                    "Left" => Ok(Action::Left),
+                    "Right" => Ok(Action::Right),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),
                     "Tab1" => Ok(Action::SelectTab(0)),
