@@ -1,6 +1,6 @@
 use hivemq_openapi::apis::mqtt_clients_api;
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::mqtt_clients_api::{get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
+use hivemq_openapi::apis::mqtt_clients_api::{DisconnectClientParams, get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
 use hivemq_openapi::models::{ClientDetails, PaginationCursor};
 use mqtt_clients_api::get_mqtt_client_details;
 
@@ -51,6 +51,22 @@ pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
     }
 
     Ok(client_ids)
+}
+
+pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let params = DisconnectClientParams {
+        client_id: client_id.clone(),
+        prevent_will_message: Some(false)
+    };
+
+    mqtt_clients_api::disconnect_client(&configuration, params)
+        .await
+        .or_else(|error| Err(format!("Failed to disconnect client '{client_id}': {error}")))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
