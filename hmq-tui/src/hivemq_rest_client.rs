@@ -1,7 +1,8 @@
 use hivemq_openapi::apis::mqtt_clients_api;
 use hivemq_openapi::apis::configuration::Configuration;
+use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, GetAllDataPoliciesParams};
 use hivemq_openapi::apis::mqtt_clients_api::{DisconnectClientParams, get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
-use hivemq_openapi::models::{ClientDetails, PaginationCursor};
+use hivemq_openapi::models::{ClientDetails, DataPolicy, PaginationCursor};
 use mqtt_clients_api::get_mqtt_client_details;
 
 pub async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
@@ -51,6 +52,44 @@ pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
     }
 
     Ok(client_ids)
+}
+
+//TODO: Test
+pub async fn fetch_policies(host: String) -> Result<Vec<(String, DataPolicy)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let mut params = GetAllDataPoliciesParams {
+        fields: None,
+        policy_ids: None,
+        schema_ids: None,
+        topic: None,
+        limit: Some(2_500),
+        cursor: None,
+    };
+
+    let mut policies = vec![];
+    loop {
+        let response = get_all_data_policies(&configuration, params.clone())
+            .await
+            .or_else(|error| Err(format!("Failed to fetch data policies: {error}")))?;
+
+        for policy in response.items.unwrap() {
+            policies.push((policy.id.clone(), policy));
+        }
+
+        let cursor = match response._links {
+            None => {
+                break;
+            }
+            Some(cursor) => {
+                cursor.unwrap().next
+            }
+        };
+        params.cursor = cursor;
+    }
+
+    Ok(policies)
 }
 
 pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {

@@ -8,6 +8,7 @@ use futures::stream::iter;
 use indexmap::IndexMap;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Widget};
+use State::Loaded;
 
 use crate::{tui};
 use crate::components::views::State::{Error, Loading};
@@ -30,17 +31,17 @@ impl<T: Display> DetailsView<'_, T> {
         DetailsView {
             list_title,
             details_title,
-            state: State::Loaded(IndexMap::new(), vec![], ListState::default()),
+            state: Loaded(IndexMap::new(), vec![], ListState::default()),
         }
     }
 
     pub fn reset(&mut self) {
-        self.state = State::Loaded(IndexMap::new(), vec![], ListState::default())
+        self.state = Loaded(IndexMap::new(), vec![], ListState::default())
     }
 
     pub fn update_items(&mut self, items: Vec<(&str, T)>) {
         self.reset();
-        if let State::Loaded(map, list, state) = &mut self.state {
+        if let Loaded(map, list, state) = &mut self.state {
             for item in items {
                 map.insert(item.0.to_string(), item.1);
                 list.push(ListItem::new(item.0.to_string()));
@@ -59,7 +60,7 @@ impl<T: Display> DetailsView<'_, T> {
     }
 
     pub fn next_item(&mut self) {
-        if let State::Loaded(map, list, state) = &mut self.state {
+        if let Loaded(map, list, state) = &mut self.state {
             let new_selected = match state.selected() {
                 None if list.len() != 0 => 0,
                 Some(i) if i + 1 < list.len() => i + 1,
@@ -71,7 +72,7 @@ impl<T: Display> DetailsView<'_, T> {
     }
 
     pub fn prev_item(&mut self) {
-        if let State::Loaded(map, list, state) = &mut self.state {
+        if let Loaded(map, list, state) = &mut self.state {
             let new_selected = match state.selected() {
                 Some(i) if i > 0 => i - 1,
                 _ => return
@@ -103,25 +104,24 @@ impl<T: Display> DetailsView<'_, T> {
                 f.render_widget(p, list_view);
                 f.render_widget(Block::default().borders(Borders::ALL).title(detail_title), detail_view);
             }
-            State::Loading() => {
+            Loading() => {
                 let b = Block::default().borders(Borders::ALL)
                     .style(Style::default().fg(Color::LightBlue))
                     .title(format!("Loading {list_title}..."));
                 f.render_widget(b, list_view);
                 f.render_widget(Block::default().borders(Borders::ALL).title(detail_title), detail_view);
             }
-            State::Loaded(map, list, state) => {
+            Loaded(map, list, state) => {
                 let items = List::new(&**list)
                     .block(Block::default()
                         .borders(Borders::ALL)
-                        .title(format!("{} ({}/{})", list_title, state.selected().unwrap_or(0), list.len())))
+                        .title(format!("{} ({}/{})", list_title, state.selected().map_or(0, |i| i + 1), list.len())))
                     .highlight_style(
                         Style::default()
                             .bg(Color::Green)
                             .add_modifier(Modifier::BOLD),
                     );
                 f.render_stateful_widget(items, list_view, state);
-
 
                 match state.selected() {
                     None => {
