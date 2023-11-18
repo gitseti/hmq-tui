@@ -25,7 +25,7 @@ pub type IO = std::io::Stderr;
 pub fn io() -> IO {
     std::io::stderr()
 }
-pub type Frame<'a> = ratatui::Frame<'a, Backend<IO>>;
+pub type Frame<'a> = ratatui::Frame<'a>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {

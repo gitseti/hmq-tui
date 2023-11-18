@@ -5,16 +5,20 @@ use arboard::Clipboard;
 use tui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use color_eyre::eyre::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::stream::iter;
 use indexmap::IndexMap;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
+use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::Serialize;
+use tui_textarea::{Input, Key, TextArea};
 use State::Loaded;
+use ratatui::widgets::block::Block;
 
 use crate::{tui};
+use crate::action::Action;
+use crate::components::Component;
 use crate::components::views::State::{Error, Loading};
-
 
 pub enum State<'a, T> {
     Error(String),
@@ -150,6 +154,60 @@ impl<T: Serialize> DetailsView<'_, T> {
             }
         }
 
+        Ok(())
+    }
+}
+
+pub struct Editor<'a> {
+    textarea: TextArea<'a>,
+}
+
+impl Editor<'_> {
+    pub fn new() -> Self {
+        let mut textarea = TextArea::default();
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Editor")
+        );
+        Editor {
+            textarea
+        }
+    }
+}
+
+impl Component for Editor<'_> {
+    fn handle_key_events(&mut self, mut key: KeyEvent) -> Result<Option<Action>> {
+        if cfg!(target_os = "macos") {
+            // crossterm doesn't handle these macos keybindings correctly
+            if key.modifiers == KeyModifiers::ALT {
+                match key.code {
+                      KeyCode::Char('5') => {
+                        key.code = KeyCode::Char('[');
+                        key.modifiers = KeyModifiers::NONE;
+                    }
+                    KeyCode::Char('6') => {
+                        key.code = KeyCode::Char(']');
+                        key.modifiers = KeyModifiers::NONE;
+                    }
+                    KeyCode::Char('8') => {
+                        key.code = KeyCode::Char('{');
+                        key.modifiers = KeyModifiers::NONE;
+                    }
+                    KeyCode::Char('9') => {
+                        key.code = KeyCode::Char('}');
+                        key.modifiers = KeyModifiers::NONE;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        self.textarea.input(key);
+        Ok(None)
+    }
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        f.render_widget(self.textarea.widget(), area);
         Ok(())
     }
 }
