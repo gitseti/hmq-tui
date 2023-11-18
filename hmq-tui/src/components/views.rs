@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Index;
+use arboard::Clipboard;
 use tui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use color_eyre::eyre::Result;
@@ -80,6 +81,17 @@ impl<T: Serialize> DetailsView<'_, T> {
             };
 
             state.select(Some(new_selected));
+        }
+    }
+
+    pub fn copy_details_to_clipboard(&mut self) {
+        if let Loaded(map, _, state) = &mut self.state {
+            if let Some(selected) = state.selected() {
+                let item = map.get_index(selected).unwrap();
+                let details = serde_json::to_string_pretty(item.1).unwrap();
+                let mut clipboard = Clipboard::new().unwrap();
+                clipboard.set_text(details).unwrap();
+            }
         }
     }
 

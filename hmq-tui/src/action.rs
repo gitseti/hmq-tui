@@ -28,6 +28,7 @@ pub enum Action {
     SelectTab(usize),
     Escape,
     Reload,
+    Copy,
 
     // Clients view
     ClientIdsLoading,
@@ -80,6 +81,7 @@ impl<'de> Deserialize<'de> for Action {
                     "Refresh" => Ok(Action::Refresh),
                     "Help" => Ok(Action::Help),
                     "Reload" => Ok(Action::Reload),
+                    "Copy" => Ok(Action::Copy),
                     "Up" => Ok(Action::Up),
                     "Down" => Ok(Action::Down),
                     "Left" => Ok(Action::Left),

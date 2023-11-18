@@ -43,6 +43,9 @@ impl Component for DataPoliciesTab<'_> {
             Action::Down => {
                 self.details_view.next_item();
             }
+            Action::Copy => {
+                self.details_view.copy_details_to_clipboard();
+            }
             Action::Reload => {
                 self.details_view.loading();
 
@@ -81,6 +84,6 @@ impl TabComponent for DataPoliciesTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load")]
+        vec![("R", "Load"), ("C", "Copy")]
     }
 }
