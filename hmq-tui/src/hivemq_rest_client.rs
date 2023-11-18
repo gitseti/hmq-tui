@@ -1,9 +1,13 @@
 use futures::future::err;
 use hivemq_openapi::apis::{Error, mqtt_clients_api};
+use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
 use hivemq_openapi::apis::configuration::Configuration;
+use hivemq_openapi::apis::data_hub_behavior_policies_api::{get_all_behavior_policies, GetAllBehaviorPoliciesParams};
 use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams};
+use hivemq_openapi::apis::data_hub_schemas_api::{get_all_schemas, GetAllSchemasParams};
 use hivemq_openapi::apis::mqtt_clients_api::{DisconnectClientParams, get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
-use hivemq_openapi::models::{ClientDetails, DataPolicy, PaginationCursor};
+use hivemq_openapi::apis::trace_recordings_api::get_all_trace_recordings;
+use hivemq_openapi::models::{Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, TraceRecording};
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
 
@@ -92,6 +96,113 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy
     }
 
     Ok(policies)
+}
+
+//TODO: Tests
+pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, BehaviorPolicy)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let mut params = GetAllBehaviorPoliciesParams {
+        fields: None,
+        policy_ids: None,
+        client_ids: None,
+        limit: Some(500),
+        cursor: None,
+    };
+
+    let mut policies = vec![];
+    loop {
+        let response = get_all_behavior_policies(&configuration, params.clone())
+            .await
+            .or_else(|error| Err(transform_api_err(&error)))?;
+
+        for policy in response.items.unwrap() {
+            policies.push((policy.id.clone(), policy));
+        }
+
+        let cursor = match response._links {
+            None => {
+                break;
+            }
+            Some(cursor) => {
+                cursor.unwrap().next
+            }
+        };
+        params.cursor = cursor;
+    }
+
+    Ok(policies)
+}
+
+//TODO: Test | Refactor?
+pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let mut params = GetAllSchemasParams {
+        fields: None,
+        types: None,
+        limit: Some(500),
+        cursor: None,
+        schema_ids: None,
+    };
+
+    let mut schemas = vec![];
+    loop {
+        let response = get_all_schemas(&configuration, params.clone())
+            .await
+            .or_else(|error| Err(transform_api_err(&error)))?;
+
+        for schema in response.items.unwrap() {
+            schemas.push((schema.id.clone(), schema));
+        }
+
+        let cursor = match response._links {
+            None => {
+                break;
+            }
+            Some(cursor) => {
+                cursor.unwrap().next
+            }
+        };
+        params.cursor = cursor;
+    }
+
+    Ok(schemas)
+}
+
+pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+
+    let mut backups = vec![];
+    let response = get_all_backups(&configuration)
+        .await
+        .or_else(|error| Err(transform_api_err(&error)))?;
+
+    for backup in response.items.unwrap() {
+        backups.push((backup.id.clone().unwrap(), backup));
+    }
+
+    Ok(backups)
+}
+
+pub async fn fetch_trace_recordings(host: String) ->  Result<Vec<(String, TraceRecording)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let mut trace_recordings = vec![];
+    let response = get_all_trace_recordings(&configuration)
+        .await
+        .or_else(|error| Err(transform_api_err(&error)))?;
+
+    for trace_recording in response.items.unwrap() {
+        trace_recordings.push((trace_recording.name.clone().unwrap(), trace_recording));
+    }
+
+    Ok(trace_recordings)
 }
 
 pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {

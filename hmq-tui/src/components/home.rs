@@ -15,14 +15,18 @@ use crate::{
     config::{Config, KeyBindings},
     components::clients,
 };
-use crate::components::data_policies::DataPolicies;
+use crate::components::backups::BackupsTab;
+use crate::components::behavior_policies::BehaviorPoliciesTab;
+use crate::components::data_policies::DataPoliciesTab;
+use crate::components::schemas::SchemasTab;
 use crate::components::tab_components::TabComponent;
+use crate::components::trace_recordings::TraceRecordingsTab;
 use crate::tui::Event;
 
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
-    tabs: [Box<dyn TabComponent>; 2],
+    tabs: [Box<dyn TabComponent>; 6],
     active_tab: usize
 }
 
@@ -31,7 +35,14 @@ impl Home {
         return Home {
             command_tx: None,
             config: Config::default(),
-            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(DataPolicies::new(&hivemq_address))],
+            tabs: [
+                Box::new(Clients::new(&hivemq_address)),
+                Box::new(SchemasTab::new(&hivemq_address)),
+                Box::new(DataPoliciesTab::new(&hivemq_address)),
+                Box::new(BehaviorPoliciesTab::new(&hivemq_address)),
+                Box::new(TraceRecordingsTab::new(&hivemq_address)),
+                Box::new(BackupsTab::new(&hivemq_address)),
+            ],
             active_tab: 0
         };
     }
