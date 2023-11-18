@@ -89,6 +89,9 @@ impl<'de> Deserialize<'de> for Action {
                     "Tab1" => Ok(Action::SelectTab(0)),
                     "Tab2" => Ok(Action::SelectTab(1)),
                     "Tab3" => Ok(Action::SelectTab(2)),
+                    "Tab4" => Ok(Action::SelectTab(3)),
+                    "Tab5" => Ok(Action::SelectTab(4)),
+                    "Tab6" => Ok(Action::SelectTab(5)),
                     "Escape" => Ok(Action::Escape),
                     data if data.starts_with("Error(") => {
                         let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
