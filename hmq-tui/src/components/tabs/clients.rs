@@ -17,7 +17,7 @@ use crate::action::Action;
 use crate::cli::Cli;
 use crate::components::Component;
 use crate::components::home::Home;
-use crate::components::tab_components::TabComponent;
+use crate::components::tabs::TabComponent;
 use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 
 

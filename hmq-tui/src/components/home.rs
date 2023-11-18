@@ -7,20 +7,19 @@ use ratatui::{prelude::*, widgets::*};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::span;
-use clients::Clients;
 
 use super::{Component, Frame};
 use crate::{
     action::Action,
     config::{Config, KeyBindings},
-    components::clients,
 };
-use crate::components::backups::BackupsTab;
-use crate::components::behavior_policies::BehaviorPoliciesTab;
-use crate::components::data_policies::DataPoliciesTab;
-use crate::components::schemas::SchemasTab;
-use crate::components::tab_components::TabComponent;
-use crate::components::trace_recordings::TraceRecordingsTab;
+use crate::components::tabs::backups::BackupsTab;
+use crate::components::tabs::behavior_policies::BehaviorPoliciesTab;
+use crate::components::tabs::clients::Clients;
+use crate::components::tabs::data_policies::DataPoliciesTab;
+use crate::components::tabs::schemas::SchemasTab;
+use crate::components::tabs::TabComponent;
+use crate::components::tabs::trace_recordings::TraceRecordingsTab;
 use crate::tui::Event;
 
 pub struct Home {

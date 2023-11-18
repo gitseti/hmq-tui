@@ -5,31 +5,31 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
 use crate::components::{Component, views};
-use crate::components::tab_components::TabComponent;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
-use hivemq_openapi::models::DataPolicy;
+use hivemq_openapi::models::{Backup};
+use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
 use crate::config::Config;
-use crate::hivemq_rest_client::fetch_data_policies;
+use crate::hivemq_rest_client::{fetch_backups};
 
-pub struct DataPoliciesTab<'a> {
+pub struct BackupsTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
-    details_view: DetailsView<'a, DataPolicy>,
+    details_view: DetailsView<'a, Backup>,
 }
 
-impl DataPoliciesTab<'_> {
+impl BackupsTab<'_> {
     pub fn new(hivemq_address: &String) -> Self {
-        DataPoliciesTab {
+        BackupsTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            details_view: DetailsView::new("Policies".to_string(), "Policy".to_string())
+            details_view: DetailsView::new("Backups".to_string(), "Backup".to_string())
         }
     }
 }
 
-impl Component for DataPoliciesTab<'_> {
+impl Component for BackupsTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.tx = Some(tx);
         Ok(())
@@ -49,14 +49,14 @@ impl Component for DataPoliciesTab<'_> {
                 let tx = self.tx.clone().unwrap();
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
-                    let result = fetch_data_policies(hivemq_address).await;
-                    tx.send(Action::DataPoliciesLoadingFinished(result)).expect("Failed to send data policies loading finished action")
+                    let result = fetch_backups(hivemq_address).await;
+                    tx.send(Action::BackupsLoadingFinished(result)).expect("Failed to send backups loading finished action")
                 });
             },
-            Action::DataPoliciesLoadingFinished(result) => {
+            Action::BackupsLoadingFinished(result) => {
                 match result {
-                    Ok(policies) => {
-                        self.details_view.update_items(policies)
+                    Ok(backups) => {
+                        self.details_view.update_items(backups)
                     }
                     Err(msg) => {
                         self.details_view.error(&msg);
@@ -75,9 +75,9 @@ impl Component for DataPoliciesTab<'_> {
     }
 }
 
-impl TabComponent for DataPoliciesTab<'_> {
+impl TabComponent for BackupsTab<'_> {
     fn get_name(&self) -> &str {
-        "D. Policies"
+        "Backups"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {

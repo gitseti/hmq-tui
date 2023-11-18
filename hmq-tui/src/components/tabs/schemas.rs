@@ -5,31 +5,31 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
 use crate::components::{Component, views};
-use crate::components::tab_components::TabComponent;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
-use hivemq_openapi::models::{Backup};
+use hivemq_openapi::models::{Schema};
+use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
 use crate::config::Config;
-use crate::hivemq_rest_client::{fetch_backups};
+use crate::hivemq_rest_client::fetch_schemas;
 
-pub struct BackupsTab<'a> {
+pub struct SchemasTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
-    details_view: DetailsView<'a, Backup>,
+    details_view: DetailsView<'a, Schema>,
 }
 
-impl BackupsTab<'_> {
+impl SchemasTab<'_> {
     pub fn new(hivemq_address: &String) -> Self {
-        BackupsTab {
+        SchemasTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            details_view: DetailsView::new("Backups".to_string(), "Backup".to_string())
+            details_view: DetailsView::new("Schemas".to_string(), "Schema".to_string())
         }
     }
 }
 
-impl Component for BackupsTab<'_> {
+impl Component for SchemasTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.tx = Some(tx);
         Ok(())
@@ -49,14 +49,14 @@ impl Component for BackupsTab<'_> {
                 let tx = self.tx.clone().unwrap();
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
-                    let result = fetch_backups(hivemq_address).await;
-                    tx.send(Action::BackupsLoadingFinished(result)).expect("Failed to send backups loading finished action")
+                    let result = fetch_schemas(hivemq_address).await;
+                    tx.send(Action::SchemasLoadingFinished(result)).expect("Failed to send schemas loading finished action")
                 });
             },
-            Action::BackupsLoadingFinished(result) => {
+            Action::SchemasLoadingFinished(result) => {
                 match result {
-                    Ok(backups) => {
-                        self.details_view.update_items(backups)
+                    Ok(schemas) => {
+                        self.details_view.update_items(schemas)
                     }
                     Err(msg) => {
                         self.details_view.error(&msg);
@@ -75,9 +75,9 @@ impl Component for BackupsTab<'_> {
     }
 }
 
-impl TabComponent for BackupsTab<'_> {
+impl TabComponent for SchemasTab<'_> {
     fn get_name(&self) -> &str {
-        "Backups"
+        "Schemas"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
