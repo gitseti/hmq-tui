@@ -8,10 +8,13 @@ use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::stream::iter;
 use indexmap::IndexMap;
+use ratatui::buffer::Buffer;
+use ratatui::prelude::Stylize;
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color::DarkGray;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::Serialize;
-use tui_textarea::{Input, Key, TextArea};
+use tui_textarea::{CursorMove, Input, Key, TextArea};
 use State::Loaded;
 use ratatui::widgets::block::Block;
 
@@ -30,6 +33,7 @@ pub struct DetailsView<'a, T> {
     pub list_title: String,
     pub details_title: String,
     pub state: State<'a, T>,
+    pub editor: Option<Editor<'a>>,
 }
 
 impl<T: Serialize> DetailsView<'_, T> {
@@ -38,6 +42,7 @@ impl<T: Serialize> DetailsView<'_, T> {
             list_title,
             details_title,
             state: Loaded(IndexMap::new(), vec![], ListState::default()),
+            editor: None,
         }
     }
 
@@ -160,29 +165,54 @@ impl<T: Serialize> DetailsView<'_, T> {
 
 pub struct Editor<'a> {
     textarea: TextArea<'a>,
+    readonly: bool,
 }
 
 impl Editor<'_> {
-    pub fn new() -> Self {
-        let mut textarea = TextArea::default();
+    pub fn readonly(readonly: bool, text: String) -> Self {
+        let mut textarea = TextArea::from_iter(text.lines());
         textarea.set_block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Editor")
         );
+        textarea.set_line_number_style(Style::default().bg(Color::Gray));
+        textarea.set_cursor_line_style(Style::default().not_underlined());
+        textarea.move_cursor(CursorMove::Top);
+
         Editor {
-            textarea
+            textarea,
+            readonly,
         }
+    }
+
+    pub fn writeable() -> Self {
+        return Editor::readonly(false, "".to_string());
     }
 }
 
 impl Component for Editor<'_> {
     fn handle_key_events(&mut self, mut key: KeyEvent) -> Result<Option<Action>> {
+        if self.readonly {
+            match key.code {
+                KeyCode::Left => {}
+                KeyCode::Right => {}
+                KeyCode::Up => {}
+                KeyCode::Down => {}
+                KeyCode::Home => {}
+                KeyCode::End => {}
+                KeyCode::PageUp => {}
+                KeyCode::PageDown => {}
+                KeyCode::Esc => {}
+                _ => return Ok(None)
+            }
+        }
+
         if cfg!(target_os = "macos") {
             // crossterm doesn't handle these macos keybindings correctly
             if key.modifiers == KeyModifiers::ALT {
                 match key.code {
-                      KeyCode::Char('5') => {
+                    KeyCode::Char('5') => {
                         key.code = KeyCode::Char('[');
                         key.modifiers = KeyModifiers::NONE;
                     }
