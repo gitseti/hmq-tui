@@ -329,11 +329,6 @@ impl TabComponent for Clients {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        let mut vec = vec![];
-        vec.push(("↑", "Up"));
-        vec.push(("↓", "Down"));
-        vec.push(("R", "Load"));
-        vec.push(("Esc", "Unfocus"));
-        vec
+        vec![("R", "Load")]
     }
 }

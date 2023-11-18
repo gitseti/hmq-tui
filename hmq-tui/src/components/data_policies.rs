@@ -13,15 +13,15 @@ use crate::components::views::{DetailsView, State};
 use crate::config::Config;
 use crate::hivemq_rest_client::fetch_data_policies;
 
-pub struct Policies<'a> {
+pub struct DataPolicies<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     details_view: DetailsView<'a, DataPolicy>,
 }
 
-impl Policies<'_> {
+impl DataPolicies<'_> {
     pub fn new(hivemq_address: &String) -> Self {
-        Policies {
+        DataPolicies {
             hivemq_address: hivemq_address.clone(),
             tx: None,
             details_view: DetailsView::new("Policies".to_string(), "Policy".to_string())
@@ -29,7 +29,7 @@ impl Policies<'_> {
     }
 }
 
-impl Component for Policies<'_> {
+impl Component for DataPolicies<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.tx = Some(tx);
         Ok(())
@@ -75,12 +75,12 @@ impl Component for Policies<'_> {
     }
 }
 
-impl TabComponent for Policies<'_> {
+impl TabComponent for DataPolicies<'_> {
     fn get_name(&self) -> &str {
         "D. Policies"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![]
+        vec![("R", "Load")]
     }
 }

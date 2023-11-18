@@ -15,7 +15,7 @@ use crate::{
     config::{Config, KeyBindings},
     components::clients,
 };
-use crate::components::policies::Policies;
+use crate::components::data_policies::DataPolicies;
 use crate::components::tab_components::TabComponent;
 use crate::tui::Event;
 
@@ -31,7 +31,7 @@ impl Home {
         return Home {
             command_tx: None,
             config: Config::default(),
-            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(Policies::new(&hivemq_address))],
+            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(DataPolicies::new(&hivemq_address))],
             active_tab: 0
         };
     }
@@ -163,11 +163,10 @@ impl Component for Home {
         active_tab.draw(f, tab_area)?;
 
         let mut mappings = String::new();
-        mappings.push_str("[Q] Quit | [Tab] Next Tab | [Backtab] Previous Tab ");
         for mapping in active_tab.get_key_hints() {
             let key = mapping.0;
             let value = mapping.1;
-            mappings.push_str(format!("| [{key}] {value} ").as_str());
+            mappings.push_str(format!(" [{key}] {value} ").as_str());
         }
 
         f.render_widget(Paragraph::new(mappings),layout[2]);
