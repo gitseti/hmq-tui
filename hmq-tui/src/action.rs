@@ -1,12 +1,12 @@
 use std::fmt;
-use hivemq_openapi::models::ClientDetails;
+use hivemq_openapi::models::{ClientDetails, DataPolicy};
 
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Action {
     Tick,
     Render,
@@ -35,6 +35,9 @@ pub enum Action {
     ClientIdsLoaded(Vec<String>),
     ClientDetailsLoaded(String, String),
     ClientDetailsLoadingFailed(String, String),
+
+    // Data Policies
+    DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>)
 }
 
 impl<'de> Deserialize<'de> for Action {

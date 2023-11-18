@@ -7,7 +7,8 @@ use color_eyre::eyre::Result;
 use futures::stream::iter;
 use indexmap::IndexMap;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Widget};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
+use serde::Serialize;
 use State::Loaded;
 
 use crate::{tui};
@@ -26,7 +27,7 @@ pub struct DetailsView<'a, T> {
     pub state: State<'a, T>,
 }
 
-impl<T: Display> DetailsView<'_, T> {
+impl<T: Serialize> DetailsView<'_, T> {
     pub fn new(list_title: String, details_title: String) -> Self {
         DetailsView {
             list_title,
@@ -39,12 +40,12 @@ impl<T: Display> DetailsView<'_, T> {
         self.state = Loaded(IndexMap::new(), vec![], ListState::default())
     }
 
-    pub fn update_items(&mut self, items: Vec<(&str, T)>) {
+    pub fn update_items(&mut self, items: Vec<(String, T)>) {
         self.reset();
         if let Loaded(map, list, state) = &mut self.state {
             for item in items {
-                map.insert(item.0.to_string(), item.1);
-                list.push(ListItem::new(item.0.to_string()));
+                map.insert(item.0.clone(), item.1);
+                list.push(ListItem::new(item.0.clone()));
             }
         }
     }
@@ -99,6 +100,7 @@ impl<T: Display> DetailsView<'_, T> {
         match &mut self.state {
             Error(msg) => {
                 let p = Paragraph::new(msg.clone())
+                    .wrap(Wrap { trim: true })
                     .style(Style::default().fg(Color::Red))
                     .block(Block::default().borders(Borders::ALL).title(format!("Loading {list_title} failed")));
                 f.render_widget(p, list_view);
@@ -129,7 +131,7 @@ impl<T: Display> DetailsView<'_, T> {
                     }
                     Some(selected) => {
                         let item = map.get_index(selected).unwrap();
-                        let p = Paragraph::new(item.1.to_string()).block(Block::default().borders(Borders::ALL).title(detail_title));
+                        let p = Paragraph::new(serde_json::to_string_pretty(item.1).unwrap()).block(Block::default().borders(Borders::ALL).title(detail_title));
                         f.render_widget(p, detail_view);
                     }
                 }

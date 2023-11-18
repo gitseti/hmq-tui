@@ -1,9 +1,11 @@
-use hivemq_openapi::apis::mqtt_clients_api;
+use futures::future::err;
+use hivemq_openapi::apis::{Error, mqtt_clients_api};
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, GetAllDataPoliciesParams};
+use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams};
 use hivemq_openapi::apis::mqtt_clients_api::{DisconnectClientParams, get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
 use hivemq_openapi::models::{ClientDetails, DataPolicy, PaginationCursor};
 use mqtt_clients_api::get_mqtt_client_details;
+use serde::Serialize;
 
 pub async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
     let mut configuration = Configuration::default();
@@ -55,7 +57,7 @@ pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
 }
 
 //TODO: Test
-pub async fn fetch_policies(host: String) -> Result<Vec<(String, DataPolicy)>, String> {
+pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -64,7 +66,7 @@ pub async fn fetch_policies(host: String) -> Result<Vec<(String, DataPolicy)>, S
         policy_ids: None,
         schema_ids: None,
         topic: None,
-        limit: Some(2_500),
+        limit: Some(500),
         cursor: None,
     };
 
@@ -72,7 +74,7 @@ pub async fn fetch_policies(host: String) -> Result<Vec<(String, DataPolicy)>, S
     loop {
         let response = get_all_data_policies(&configuration, params.clone())
             .await
-            .or_else(|error| Err(format!("Failed to fetch data policies: {error}")))?;
+            .or_else(|error| Err(transform_api_err(&error)))?;
 
         for policy in response.items.unwrap() {
             policies.push((policy.id.clone(), policy));
@@ -98,7 +100,7 @@ pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
 
     let params = DisconnectClientParams {
         client_id: client_id.clone(),
-        prevent_will_message: Some(false)
+        prevent_will_message: Some(false),
     };
 
     mqtt_clients_api::disconnect_client(&configuration, params)
@@ -107,6 +109,24 @@ pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
 
     Ok(())
 }
+
+pub fn transform_api_err<T: Serialize>(error: &Error<T>) -> String {
+    let msg = if let Error::ResponseError(response) = error {
+        match &response.entity {
+            None => {
+                response.content.clone()
+            }
+            Some(entity) => {
+                serde_json::to_string_pretty(entity).expect("Can not serialize entity")
+            }
+        }
+    } else {
+        error.to_string()
+    };
+
+    format!("Fetching failed: {}", msg)
+}
+
 
 #[cfg(test)]
 mod tests {

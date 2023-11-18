@@ -31,7 +31,7 @@ impl Home {
         return Home {
             command_tx: None,
             config: Config::default(),
-            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(Policies::new())],
+            tabs: [Box::new(Clients::new(&hivemq_address)), Box::new(Policies::new(&hivemq_address))],
             active_tab: 0
         };
     }
