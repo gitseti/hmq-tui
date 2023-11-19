@@ -35,12 +35,12 @@ impl Home {
             command_tx: None,
             config: Config::default(),
             tabs: [
-                Box::new(Clients::new(&hivemq_address)),
-                Box::new(SchemasTab::new(&hivemq_address)),
-                Box::new(DataPoliciesTab::new(&hivemq_address)),
-                Box::new(BehaviorPoliciesTab::new(&hivemq_address)),
-                Box::new(TraceRecordingsTab::new(&hivemq_address)),
-                Box::new(BackupsTab::new(&hivemq_address)),
+                Box::new(Clients::new(hivemq_address.to_owned())),
+                Box::new(SchemasTab::new(hivemq_address.to_owned())),
+                Box::new(DataPoliciesTab::new(hivemq_address.to_owned())),
+                Box::new(BehaviorPoliciesTab::new(hivemq_address.to_owned())),
+                Box::new(TraceRecordingsTab::new(hivemq_address.to_owned())),
+                Box::new(BackupsTab::new(hivemq_address.to_owned())),
             ],
             active_tab: 0
         };

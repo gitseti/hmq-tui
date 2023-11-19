@@ -20,9 +20,9 @@ pub struct TraceRecordingsTab<'a> {
 }
 
 impl TraceRecordingsTab<'_> {
-    pub fn new(hivemq_address: &String) -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         TraceRecordingsTab {
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             tx: None,
             details_view: DetailsView::new("Trace Recordings".to_string(), "Trace Recording".to_string())
         }

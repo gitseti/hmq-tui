@@ -33,10 +33,10 @@ pub struct Clients {
 }
 
 impl Clients {
-    pub fn new(hivemq_address: &String) -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         Clients {
             tx: None,
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             selected_client: ListState::default(),
             client_ids: vec![],
             client_details: HashMap::new(),

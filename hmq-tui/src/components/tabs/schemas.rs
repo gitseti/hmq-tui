@@ -20,7 +20,7 @@ pub struct SchemasTab<'a> {
 }
 
 impl SchemasTab<'_> {
-    pub fn new(hivemq_address: &String) -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         SchemasTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,

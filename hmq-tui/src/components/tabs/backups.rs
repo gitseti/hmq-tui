@@ -20,9 +20,9 @@ pub struct BackupsTab<'a> {
 }
 
 impl BackupsTab<'_> {
-    pub fn new(hivemq_address: &String) -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         BackupsTab {
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             tx: None,
             details_view: DetailsView::new("Backups".to_string(), "Backup".to_string())
         }

@@ -20,9 +20,9 @@ pub struct DataPoliciesTab<'a> {
 }
 
 impl DataPoliciesTab<'_> {
-    pub fn new(hivemq_address: &String) -> Self {
+    pub fn new(hivemq_address: String) -> Self {
         DataPoliciesTab {
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             tx: None,
             details_view: DetailsView::new("Policies".to_string(), "Policy".to_string())
         }
