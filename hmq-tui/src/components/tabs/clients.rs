@@ -47,39 +47,20 @@ impl Clients {
     }
 
     fn next(&mut self) {
-        let i = match self.selected_client.selected() {
-            Some(i) => {
-                if i < self.client_ids.len() - 1 {
-                    i + 1
-                } else {
-                    return;
-                }
-            }
-            None => {
-                if self.client_ids.is_empty() {
-                    return;
-                }
-                0
-            }
+        let selected = match self.selected_client.selected() {
+            None if !self.client_ids.is_empty() => 0,
+            Some(i) if i + 1 < self.client_ids.len() => i + 1,
+            _ => return
         };
-        self.selected_client.select(Some(i))
+        self.selected_client.select(Some(selected))
     }
 
     fn prev(&mut self) {
-        let i = match self.selected_client.selected() {
-            Some(i) => if i == 0 {
-                0
-            } else {
-                i - 1
-            },
-            None => {
-                if self.client_ids.is_empty() {
-                    return;
-                }
-                0
-            }
+        let selected = match self.selected_client.selected() {
+            Some(i) if i > 0 => i - 1,
+            _ => return
         };
-        self.selected_client.select(Some(i))
+        self.selected_client.select(Some(selected))
     }
 
     fn reset(&mut self) {
