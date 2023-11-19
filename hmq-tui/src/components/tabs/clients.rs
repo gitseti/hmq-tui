@@ -216,10 +216,7 @@ impl Component for Clients {
                 list_items.push(ListItem::new(item.as_str()));
             }
 
-            let selected_client = match self.selected_client.selected() {
-                None => 0,
-                Some(selected) => selected + 1,
-            };
+            let selected_client = self.selected_client.selected().map_or(0, |x| x + 1);
             let total_clients = self.client_ids.len();
             let items = List::new(list_items)
                 .block(

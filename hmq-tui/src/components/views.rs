@@ -62,7 +62,7 @@ impl<T: Serialize> DetailsView<'_, T> {
 
     pub fn error(&mut self, msg: &str) {
         self.reset();
-        self.state = Error(msg.to_string());
+        self.state = Error(msg.to_owned());
     }
 
     pub fn loading(&mut self) {
@@ -195,7 +195,7 @@ impl Editor<'_> {
     }
 
     pub fn writeable() -> Self {
-        return Editor::readonly(false, "".to_string());
+        return Editor::readonly(false, "".to_owned());
     }
 }
 

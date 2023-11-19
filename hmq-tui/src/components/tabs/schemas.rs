@@ -24,7 +24,7 @@ impl SchemasTab<'_> {
         SchemasTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            details_view: DetailsView::new("Schemas".to_string(), "Schema".to_string()),
+            details_view: DetailsView::new("Schemas".to_owned(), "Schema".to_owned()),
         }
     }
 }

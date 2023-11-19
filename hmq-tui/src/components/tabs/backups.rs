@@ -24,7 +24,7 @@ impl BackupsTab<'_> {
         BackupsTab {
             hivemq_address,
             tx: None,
-            details_view: DetailsView::new("Backups".to_string(), "Backup".to_string()),
+            details_view: DetailsView::new("Backups".to_owned(), "Backup".to_owned()),
         }
     }
 }

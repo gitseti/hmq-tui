@@ -24,7 +24,7 @@ impl BehaviorPoliciesTab<'_> {
         BehaviorPoliciesTab {
             hivemq_address,
             tx: None,
-            details_view: DetailsView::new("Policies".to_string(), "Policy".to_string()),
+            details_view: DetailsView::new("Policies".to_owned(), "Policy".to_owned()),
         }
     }
 }

@@ -25,8 +25,8 @@ impl TraceRecordingsTab<'_> {
             hivemq_address,
             tx: None,
             details_view: DetailsView::new(
-                "Trace Recordings".to_string(),
-                "Trace Recording".to_string(),
+                "Trace Recordings".to_owned(),
+                "Trace Recording".to_owned(),
             ),
         }
     }

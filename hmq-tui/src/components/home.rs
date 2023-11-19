@@ -98,7 +98,7 @@ impl Component for Home {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        let tab_action = self.tabs[self.active_tab].handle_key_events(key.clone())?;
+        let tab_action = self.tabs[self.active_tab].handle_key_events(key)?;
         if tab_action.is_some() {
             self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
         }
@@ -107,7 +107,7 @@ impl Component for Home {
     }
 
     fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
-        let tab_action = self.tabs[self.active_tab].handle_mouse_events(mouse.clone())?;
+        let tab_action = self.tabs[self.active_tab].handle_mouse_events(mouse)?;
         if tab_action.is_some() {
             self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
         }
@@ -122,12 +122,10 @@ impl Component for Home {
         }
 
         match action {
-            Action::SelectTab(tab) => {
-                self.select_tab(tab);
-            }
+            Action::SelectTab(tab) => self.select_tab(tab),
             Action::NextTab => self.next_tab(),
             Action::PrevTab => self.prev_tab(),
-            _ => (),
+            _ => {}
         }
 
         Ok(None)
@@ -144,12 +142,7 @@ impl Component for Home {
             .split(f.size());
         let tab_area = layout[1];
 
-        let mut spans = vec![];
-        for (i, tab) in self.tabs.iter().enumerate() {
-            if i > 0 {
-                spans.push(Span::raw(format!("|")))
-            }
-
+        let spans: Vec<Span> = self.tabs.iter().enumerate().map(|(i, tab)| {
             let style = if i == self.active_tab {
                 Style::default().bg(Color::Green).bold()
             } else {
@@ -158,21 +151,17 @@ impl Component for Home {
 
             let index = i + 1;
             let name = tab.get_name();
-            let text = Span::styled(format!(" [{index}] {name} "), style);
-            spans.push(text)
-        }
+            Span::styled(format!(" [{index}] {name} "), style)
+        }).collect();
         f.render_widget(Paragraph::new(Line::from(spans)), layout[0]);
 
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
 
-        let mut mappings = String::new();
-        for mapping in active_tab.get_key_hints() {
-            let key = mapping.0;
-            let value = mapping.1;
-            mappings.push_str(format!(" [{key}] {value} ").as_str());
-        }
-
+        let mappings: Vec<_> = active_tab.get_key_hints().iter().map(|(key, value)| {
+            format!(" [{key}] {value} ")
+        }).collect();
+        let mappings = mappings.join("");
         f.render_widget(Paragraph::new(mappings), layout[2]);
 
         Ok(())
