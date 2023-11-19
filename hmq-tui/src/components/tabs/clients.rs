@@ -100,10 +100,9 @@ impl Clients {
         self.is_loading_client_ids = false;
     }
 
-    fn load_client_details(&mut self, client_id: &String) {
+    fn load_client_details(&mut self, client_id: String) {
         let tx = self.tx.clone().unwrap();
         let hivemq_address = self.hivemq_address.clone();
-        let client_id = client_id.clone();
         let handle = tokio::spawn(async move {
             let client_details = fetch_client_details(client_id.clone(), hivemq_address).await;
 
@@ -291,7 +290,7 @@ impl Component for Clients {
                 Some(selected) => {
                     match self.client_details.get(self.client_ids[selected].as_str()) {
                         None => {
-                            self.load_client_details(&self.client_ids[selected].clone());
+                            self.load_client_details(self.client_ids[selected].clone());
                             f.render_widget(
                                 Block::default().borders(Borders::ALL).title("Details"),
                                 layout[1],
