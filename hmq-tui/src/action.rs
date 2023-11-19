@@ -32,10 +32,10 @@ pub enum Action {
 
     // Clients view
     ClientIdsLoading,
-    ClientIdsLoadingFailed(String),
-    ClientIdsLoaded(Vec<String>),
-    ClientDetailsLoaded(String, String),
-    ClientDetailsLoadingFailed(String, String),
+    ClientIdsLoadingFailed { error: String },
+    ClientIdsLoaded { client_ids: Vec<String> },
+    ClientDetailsLoaded { client_id: String, details: String},
+    ClientDetailsLoadingFailed { client_id: String, error: String },
 
     // Data Policies
     DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>),
