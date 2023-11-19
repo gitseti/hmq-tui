@@ -77,12 +77,14 @@ impl Clients {
             tx.send(Action::ClientIdsLoading).expect("Could not send loading action"); // The action channel is expected to be open
             let client_ids = fetch_client_ids(hivemq_address).await;
 
+
+
             match client_ids {
                 Ok(ids) => {
-                    tx.send(Action::ClientIdsLoaded(ids)).expect("Could not send loaded action");
+                    tx.send(Action::ClientIdsLoaded { client_ids: ids} ).expect("Could not send loaded action");
                 }
-                Err(err) => {
-                    tx.send(Action::ClientIdsLoadingFailed(err)).expect("Could not send loading failed action");
+                Err(error) => {
+                    tx.send(Action::ClientIdsLoadingFailed { error }).expect("Could not send loading failed action");
                 }
             }
         });
@@ -107,10 +109,16 @@ impl Clients {
 
             match client_details {
                 Ok(ref details) => {
-                    tx.send(Action::ClientDetailsLoaded(client_id.clone(), serde_json::to_string_pretty(&client_details).unwrap())).expect("Could not send loaded action");
+                    tx.send(Action::ClientDetailsLoaded {
+                        client_id: client_id.clone(),
+                        details: serde_json::to_string_pretty(&client_details).unwrap()
+                    }).expect("Could not send loaded action");
                 }
                 Err(err) => {
-                    tx.send(Action::ClientDetailsLoadingFailed(client_id.clone(), err)).expect("Could not send client details loading failed action")
+                    tx.send(Action::ClientDetailsLoadingFailed {
+                        client_id: client_id.clone(),
+                        error: err }
+                    ).expect("Could not send client details loading failed action")
                 }
             }
         });
@@ -200,11 +208,11 @@ impl Component for Clients {
                 Action::ClientIdsLoading => {
                     self.is_loading_client_ids = true;
                 }
-                Action::ClientDetailsLoaded(client_id, details) => {
+                Action::ClientDetailsLoaded {client_id, details} => {
                     self.client_details.insert(client_id, Ok(details));
                 }
-                Action::ClientDetailsLoadingFailed(client_id, err) => {
-                    self.client_details.insert(client_id, Err(err));
+                Action::ClientDetailsLoadingFailed {client_id, error} => {
+                    self.client_details.insert(client_id, Err(error));
                 }
                 Action::Right => {
                     self.focus();
@@ -213,11 +221,11 @@ impl Component for Clients {
             };
         } else {
             match action {
-                Action::ClientIdsLoaded(items) => {
-                    self.client_ids_loaded(items);
+                Action::ClientIdsLoaded { client_ids } => {
+                    self.client_ids_loaded(client_ids);
                 }
-                Action::ClientIdsLoadingFailed(err) => {
-                    self.client_ids_loading_failed(err);
+                Action::ClientIdsLoadingFailed { error } => {
+                    self.client_ids_loading_failed(error);
                 }
                 _ => ()
             }
