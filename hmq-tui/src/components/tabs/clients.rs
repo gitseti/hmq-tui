@@ -38,7 +38,7 @@ impl Clients {
             tx: None,
             hivemq_address,
             selected_client: ListState::default(),
-            client_ids: vec![],
+            client_ids: Vec::new(),
             client_details: HashMap::new(),
             is_loading_client_ids: false,
             client_ids_loading_error: None,
@@ -249,7 +249,7 @@ impl Component for Clients {
         } else if self.client_ids_loading_error.is_some() {
             self.draw_loading_error(f, &layout);
         } else {
-            let mut list_items = vec![];
+            let mut list_items = Vec::new();
             for item in &self.client_ids {
                 list_items.push(ListItem::new(item.as_str()));
             }
