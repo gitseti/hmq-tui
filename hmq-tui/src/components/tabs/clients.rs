@@ -28,7 +28,6 @@ pub struct Clients {
     client_details: HashMap<String, Result<String, String>>,
     is_loading_client_ids: bool,
     client_ids_loading_error: Option<String>,
-    is_focus_details: bool,
 }
 
 impl Clients {
@@ -41,7 +40,6 @@ impl Clients {
             client_details: HashMap::new(),
             is_loading_client_ids: false,
             client_ids_loading_error: None,
-            is_focus_details: false,
         }
     }
 
@@ -109,7 +107,7 @@ impl Clients {
             match client_details {
                 Ok(ref details) => {
                     tx.send(Action::ClientDetailsLoaded {
-                        client_id: client_id.clone(),
+                        client_id,
                         details: serde_json::to_string_pretty(&client_details).unwrap(),
                     })
                     .expect("Could not send loaded action");
@@ -122,35 +120,6 @@ impl Clients {
                     .expect("Could not send client details loading failed action"),
             }
         });
-    }
-
-    fn focus(&mut self) {
-        let selected = match self.selected_client.selected() {
-            None => {
-                return;
-            }
-            Some(selected) => selected,
-        };
-
-        let result = match self.client_details.get(self.client_ids[selected].as_str()) {
-            None => {
-                return;
-            }
-            Some(result) => result,
-        };
-
-        let details = match result {
-            Ok(details) => details,
-            Err(_) => {
-                return;
-            }
-        };
-
-        self.is_focus_details = true;
-    }
-
-    fn unfocus(&mut self) {
-        self.is_focus_details = false;
     }
 
     fn draw_loading_client_ids(&self, f: &mut Frame, layout: &Rc<[Rect]>) {
@@ -193,17 +162,7 @@ impl Component for Clients {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if self.is_focus_details {
-            match action {
-                Action::Escape => {
-                    self.unfocus();
-                }
-                Action::Left => {
-                    self.unfocus();
-                }
-                _ => (),
-            }
-        } else if !self.is_loading_client_ids {
+        if !self.is_loading_client_ids {
             match action {
                 Action::Reload => {
                     self.load_client_ids();
@@ -223,9 +182,6 @@ impl Component for Clients {
                 }
                 Action::ClientDetailsLoadingFailed { client_id, error } => {
                     self.client_details.insert(client_id, Err(error));
-                }
-                Action::Right => {
-                    self.focus();
                 }
                 _ => (),
             };
@@ -252,7 +208,7 @@ impl Component for Clients {
 
         if self.is_loading_client_ids {
             self.draw_loading_client_ids(f, &layout);
-        } else if self.client_ids_loading_error.is_some() {
+        } else if self.client_ids_loading_error.as_deref().is_some() {
             self.draw_loading_error(f, &layout);
         } else {
             let mut list_items = Vec::new();
