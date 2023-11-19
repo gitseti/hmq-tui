@@ -1,29 +1,47 @@
 use futures::future::err;
-use hivemq_openapi::apis::{Error, mqtt_clients_api};
 use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_behavior_policies_api::{get_all_behavior_policies, GetAllBehaviorPoliciesParams};
-use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams};
+use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+    get_all_behavior_policies, GetAllBehaviorPoliciesParams,
+};
+use hivemq_openapi::apis::data_hub_data_policies_api::{
+    get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams,
+};
 use hivemq_openapi::apis::data_hub_schemas_api::{get_all_schemas, GetAllSchemasParams};
-use hivemq_openapi::apis::mqtt_clients_api::{DisconnectClientParams, get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams};
+use hivemq_openapi::apis::mqtt_clients_api::{
+    get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
+    GetMqttClientDetailsParams,
+};
 use hivemq_openapi::apis::trace_recordings_api::get_all_trace_recordings;
-use hivemq_openapi::models::{Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, TraceRecording};
+use hivemq_openapi::apis::{mqtt_clients_api, Error};
+use hivemq_openapi::models::{
+    Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, TraceRecording,
+};
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
 
-pub async fn fetch_client_details(client_id: String, host: String) -> Result<ClientDetails, String> {
+pub async fn fetch_client_details(
+    client_id: String,
+    host: String,
+) -> Result<ClientDetails, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
     let params = GetMqttClientDetailsParams {
-        client_id: client_id.clone()
+        client_id: client_id.clone(),
     };
 
     let details = get_mqtt_client_details(&configuration, params)
         .await
-        .or_else(|error| Err(format!("Failed to fetch client details for client {client_id}: {error}")))?;
+        .or_else(|error| {
+            Err(format!(
+                "Failed to fetch client details for client {client_id}: {error}"
+            ))
+        })?;
 
-    let details = details.client.expect(format!("Client details for client {client_id} were empty").as_str());
+    let details = details
+        .client
+        .expect(format!("Client details for client {client_id} were empty").as_str());
     Ok(*details)
 }
 
@@ -50,9 +68,7 @@ pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
             None => {
                 break;
             }
-            Some(cursor) => {
-                cursor.unwrap().next
-            }
+            Some(cursor) => cursor.unwrap().next,
         };
         params.cursor = cursor;
     }
@@ -88,9 +104,7 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy
             None => {
                 break;
             }
-            Some(cursor) => {
-                cursor.unwrap().next
-            }
+            Some(cursor) => cursor.unwrap().next,
         };
         params.cursor = cursor;
     }
@@ -99,7 +113,9 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy
 }
 
 //TODO: Tests
-pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, BehaviorPolicy)>, String> {
+pub async fn fetch_behavior_policies(
+    host: String,
+) -> Result<Vec<(String, BehaviorPolicy)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -125,9 +141,7 @@ pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, Behavi
             None => {
                 break;
             }
-            Some(cursor) => {
-                cursor.unwrap().next
-            }
+            Some(cursor) => cursor.unwrap().next,
         };
         params.cursor = cursor;
     }
@@ -162,9 +176,7 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String
             None => {
                 break;
             }
-            Some(cursor) => {
-                cursor.unwrap().next
-            }
+            Some(cursor) => cursor.unwrap().next,
         };
         params.cursor = cursor;
     }
@@ -175,7 +187,6 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String
 pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
-
 
     let mut backups = vec![];
     let response = get_all_backups(&configuration)
@@ -189,7 +200,7 @@ pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String
     Ok(backups)
 }
 
-pub async fn fetch_trace_recordings(host: String) ->  Result<Vec<(String, TraceRecording)>, String> {
+pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, TraceRecording)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -216,7 +227,11 @@ pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
 
     mqtt_clients_api::disconnect_client(&configuration, params)
         .await
-        .or_else(|error| Err(format!("Failed to disconnect client '{client_id}': {error}")))?;
+        .or_else(|error| {
+            Err(format!(
+                "Failed to disconnect client '{client_id}': {error}"
+            ))
+        })?;
 
     Ok(())
 }
@@ -224,12 +239,8 @@ pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
 pub fn transform_api_err<T: Serialize>(error: &Error<T>) -> String {
     let msg = if let Error::ResponseError(response) = error {
         match &response.entity {
-            None => {
-                response.content.clone()
-            }
-            Some(entity) => {
-                serde_json::to_string_pretty(entity).expect("Can not serialize entity")
-            }
+            None => response.content.clone(),
+            Some(entity) => serde_json::to_string_pretty(entity).expect("Can not serialize entity"),
         }
     } else {
         error.to_string()
@@ -238,13 +249,12 @@ pub fn transform_api_err<T: Serialize>(error: &Error<T>) -> String {
     format!("Fetching failed: {}", msg)
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
     use httpmock::Method::GET;
     use httpmock::MockServer;
     use tracing_subscriber::fmt::format;
-    use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 
     #[tokio::test]
     async fn test_fetch_client_details_online_client() {
@@ -276,8 +286,7 @@ mod tests {
 
         let broker = MockServer::start();
         let client_details_mock = broker.mock(|when, then| {
-            when.method(GET)
-                .path("/api/v1/mqtt/clients/my-client");
+            when.method(GET).path("/api/v1/mqtt/clients/my-client");
             then.status(200)
                 .header("content-type", "application/json")
                 .body(response);
@@ -289,8 +298,14 @@ mod tests {
         // assert top level client details
         assert_eq!("my-client", client_details.id.unwrap().as_str());
         assert_eq!(true, client_details.connected.unwrap());
-        assert_eq!(15000, client_details.session_expiry_interval.unwrap().unwrap());
-        assert_eq!("2020-07-20T14:59:50.580Z", client_details.connected_at.unwrap().unwrap());
+        assert_eq!(
+            15000,
+            client_details.session_expiry_interval.unwrap().unwrap()
+        );
+        assert_eq!(
+            "2020-07-20T14:59:50.580Z",
+            client_details.connected_at.unwrap().unwrap()
+        );
         assert_eq!(0, client_details.message_queue_size.unwrap());
         assert_eq!(false, client_details.will_present.unwrap());
 
@@ -298,7 +313,10 @@ mod tests {
         let restrictions = client_details.restrictions.unwrap().unwrap();
         assert_eq!(268435460, restrictions.max_message_size.unwrap().unwrap());
         assert_eq!(1000, restrictions.max_queue_size.unwrap().unwrap());
-        assert_eq!("DISCARD", restrictions.queued_message_strategy.unwrap().unwrap());
+        assert_eq!(
+            "DISCARD",
+            restrictions.queued_message_strategy.unwrap().unwrap()
+        );
 
         // assert connection
         let connection = client_details.connection.unwrap().unwrap();
@@ -327,8 +345,7 @@ mod tests {
 
         let broker = MockServer::start();
         let client_details_mock = broker.mock(|when, then| {
-            when.method(GET)
-                .path("/api/v1/mqtt/clients/my-client");
+            when.method(GET).path("/api/v1/mqtt/clients/my-client");
             then.status(400)
                 .header("content-type", "application/json")
                 .body(response);
@@ -366,8 +383,7 @@ mod tests {
 
         let broker = MockServer::start();
         let clients_mock = broker.mock(|when, then| {
-            when.method(GET)
-                .path("/api/v1/mqtt/clients");
+            when.method(GET).path("/api/v1/mqtt/clients");
             then.status(200)
                 .header("content-type", "application/json")
                 .body(response);
@@ -443,8 +459,7 @@ mod tests {
                 .body(response2);
         });
         let clients_mock1 = broker.mock(|when, then| {
-            when.method(GET)
-                .path("/api/v1/mqtt/clients");
+            when.method(GET).path("/api/v1/mqtt/clients");
             then.status(200)
                 .header("content-type", "application/json")
                 .body(response1);

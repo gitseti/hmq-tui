@@ -9,24 +9,24 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::span;
 
 use super::{Component, Frame};
-use crate::{
-    action::Action,
-    config::{Config, KeyBindings},
-};
 use crate::components::tabs::backups::BackupsTab;
 use crate::components::tabs::behavior_policies::BehaviorPoliciesTab;
 use crate::components::tabs::clients::Clients;
 use crate::components::tabs::data_policies::DataPoliciesTab;
 use crate::components::tabs::schemas::SchemasTab;
-use crate::components::tabs::TabComponent;
 use crate::components::tabs::trace_recordings::TraceRecordingsTab;
+use crate::components::tabs::TabComponent;
 use crate::tui::Event;
+use crate::{
+    action::Action,
+    config::{Config, KeyBindings},
+};
 
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     tabs: [Box<dyn TabComponent>; 6],
-    active_tab: usize
+    active_tab: usize,
 }
 
 impl Home {
@@ -42,7 +42,7 @@ impl Home {
                 Box::new(TraceRecordingsTab::new(hivemq_address.to_owned())),
                 Box::new(BackupsTab::new(hivemq_address.to_owned())),
             ],
-            active_tab: 0
+            active_tab: 0,
         };
     }
 
@@ -115,7 +115,6 @@ impl Component for Home {
         Ok(None)
     }
 
-
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let tab_action = self.tabs[self.active_tab].update(action.clone())?;
         if tab_action.is_some() {
@@ -126,13 +125,9 @@ impl Component for Home {
             Action::SelectTab(tab) => {
                 self.select_tab(tab);
             }
-            Action::NextTab => {
-                self.next_tab()
-            }
-            Action::PrevTab => {
-                self.prev_tab()
-            }
-            _ => ()
+            Action::NextTab => self.next_tab(),
+            Action::PrevTab => self.prev_tab(),
+            _ => (),
         }
 
         Ok(None)
@@ -149,14 +144,13 @@ impl Component for Home {
             .split(f.size());
         let tab_area = layout[1];
 
-
         let mut spans = vec![];
         for (i, tab) in self.tabs.iter().enumerate() {
             if i > 0 {
-                spans.push(Span::raw(format!("|"),))
+                spans.push(Span::raw(format!("|")))
             }
 
-            let style = if i == self.active_tab  {
+            let style = if i == self.active_tab {
                 Style::default().bg(Color::Green).bold()
             } else {
                 Style::default()
@@ -179,7 +173,7 @@ impl Component for Home {
             mappings.push_str(format!(" [{key}] {value} ").as_str());
         }
 
-        f.render_widget(Paragraph::new(mappings),layout[2]);
+        f.render_widget(Paragraph::new(mappings), layout[2]);
 
         Ok(())
     }

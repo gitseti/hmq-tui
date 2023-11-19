@@ -1,5 +1,7 @@
+use hivemq_openapi::models::{
+    Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, TraceRecording,
+};
 use std::fmt;
-use hivemq_openapi::models::{Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, TraceRecording};
 
 use serde::{
     de::{self, Deserializer, Visitor},
@@ -34,7 +36,7 @@ pub enum Action {
     ClientIdsLoading,
     ClientIdsLoadingFailed { error: String },
     ClientIdsLoaded { client_ids: Vec<String> },
-    ClientDetailsLoaded { client_id: String, details: String},
+    ClientDetailsLoaded { client_id: String, details: String },
     ClientDetailsLoadingFailed { client_id: String, error: String },
 
     // Data Policies
@@ -51,7 +53,6 @@ pub enum Action {
 
     // Trace Recordings
     TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
-
 }
 
 impl<'de> Deserialize<'de> for Action {

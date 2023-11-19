@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
-use crate::components::{Component, views};
-use crate::tui::Frame;
-use color_eyre::eyre::Result;
-use hivemq_openapi::models::{BehaviorPolicy};
 use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
+use crate::components::{views, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::fetch_behavior_policies;
+use crate::tui::Frame;
+use color_eyre::eyre::Result;
+use hivemq_openapi::models::BehaviorPolicy;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Block, Borders, ListItem, ListState};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct BehaviorPoliciesTab<'a> {
     hivemq_address: String,
@@ -24,7 +24,7 @@ impl BehaviorPoliciesTab<'_> {
         BehaviorPoliciesTab {
             hivemq_address,
             tx: None,
-            details_view: DetailsView::new("Policies".to_string(), "Policy".to_string())
+            details_view: DetailsView::new("Policies".to_string(), "Policy".to_string()),
         }
     }
 }
@@ -53,19 +53,16 @@ impl Component for BehaviorPoliciesTab<'_> {
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
                     let result = fetch_behavior_policies(hivemq_address).await;
-                    tx.send(Action::BehaviorPoliciesLoadingFinished(result)).expect("Failed to send behavior policies loading finished action")
+                    tx.send(Action::BehaviorPoliciesLoadingFinished(result))
+                        .expect("Failed to send behavior policies loading finished action")
                 });
-            },
-            Action::BehaviorPoliciesLoadingFinished(result) => {
-                match result {
-                    Ok(policies) => {
-                        self.details_view.update_items(policies)
-                    }
-                    Err(msg) => {
-                        self.details_view.error(&msg);
-                    }
-                }
             }
+            Action::BehaviorPoliciesLoadingFinished(result) => match result {
+                Ok(policies) => self.details_view.update_items(policies),
+                Err(msg) => {
+                    self.details_view.error(&msg);
+                }
+            },
             _ => {}
         }
 

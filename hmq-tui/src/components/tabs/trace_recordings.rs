@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
-use crate::components::{Component, views};
-use crate::tui::Frame;
-use color_eyre::eyre::Result;
-use hivemq_openapi::models::{TraceRecording};
 use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
+use crate::components::{views, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::{fetch_backups, fetch_trace_recordings};
+use crate::tui::Frame;
+use color_eyre::eyre::Result;
+use hivemq_openapi::models::TraceRecording;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Block, Borders, ListItem, ListState};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct TraceRecordingsTab<'a> {
     hivemq_address: String,
@@ -24,7 +24,10 @@ impl TraceRecordingsTab<'_> {
         TraceRecordingsTab {
             hivemq_address,
             tx: None,
-            details_view: DetailsView::new("Trace Recordings".to_string(), "Trace Recording".to_string())
+            details_view: DetailsView::new(
+                "Trace Recordings".to_string(),
+                "Trace Recording".to_string(),
+            ),
         }
     }
 }
@@ -53,19 +56,16 @@ impl Component for TraceRecordingsTab<'_> {
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
                     let result = fetch_trace_recordings(hivemq_address).await;
-                    tx.send(Action::TraceRecordingsLoadingFinished(result)).expect("Failed to send backups loading finished action")
+                    tx.send(Action::TraceRecordingsLoadingFinished(result))
+                        .expect("Failed to send backups loading finished action")
                 });
-            },
-            Action::TraceRecordingsLoadingFinished(result) => {
-                match result {
-                    Ok(backups) => {
-                        self.details_view.update_items(backups)
-                    }
-                    Err(msg) => {
-                        self.details_view.error(&msg);
-                    }
-                }
             }
+            Action::TraceRecordingsLoadingFinished(result) => match result {
+                Ok(backups) => self.details_view.update_items(backups),
+                Err(msg) => {
+                    self.details_view.error(&msg);
+                }
+            },
             _ => {}
         }
 

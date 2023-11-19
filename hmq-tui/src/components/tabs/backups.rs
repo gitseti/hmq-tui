@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
-use crate::components::{Component, views};
-use crate::tui::Frame;
-use color_eyre::eyre::Result;
-use hivemq_openapi::models::{Backup};
 use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
+use crate::components::{views, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{fetch_backups};
+use crate::hivemq_rest_client::fetch_backups;
+use crate::tui::Frame;
+use color_eyre::eyre::Result;
+use hivemq_openapi::models::Backup;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Block, Borders, ListItem, ListState};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
@@ -24,7 +24,7 @@ impl BackupsTab<'_> {
         BackupsTab {
             hivemq_address,
             tx: None,
-            details_view: DetailsView::new("Backups".to_string(), "Backup".to_string())
+            details_view: DetailsView::new("Backups".to_string(), "Backup".to_string()),
         }
     }
 }
@@ -53,19 +53,16 @@ impl Component for BackupsTab<'_> {
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
                     let result = fetch_backups(hivemq_address).await;
-                    tx.send(Action::BackupsLoadingFinished(result)).expect("Failed to send backups loading finished action")
+                    tx.send(Action::BackupsLoadingFinished(result))
+                        .expect("Failed to send backups loading finished action")
                 });
-            },
-            Action::BackupsLoadingFinished(result) => {
-                match result {
-                    Ok(backups) => {
-                        self.details_view.update_items(backups)
-                    }
-                    Err(msg) => {
-                        self.details_view.error(&msg);
-                    }
-                }
             }
+            Action::BackupsLoadingFinished(result) => match result {
+                Ok(backups) => self.details_view.update_items(backups),
+                Err(msg) => {
+                    self.details_view.error(&msg);
+                }
+            },
             _ => {}
         }
 

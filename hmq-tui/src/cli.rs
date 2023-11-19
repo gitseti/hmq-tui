@@ -8,7 +8,6 @@ use crate::utils::version;
 #[command(author, version = version(), about)]
 #[clap(disable_help_flag = true)]
 pub struct Cli {
-
     #[arg(
         long,
         action = clap::ArgAction::HelpLong
@@ -38,7 +37,7 @@ pub struct Cli {
         long,
         value_name = "STRING",
         help = "The HiveMQ hostname",
-        default_value = "http://localhost",
+        default_value = "http://localhost"
     )]
     pub host: String,
 
@@ -47,7 +46,7 @@ pub struct Cli {
         long,
         value_name = "INTEGER",
         help = "The port of the HiveMQ Rest API",
-        default_value_t = 8888,
+        default_value_t = 8888
     )]
-    pub port: usize
+    pub port: usize,
 }

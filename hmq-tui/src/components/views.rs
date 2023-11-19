@@ -1,27 +1,27 @@
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::ops::Index;
 use arboard::Clipboard;
-use tui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::stream::iter;
 use indexmap::IndexMap;
 use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Stylize;
-use ratatui::style::{Color, Modifier, Style};
 use ratatui::style::Color::DarkGray;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::Serialize;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::ops::Index;
+use tui::Frame;
 use tui_textarea::{CursorMove, Input, Key, TextArea};
 use State::Loaded;
-use ratatui::widgets::block::Block;
 
-use crate::{tui};
 use crate::action::Action;
-use crate::components::Component;
 use crate::components::views::State::{Error, Loading};
+use crate::components::Component;
+use crate::tui;
 
 pub enum State<'a, T> {
     Error(String),
@@ -75,7 +75,7 @@ impl<T: Serialize> DetailsView<'_, T> {
             let new_selected = match state.selected() {
                 None if list.len() != 0 => 0,
                 Some(i) if i + 1 < list.len() => i + 1,
-                _ => return
+                _ => return,
             };
 
             state.select(Some(new_selected));
@@ -86,7 +86,7 @@ impl<T: Serialize> DetailsView<'_, T> {
         if let Loaded(map, list, state) = &mut self.state {
             let new_selected = match state.selected() {
                 Some(i) if i > 0 => i - 1,
-                _ => return
+                _ => return,
             };
 
             state.select(Some(new_selected));
@@ -107,10 +107,7 @@ impl<T: Serialize> DetailsView<'_, T> {
     pub fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![
-                Constraint::Ratio(1, 3),
-                Constraint::Ratio(2, 3),
-            ])
+            .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
             .split(area);
 
         let list_view = layout[0];
@@ -123,22 +120,36 @@ impl<T: Serialize> DetailsView<'_, T> {
                 let p = Paragraph::new(msg.clone())
                     .wrap(Wrap { trim: true })
                     .style(Style::default().fg(Color::Red))
-                    .block(Block::default().borders(Borders::ALL).title(format!("Loading {list_title} failed")));
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(format!("Loading {list_title} failed")),
+                    );
                 f.render_widget(p, list_view);
-                f.render_widget(Block::default().borders(Borders::ALL).title(detail_title), detail_view);
+                f.render_widget(
+                    Block::default().borders(Borders::ALL).title(detail_title),
+                    detail_view,
+                );
             }
             Loading() => {
-                let b = Block::default().borders(Borders::ALL)
+                let b = Block::default()
+                    .borders(Borders::ALL)
                     .style(Style::default().fg(Color::LightBlue))
                     .title(format!("Loading {list_title}..."));
                 f.render_widget(b, list_view);
-                f.render_widget(Block::default().borders(Borders::ALL).title(detail_title), detail_view);
+                f.render_widget(
+                    Block::default().borders(Borders::ALL).title(detail_title),
+                    detail_view,
+                );
             }
             Loaded(map, list, state) => {
                 let items = List::new(&**list)
-                    .block(Block::default()
-                        .borders(Borders::ALL)
-                        .title(format!("{} ({}/{})", list_title, state.selected().map_or(0, |i| i + 1), list.len())))
+                    .block(Block::default().borders(Borders::ALL).title(format!(
+                        "{} ({}/{})",
+                        list_title,
+                        state.selected().map_or(0, |i| i + 1),
+                        list.len()
+                    )))
                     .highlight_style(
                         Style::default()
                             .bg(Color::Green)
@@ -148,11 +159,15 @@ impl<T: Serialize> DetailsView<'_, T> {
 
                 match state.selected() {
                     None => {
-                        f.render_widget(Block::default().borders(Borders::ALL).title(detail_title), detail_view);
+                        f.render_widget(
+                            Block::default().borders(Borders::ALL).title(detail_title),
+                            detail_view,
+                        );
                     }
                     Some(selected) => {
                         let item = map.get_index(selected).unwrap();
-                        let p = Paragraph::new(serde_json::to_string_pretty(item.1).unwrap()).block(Block::default().borders(Borders::ALL).title(detail_title));
+                        let p = Paragraph::new(serde_json::to_string_pretty(item.1).unwrap())
+                            .block(Block::default().borders(Borders::ALL).title(detail_title));
                         f.render_widget(p, detail_view);
                     }
                 }
@@ -171,19 +186,12 @@ pub struct Editor<'a> {
 impl Editor<'_> {
     pub fn readonly(readonly: bool, text: String) -> Self {
         let mut textarea = TextArea::from_iter(text.lines());
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Editor")
-        );
+        textarea.set_block(Block::default().borders(Borders::ALL).title("Editor"));
         textarea.set_line_number_style(Style::default().bg(Color::Gray));
         textarea.set_cursor_line_style(Style::default().not_underlined());
         textarea.move_cursor(CursorMove::Top);
 
-        Editor {
-            textarea,
-            readonly,
-        }
+        Editor { textarea, readonly }
     }
 
     pub fn writeable() -> Self {
@@ -204,7 +212,7 @@ impl Component for Editor<'_> {
                 KeyCode::PageUp => {}
                 KeyCode::PageDown => {}
                 KeyCode::Esc => {}
-                _ => return Ok(None)
+                _ => return Ok(None),
             }
         }
 

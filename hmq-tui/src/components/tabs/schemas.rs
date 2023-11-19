@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use tokio::sync::mpsc::UnboundedSender;
 use crate::action::Action;
-use crate::components::{Component, views};
-use crate::tui::Frame;
-use color_eyre::eyre::Result;
-use hivemq_openapi::models::{Schema};
 use crate::components::tabs::TabComponent;
 use crate::components::views::{DetailsView, State};
+use crate::components::{views, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::fetch_schemas;
+use crate::tui::Frame;
+use color_eyre::eyre::Result;
+use hivemq_openapi::models::Schema;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Block, Borders, ListItem, ListState};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
@@ -24,7 +24,7 @@ impl SchemasTab<'_> {
         SchemasTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            details_view: DetailsView::new("Schemas".to_string(), "Schema".to_string())
+            details_view: DetailsView::new("Schemas".to_string(), "Schema".to_string()),
         }
     }
 }
@@ -53,19 +53,16 @@ impl Component for SchemasTab<'_> {
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
                     let result = fetch_schemas(hivemq_address).await;
-                    tx.send(Action::SchemasLoadingFinished(result)).expect("Failed to send schemas loading finished action")
+                    tx.send(Action::SchemasLoadingFinished(result))
+                        .expect("Failed to send schemas loading finished action")
                 });
-            },
-            Action::SchemasLoadingFinished(result) => {
-                match result {
-                    Ok(schemas) => {
-                        self.details_view.update_items(schemas)
-                    }
-                    Err(msg) => {
-                        self.details_view.error(&msg);
-                    }
-                }
             }
+            Action::SchemasLoadingFinished(result) => match result {
+                Ok(schemas) => self.details_view.update_items(schemas),
+                Err(msg) => {
+                    self.details_view.error(&msg);
+                }
+            },
             _ => {}
         }
 

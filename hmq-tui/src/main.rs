@@ -7,10 +7,10 @@ pub mod app;
 pub mod cli;
 pub mod components;
 pub mod config;
+mod hivemq_rest_client;
 pub mod mode;
 pub mod tui;
 pub mod utils;
-mod hivemq_rest_client;
 
 use clap::Parser;
 use cli::Cli;
