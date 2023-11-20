@@ -7,10 +7,10 @@ pub mod app;
 pub mod cli;
 pub mod components;
 pub mod config;
+mod hivemq_rest_client;
 pub mod mode;
 pub mod tui;
 pub mod utils;
-mod hivemq_rest_client;
 
 use clap::Parser;
 use cli::Cli;
@@ -27,7 +27,8 @@ async fn tokio_main() -> Result<()> {
     initialize_panic_handler()?;
 
     let args = Cli::parse();
-    let mut app = App::new(args.tick_rate, args.frame_rate)?;
+    let hivemq_address = args.host + ":" + args.port.to_string().as_str();
+    let mut app = App::new(args.tick_rate, args.frame_rate, hivemq_address)?;
     app.run().await?;
 
     Ok(())

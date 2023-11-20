@@ -4,7 +4,22 @@
       "<q>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend" // Suspend the application
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<r>": "Reload",
+      "<c>": "Copy",
+      "<up>": "Up",
+      "<down>": "Down",
+      "<left>": "Left",
+      "<right>": "Right",
+      "<tab>": "NextTab",
+      "<backtab>": "PrevTab",
+      "<1>": "Tab1",
+      "<2>": "Tab2",
+      "<3>": "Tab3",
+      "<4>": "Tab4",
+      "<5>": "Tab5",
+      "<6>": "Tab6",
+      "<esc>": "Escape"
     },
   }
 }

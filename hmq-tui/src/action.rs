@@ -1,3 +1,6 @@
+use hivemq_openapi::models::{
+    Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, TraceRecording,
+};
 use std::fmt;
 
 use serde::{
@@ -5,7 +8,7 @@ use serde::{
     Deserialize, Serialize,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Action {
     Tick,
     Render,
@@ -16,6 +19,40 @@ pub enum Action {
     Refresh,
     Error(String),
     Help,
+
+    // Key Events
+    Up,
+    Down,
+    Left,
+    Right,
+    NextTab,
+    PrevTab,
+    SelectTab(usize),
+    Escape,
+    Reload,
+    Copy,
+
+    // Clients view
+    ClientIdsLoading,
+    ClientIdsLoadingFailed { error: String },
+    ClientIdsLoaded { client_ids: Vec<String> },
+    ClientDetailsLoaded { client_id: String, details: String },
+    ClientDetailsLoadingFailed { client_id: String, error: String },
+
+    // Data Policies
+    DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>),
+
+    // Behavior Policies
+    BehaviorPoliciesLoadingFinished(Result<Vec<(String, BehaviorPolicy)>, String>),
+
+    // Schemas
+    SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
+
+    // Backups
+    BackupsLoadingFinished(Result<Vec<(String, Backup)>, String>),
+
+    // Trace Recordings
+    TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -44,6 +81,21 @@ impl<'de> Deserialize<'de> for Action {
                     "Quit" => Ok(Action::Quit),
                     "Refresh" => Ok(Action::Refresh),
                     "Help" => Ok(Action::Help),
+                    "Reload" => Ok(Action::Reload),
+                    "Copy" => Ok(Action::Copy),
+                    "Up" => Ok(Action::Up),
+                    "Down" => Ok(Action::Down),
+                    "Left" => Ok(Action::Left),
+                    "Right" => Ok(Action::Right),
+                    "NextTab" => Ok(Action::NextTab),
+                    "PrevTab" => Ok(Action::PrevTab),
+                    "Tab1" => Ok(Action::SelectTab(0)),
+                    "Tab2" => Ok(Action::SelectTab(1)),
+                    "Tab3" => Ok(Action::SelectTab(2)),
+                    "Tab4" => Ok(Action::SelectTab(3)),
+                    "Tab5" => Ok(Action::SelectTab(4)),
+                    "Tab6" => Ok(Action::SelectTab(5)),
+                    "Escape" => Ok(Action::Escape),
                     data if data.starts_with("Error(") => {
                         let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
                         Ok(Action::Error(error_msg.to_string()))
