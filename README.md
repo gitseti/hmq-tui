@@ -4,7 +4,7 @@ hmq-tui sets out to give easy access to [HiveMQ  REST API](https://docs.hivemq.c
 ```
 hmq-tui -h localhost:8888
 ```
-![tui_vision](hmq-tui/tui_vision.png)
+![demo](demo.mp4)
 
 # Libaries
 [ratatui](https://github.com/ratatui-org/ratatui)
