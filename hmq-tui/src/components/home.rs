@@ -142,25 +142,32 @@ impl Component for Home {
             .split(f.size());
         let tab_area = layout[1];
 
-        let spans: Vec<Span> = self.tabs.iter().enumerate().map(|(i, tab)| {
-            let style = if i == self.active_tab {
-                Style::default().bg(Color::Green).bold()
-            } else {
-                Style::default()
-            };
+        let spans: Vec<Span> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .map(|(i, tab)| {
+                let style = if i == self.active_tab {
+                    Style::default().bg(Color::Green).bold()
+                } else {
+                    Style::default()
+                };
 
-            let index = i + 1;
-            let name = tab.get_name();
-            Span::styled(format!(" [{index}] {name} "), style)
-        }).collect();
+                let index = i + 1;
+                let name = tab.get_name();
+                Span::styled(format!(" [{index}] {name} "), style)
+            })
+            .collect();
         f.render_widget(Paragraph::new(Line::from(spans)), layout[0]);
 
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
 
-        let mappings: Vec<_> = active_tab.get_key_hints().iter().map(|(key, value)| {
-            format!(" [{key}] {value} ")
-        }).collect();
+        let mappings: Vec<_> = active_tab
+            .get_key_hints()
+            .iter()
+            .map(|(key, value)| format!(" [{key}] {value} "))
+            .collect();
         let mappings = mappings.join("");
         f.render_widget(Paragraph::new(mappings), layout[2]);
 
