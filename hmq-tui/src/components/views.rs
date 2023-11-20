@@ -143,7 +143,7 @@ impl<T: Serialize> DetailsView<'_, T> {
                 );
             }
             Loaded(map, list, state) => {
-                let items = List::new(&**list)
+                let items = List::new(list.clone()) //FIXME: Keep whole list in memory
                     .block(Block::default().borders(Borders::ALL).title(format!(
                         "{} ({}/{})",
                         list_title,

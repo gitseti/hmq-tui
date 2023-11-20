@@ -136,8 +136,8 @@ impl Clients {
     }
 
     fn draw_loading_error(&mut self, f: &mut Frame, layout: &Rc<[Rect]>) {
-        let msg = self.client_ids_loading_error.clone().unwrap();
-        let p = Paragraph::new(msg.as_str())
+        let msg = self.client_ids_loading_error.as_deref().unwrap();
+        let p = Paragraph::new(msg)
             .style(Style::default().fg(Color::Red))
             .wrap(Wrap { trim: true });
         f.render_widget(

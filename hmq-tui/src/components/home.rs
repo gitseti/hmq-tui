@@ -163,11 +163,11 @@ impl Component for Home {
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
 
-        let mappings: Vec<_> = active_tab
+        let mappings = active_tab
             .get_key_hints()
             .iter()
             .map(|(key, value)| format!(" [{key}] {value} "))
-            .collect();
+            .collect::<Vec<_>>();
         let mappings = mappings.join("");
         f.render_widget(Paragraph::new(mappings), layout[2]);
 
