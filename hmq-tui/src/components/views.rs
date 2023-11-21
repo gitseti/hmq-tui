@@ -60,6 +60,15 @@ impl<T: Serialize> DetailsView<'_, T> {
         }
     }
 
+    pub fn put(&mut self, key: String, value: T) {
+        if let Loaded(map, list, _) = &mut self.state {
+            let old_value = map.insert(key.to_owned(), value);
+            if old_value.is_none() {
+                list.push(ListItem::new(key.clone()));
+            }
+        }
+    }
+
     pub fn error(&mut self, msg: &str) {
         self.reset();
         self.state = Error(msg.to_owned());
@@ -70,26 +79,32 @@ impl<T: Serialize> DetailsView<'_, T> {
         self.state = Loading();
     }
 
-    pub fn next_item(&mut self) {
+    pub fn next_item(&mut self) -> Option<(&String, &T)> {
         if let Loaded(map, list, state) = &mut self.state {
             let new_selected = match state.selected() {
                 None if list.len() != 0 => 0,
                 Some(i) if i + 1 < list.len() => i + 1,
-                _ => return,
+                _ => return None,
             };
 
             state.select(Some(new_selected));
+            Some(map.get_index(new_selected).unwrap())
+        } else {
+            None
         }
     }
 
-    pub fn prev_item(&mut self) {
+    pub fn prev_item(&mut self) -> Option<(&String, &T)> {
         if let Loaded(map, list, state) = &mut self.state {
             let new_selected = match state.selected() {
                 Some(i) if i > 0 => i - 1,
-                _ => return,
+                _ => return None,
             };
 
             state.select(Some(new_selected));
+            Some(map.get_index(new_selected).unwrap())
+        } else {
+            None
         }
     }
 

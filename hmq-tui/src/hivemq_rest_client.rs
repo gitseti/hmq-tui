@@ -23,7 +23,7 @@ use serde::Serialize;
 pub async fn fetch_client_details(
     client_id: String,
     host: String,
-) -> Result<ClientDetails, String> {
+) -> Result<(String, ClientDetails), String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -42,7 +42,7 @@ pub async fn fetch_client_details(
     let details = details
         .client
         .expect(format!("Client details for client {client_id} were empty").as_str());
-    Ok(*details)
+    Ok((client_id, *details))
 }
 
 pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {

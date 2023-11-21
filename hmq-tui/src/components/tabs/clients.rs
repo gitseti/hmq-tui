@@ -19,266 +19,107 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::sleep;
 use tui::Frame;
+use crate::components::views::DetailsView;
 
-pub struct Clients {
+pub struct Clients<'a> {
     tx: Option<UnboundedSender<Action>>,
     hivemq_address: String,
-    selected_client: ListState,
-    client_ids: Vec<String>,
-    client_details: HashMap<String, Result<String, String>>,
-    is_loading_client_ids: bool,
-    client_ids_loading_error: Option<String>,
+    details_view: DetailsView<'a, Option<ClientDetails>>,
 }
 
-impl Clients {
+impl Clients<'_> {
     pub fn new(hivemq_address: String) -> Self {
         Clients {
             tx: None,
             hivemq_address,
-            selected_client: ListState::default(),
-            client_ids: Vec::new(),
-            client_details: HashMap::new(),
-            is_loading_client_ids: false,
-            client_ids_loading_error: None,
+            details_view: DetailsView::new("Clients".to_owned(), "Client Details".to_owned()),
         }
     }
 
-    fn next(&mut self) {
-        let selected = match self.selected_client.selected() {
-            None if !self.client_ids.is_empty() => 0,
-            Some(i) if i + 1 < self.client_ids.len() => i + 1,
-            _ => return,
-        };
-        self.selected_client.select(Some(selected))
-    }
-
-    fn prev(&mut self) {
-        let selected = match self.selected_client.selected() {
-            Some(i) if i > 0 => i - 1,
-            _ => return,
-        };
-        self.selected_client.select(Some(selected))
-    }
-
-    fn reset(&mut self) {
-        self.selected_client.select(None)
-    }
-
-    fn load_client_ids(&mut self) {
-        self.client_details.clear();
-        self.client_ids_loading_error = None;
-
-        let tx = self.tx.clone().unwrap();
-        let hivemq_address = self.hivemq_address.clone();
-        let handle = tokio::spawn(async move {
-            tx.send(Action::ClientIdsLoading)
-                .expect("Could not send loading action"); // The action channel is expected to be open
-            let client_ids = fetch_client_ids(hivemq_address).await;
-
-            match client_ids {
-                Ok(ids) => {
-                    tx.send(Action::ClientIdsLoaded { client_ids: ids })
-                        .expect("Could not send loaded action");
-                }
-                Err(error) => {
-                    tx.send(Action::ClientIdsLoadingFailed { error })
-                        .expect("Could not send loading failed action");
-                }
-            }
-        });
-    }
-
-    fn client_ids_loaded(&mut self, client_ids: Vec<String>) {
-        self.client_ids = client_ids;
-        self.is_loading_client_ids = false;
-    }
-
-    fn client_ids_loading_failed(&mut self, err: String) {
-        self.client_ids_loading_error = Some(err);
-        self.is_loading_client_ids = false;
-    }
-
-    fn load_client_details(&mut self, client_id: String) {
-        let tx = self.tx.clone().unwrap();
-        let hivemq_address = self.hivemq_address.clone();
-        let handle = tokio::spawn(async move {
-            let client_details = fetch_client_details(client_id.clone(), hivemq_address).await;
-
-            match client_details {
-                Ok(ref details) => {
-                    tx.send(Action::ClientDetailsLoaded {
-                        client_id,
-                        details: serde_json::to_string_pretty(&client_details).unwrap(),
-                    })
-                    .expect("Could not send loaded action");
-                }
-                Err(err) => tx
-                    .send(Action::ClientDetailsLoadingFailed {
-                        client_id: client_id.clone(),
-                        error: err,
-                    })
-                    .expect("Could not send client details loading failed action"),
-            }
-        });
-    }
-
-    fn draw_loading_client_ids(&self, f: &mut Frame, layout: &Rc<[Rect]>) {
-        f.render_widget(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Loading Clients..."),
-            layout[0],
-        );
-        f.render_widget(
-            Block::default().borders(Borders::ALL).title("Details"),
-            layout[1],
-        );
-    }
-
-    fn draw_loading_error(&mut self, f: &mut Frame, layout: &Rc<[Rect]>) {
-        let msg = self.client_ids_loading_error.as_deref().unwrap();
-        let p = Paragraph::new(msg)
-            .style(Style::default().fg(Color::Red))
-            .wrap(Wrap { trim: true });
-        f.render_widget(
-            p.block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Loading Clients failed"),
-            ),
-            layout[0],
-        );
-        f.render_widget(
-            Block::default().borders(Borders::ALL).title("Details"),
-            layout[1],
-        );
-    }
 }
 
-impl Component for Clients {
+impl Component for Clients<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.tx = Some(tx);
         Ok(())
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if !self.is_loading_client_ids {
-            match action {
-                Action::Reload => {
-                    self.load_client_ids();
-                }
-                Action::Up => {
-                    self.prev();
-                }
-                Action::Down => {
-                    self.next();
-                }
-                Action::Escape => self.reset(),
-                Action::ClientIdsLoading => {
-                    self.is_loading_client_ids = true;
-                }
-                Action::ClientDetailsLoaded { client_id, details } => {
-                    self.client_details.insert(client_id, Ok(details));
-                }
-                Action::ClientDetailsLoadingFailed { client_id, error } => {
-                    self.client_details.insert(client_id, Err(error));
-                }
-                _ => (),
-            };
-        } else {
-            match action {
-                Action::ClientIdsLoaded { client_ids } => {
-                    self.client_ids_loaded(client_ids);
-                }
-                Action::ClientIdsLoadingFailed { error } => {
-                    self.client_ids_loading_failed(error);
-                }
-                _ => (),
+        match action {
+            Action::Reload => {
+                self.details_view.loading();
+                let tx = self.tx.clone().unwrap();
+                let hivemq_address = self.hivemq_address.clone();
+                let handle = tokio::spawn(async move {
+                    let result = fetch_client_ids(hivemq_address).await;
+                    tx.send(Action::ClientIdsLoadingFinished(result)).expect("Failed to send client ids loading finished action");
+                });
             }
-        }
+            Action::Up => {
+                let item = self.details_view.prev_item();
+                if let Some((client_id, details)) = item {
+                    if details.is_none() {
+                        let tx = self.tx.clone().unwrap();
+                        let hivemq_address = self.hivemq_address.clone();
+                        let client_id = client_id.to_owned();
+                        let handle = tokio::spawn(async move {
+                            let result = fetch_client_details(client_id, hivemq_address).await;
+                            tx.send(Action::ClientDetailsLoadingFinished(result)).expect("Failed to send client details loading finished action");
+                        });
+                    }
+                }
+            }
+            Action::Down => {
+                let item = self.details_view.next_item();
+                if let Some((client_id, details)) = item {
+                    if details.is_none() {
+                        let tx = self.tx.clone().unwrap();
+                        let hivemq_address = self.hivemq_address.clone();
+                        let client_id = client_id.to_owned();
+                        let handle = tokio::spawn(async move {
+                            let result = fetch_client_details(client_id, hivemq_address).await;
+                            tx.send(Action::ClientDetailsLoadingFinished(result)).expect("Failed to send client details loading finished action");
+                        });
+                    }
+                }
+            }
+            Action::ClientDetailsLoadingFinished(result) => {
+                match result {
+                    Ok((client_id, details)) => {
+                        self.details_view.put(client_id, Some(details));
+                    }
+                    Err(msg) => {
+                        self.details_view.error(&msg);
+                    }
+                }
+            }
+            Action::ClientIdsLoadingFinished(result) => {
+                match result {
+                    Ok(client_ids) => {
+                        let mut details = Vec::with_capacity(client_ids.len());
+                        for client_id in client_ids {
+                            details.push((client_id, None));
+                        }
+                        self.details_view.update_items(details);
+                    }
+                    Err(msg) => {
+                        self.details_view.error(&msg);
+                    }
+                }
+            }
+            _ => (),
+        };
 
         Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
-            .split(area);
-
-        if self.is_loading_client_ids {
-            self.draw_loading_client_ids(f, &layout);
-        } else if self.client_ids_loading_error.as_deref().is_some() {
-            self.draw_loading_error(f, &layout);
-        } else {
-            let mut list_items = Vec::new();
-            for item in &self.client_ids {
-                list_items.push(ListItem::new(item.as_str()));
-            }
-
-            let selected_client = self.selected_client.selected().map_or(0, |x| x + 1);
-            let total_clients = self.client_ids.len();
-            let items = List::new(list_items)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(format!("Clients ({selected_client}/{total_clients})")),
-                )
-                .highlight_style(
-                    Style::default()
-                        .bg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                );
-
-            f.render_stateful_widget(items, layout[0], &mut self.selected_client);
-
-            // client details
-            match self.selected_client.selected() {
-                None => {
-                    f.render_widget(
-                        Block::default().borders(Borders::ALL).title("Details"),
-                        layout[1],
-                    );
-                }
-                Some(selected) => {
-                    match self.client_details.get(self.client_ids[selected].as_str()) {
-                        None => {
-                            self.load_client_details(self.client_ids[selected].clone());
-                            f.render_widget(
-                                Block::default().borders(Borders::ALL).title("Details"),
-                                layout[1],
-                            );
-                        }
-                        Some(details) => match details {
-                            Ok(details) => {
-                                let paragraph = Paragraph::new(details.as_str())
-                                    .block(Block::default().borders(Borders::ALL).title("Details"));
-                                f.render_widget(paragraph, layout[1]);
-                            }
-                            Err(err) => {
-                                let p = Paragraph::new(err.as_str())
-                                    .style(Style::default().fg(Color::Red))
-                                    .wrap(Wrap { trim: true });
-                                f.render_widget(
-                                    p.block(
-                                        Block::default()
-                                            .borders(Borders::ALL)
-                                            .title("Loading Client Details failed"),
-                                    ),
-                                    layout[1],
-                                );
-                            }
-                        },
-                    }
-                }
-            };
-        }
-
+        self.details_view.draw(f, area).expect("panic");
         Ok(())
     }
 }
 
-impl TabComponent for Clients {
+impl TabComponent for Clients<'_> {
     fn get_name(&self) -> &str {
         "Clients"
     }

@@ -33,11 +33,8 @@ pub enum Action {
     Copy,
 
     // Clients view
-    ClientIdsLoading,
-    ClientIdsLoadingFailed { error: String },
-    ClientIdsLoaded { client_ids: Vec<String> },
-    ClientDetailsLoaded { client_id: String, details: String },
-    ClientDetailsLoadingFailed { client_id: String, error: String },
+    ClientIdsLoadingFinished(Result<Vec<String>, String>),
+    ClientDetailsLoadingFinished(Result<(String, ClientDetails), String>),
 
     // Data Policies
     DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>),
