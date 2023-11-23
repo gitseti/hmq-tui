@@ -25,10 +25,11 @@ pub enum Action {
     Down,
     Left,
     Right,
+    Enter,
+    Escape,
     NextTab,
     PrevTab,
     SelectTab(usize),
-    Escape,
     Reload,
     Copy,
 
@@ -84,6 +85,8 @@ impl<'de> Deserialize<'de> for Action {
                     "Down" => Ok(Action::Down),
                     "Left" => Ok(Action::Left),
                     "Right" => Ok(Action::Right),
+                    "Enter" => Ok(Action::Enter),
+                    "Escape" => Ok(Action::Escape),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),
                     "Tab1" => Ok(Action::SelectTab(0)),
@@ -92,7 +95,6 @@ impl<'de> Deserialize<'de> for Action {
                     "Tab4" => Ok(Action::SelectTab(3)),
                     "Tab5" => Ok(Action::SelectTab(4)),
                     "Tab6" => Ok(Action::SelectTab(5)),
-                    "Escape" => Ok(Action::Escape),
                     data if data.starts_with("Error(") => {
                         let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
                         Ok(Action::Error(error_msg.to_string()))

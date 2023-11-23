@@ -13,13 +13,14 @@
       "<right>": "Right",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
+      "<enter>": "Enter",
+      "<esc>": "Escape",
       "<1>": "Tab1",
       "<2>": "Tab2",
       "<3>": "Tab3",
       "<4>": "Tab4",
       "<5>": "Tab5",
       "<6>": "Tab6",
-      "<esc>": "Escape"
     },
   }
 }
