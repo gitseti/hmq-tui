@@ -25,16 +25,21 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64, hivemq_address: String) -> Result<Self> {
+    pub fn new(tick_rate: f64, frame_rate: f64, hivemq_address: String, is_debug: bool) -> Result<Self> {
         let home = Home::new(hivemq_address.clone());
         let fps = FpsCounter::default();
         let config = Config::new()?;
         let mode = Mode::Home;
+        let mut components: Vec<Box<dyn Component>> = vec![Box::new(home)];
+        if is_debug {
+            components.push(Box::new(fps))
+        }
+
         Ok(Self {
             tick_rate,
             frame_rate,
             hivemq_address,
-            components: vec![Box::new(home), Box::new(fps)],
+            components,
             should_quit: false,
             should_suspend: false,
             config,

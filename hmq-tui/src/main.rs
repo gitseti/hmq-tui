@@ -28,7 +28,7 @@ async fn tokio_main() -> Result<()> {
 
     let args = Cli::parse();
     let hivemq_address = args.host + ":" + args.port.to_string().as_str();
-    let mut app = App::new(args.tick_rate, args.frame_rate, hivemq_address)?;
+    let mut app = App::new(args.tick_rate, args.frame_rate, hivemq_address, args.debug)?;
     app.run().await?;
 
     Ok(())

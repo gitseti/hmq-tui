@@ -8,6 +8,7 @@ use crate::utils::version;
 #[command(author, version = version(), about)]
 #[clap(disable_help_flag = true)]
 pub struct Cli {
+
     #[arg(
         long,
         action = clap::ArgAction::HelpLong
@@ -31,6 +32,13 @@ pub struct Cli {
         hide = true
     )]
     pub frame_rate: f64,
+
+    #[arg(
+        long,
+        help = "Activates debug mode which shows additional components for debugging purposes",
+        hide = true
+    )]
+    pub debug: bool,
 
     #[arg(
         short,
