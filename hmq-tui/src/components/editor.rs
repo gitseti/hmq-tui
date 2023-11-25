@@ -25,6 +25,12 @@ impl Editor<'_> {
         textarea.set_cursor_line_style(Style::default().not_underlined());
         textarea.move_cursor(CursorMove::Top);
 
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title.to_owned()),
+        );
+
         Editor {
             textarea,
             title,

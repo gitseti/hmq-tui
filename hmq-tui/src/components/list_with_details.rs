@@ -12,11 +12,20 @@ use serde::Serialize;
 use std::fmt::Display;
 use tui::Frame;
 use State::Loaded;
+use crate::action::Action;
+use crate::action::Action::SelectedItem;
 
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{Error, Loading};
 use crate::components::Component;
 use crate::tui;
+
+
+pub struct ListWithDetails<'a, T> {
+    list_title: String,
+    details_title: String,
+    state: State<'a, T>,
+}
 
 pub enum State<'a, T> {
     Error(String),
@@ -34,12 +43,7 @@ pub struct LoadedState<'a, T> {
 pub enum Focus<'a> {
     OnList,
     OnDetails(Editor<'a>),
-}
-
-pub struct ListWithDetails<'a, T> {
-    pub list_title: String,
-    pub details_title: String,
-    pub state: State<'a, T>,
+    OnCustomComponent(Box<dyn Component>),
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
@@ -85,17 +89,42 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
+    pub fn get(&mut self, key: String) -> Option<&T> {
+        if let Loaded(state) = &mut self.state {
+            return state.items.get(&key);
+        }
+        None
+    }
+
+    pub fn set_custom_component(&mut self, component: Box<dyn Component>) {
+        let Loaded(state) = &mut self.state else {
+            return;
+        };
+
+        state.focus = Focus::OnCustomComponent(component);
+    }
+
+    pub fn remove_custom_component(&mut self) {
+        let Loaded(state) = &mut self.state else {
+            return;
+        };
+
+        if let Focus::OnCustomComponent(_) = state.focus {
+            state.focus = Focus::OnList
+        }
+    }
+
     pub fn error(&mut self, msg: &str) {
         self.reset();
         self.state = Error(msg.to_owned());
     }
 
-    pub fn loading(&mut self) {
+    fn loading(&mut self) {
         self.reset();
         self.state = Loading();
     }
 
-    pub fn next_item(&mut self) -> Option<(&String, &T)> {
+    fn next_item(&mut self) -> Option<(&String, &T)> {
         if let Loaded(state) = &mut self.state {
             let new_selected = match state.list_state.selected() {
                 None if state.list.len() != 0 => 0,
@@ -110,7 +139,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    pub fn prev_item(&mut self) -> Option<(&String, &T)> {
+    fn prev_item(&mut self) -> Option<(&String, &T)> {
         if let Loaded(state) = &mut self.state {
             let new_selected = match state.list_state.selected() {
                 Some(i) if i > 0 => i - 1,
@@ -124,7 +153,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    pub fn copy_details_to_clipboard(&mut self) {
+    fn copy_details_to_clipboard(&mut self) {
         if let Loaded(state) = &mut self.state {
             if let Some(selected) = state.list_state.selected() {
                 let item = state.items.get_index(selected).unwrap();
@@ -135,13 +164,13 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    pub fn focus_on_list(&mut self) {
+    fn focus_on_list(&mut self) {
         if let Loaded(state) = &mut self.state {
             (*state).focus = Focus::OnList;
         };
     }
 
-    pub fn focus_on_details(&mut self) {
+    fn focus_on_details(&mut self) {
         let Loaded(state) = &mut self.state else {
             return;
         };
@@ -168,35 +197,62 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         (*state).focus = Focus::OnDetails(editor);
     }
 
-    pub fn is_focus_on_details(&mut self) -> bool{
+    fn is_focus_on_details(&mut self) -> bool {
         let Loaded(state) = &mut self.state else {
             return false;
         };
 
         match state.focus {
-            Focus::OnList => false,
-            Focus::OnDetails(_) => true
+            Focus::OnDetails(_) => true,
+            _ => false
         }
     }
+}
 
-    pub fn send_key_event(&mut self, key: KeyEvent) {
+impl<T: Serialize> Component for ListWithDetails<'_, T> {
+
+    fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         let Loaded(state) = &mut self.state else {
-            return;
+            return Ok(None);
         };
 
-        let Focus::OnDetails(editor) = &mut state.focus else {
-            return;
-        };
+        if let Focus::OnDetails(editor) = &mut state.focus {
+            return editor.handle_key_events(key);
+        }
 
-        if let KeyCode::Esc = key.code {
-            self.focus_on_list();
-            return;
-        };
-
-        (*editor).handle_key_events(key).unwrap();
+        Ok(None)
     }
 
-    pub fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        if self.is_focus_on_details() {
+            if action == Action::Escape {
+                self.focus_on_list();
+            }
+            return Ok(None);
+        }
+
+        match action {
+            Action::PrevItem => {
+                if let Some((key, value)) = self.prev_item() {
+                    return Ok(Some(SelectedItem(key.to_owned())));
+                }
+            }
+            Action::NextItem => {
+                if let Some((key, value)) = self.next_item() {
+                    return Ok(Some(SelectedItem(key.to_owned())));
+                }
+            }
+            Action::FocusDetails => self.focus_on_details(),
+            Action::Enter => self.focus_on_details(),
+            Action::LoadAllItems => self.loading(),
+            Action::Copy => self.copy_details_to_clipboard(),
+            _ => {}
+        }
+
+        Ok(None)
+    }
+
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
@@ -244,12 +300,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
                 let list_style = match focus {
                     Focus::OnList => Style::default(),
-                    Focus::OnDetails(_) => Style::default().dim(),
+                    _ => Style::default().dim(),
                 };
 
                 let details_color = match focus {
-                    Focus::OnList => Color::Gray,
                     Focus::OnDetails(_) => Color::default(),
+                    _ => Color::Gray
                 };
 
                 let list_widget = List::new(list.clone()) //FIXME: Keep whole list in memory
@@ -293,6 +349,9 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     },
                     Focus::OnDetails(editor) => {
                         editor.draw(f, detail_view).unwrap();
+                    }
+                    Focus::OnCustomComponent(component) => {
+                        component.draw(f, detail_view).unwrap();
                     }
                 }
             }

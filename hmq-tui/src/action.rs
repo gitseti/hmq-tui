@@ -7,6 +7,7 @@ use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
+use crate::mode::Mode;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Action {
@@ -20,17 +21,19 @@ pub enum Action {
     Error(String),
     Help,
 
+    SwitchMode(Mode),
+
     // Key Events
-    Up,
-    Down,
+    PrevItem,
+    NextItem,
     Left,
-    Right,
+    FocusDetails,
     Enter,
     Escape,
     NextTab,
     PrevTab,
     SelectTab(usize),
-    Reload,
+    LoadAllItems,
     Copy,
 
     // Clients view
@@ -51,6 +54,8 @@ pub enum Action {
 
     // Trace Recordings
     TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
+
+    SelectedItem(String),
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -79,12 +84,11 @@ impl<'de> Deserialize<'de> for Action {
                     "Quit" => Ok(Action::Quit),
                     "Refresh" => Ok(Action::Refresh),
                     "Help" => Ok(Action::Help),
-                    "Reload" => Ok(Action::Reload),
+                    "LoadAllItems" => Ok(Action::LoadAllItems),
                     "Copy" => Ok(Action::Copy),
-                    "Up" => Ok(Action::Up),
-                    "Down" => Ok(Action::Down),
-                    "Left" => Ok(Action::Left),
-                    "Right" => Ok(Action::Right),
+                    "PrevItem" => Ok(Action::PrevItem),
+                    "NextItem" => Ok(Action::NextItem),
+                    "FocusDetails" => Ok(Action::FocusDetails),
                     "Enter" => Ok(Action::Enter),
                     "Escape" => Ok(Action::Escape),
                     "NextTab" => Ok(Action::NextTab),

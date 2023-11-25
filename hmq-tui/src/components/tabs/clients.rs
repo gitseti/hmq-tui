@@ -21,6 +21,8 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::sleep;
 use tui::Frame;
+use crate::components::editor::Editor;
+use crate::mode::Mode;
 
 pub struct Clients<'a> {
     tx: Option<UnboundedSender<Action>>,
@@ -45,24 +47,28 @@ impl Component for Clients<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        self.list_with_details.send_key_event(key);
-        Ok(None)
+        self.list_with_details.handle_key_events(key)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if self.list_with_details.is_focus_on_details() {
-            return Ok(None);
+        let list_action = self.list_with_details.update(action.clone());
+        match list_action {
+            Ok(Some(Action::SelectedItem(key))) => {
+                    if let Some(None) = self.list_with_details.get(key.to_owned()) {
+                        let tx = self.tx.clone().unwrap();
+                        let hivemq_address = self.hivemq_address.clone();
+                        let _ = tokio::spawn(async move {
+                            let result = fetch_client_details(key, hivemq_address).await;
+                            tx.send(Action::ClientDetailsLoadingFinished(result))
+                                .expect("Failed to send client details loading finished action");
+                        });
+                    }
+            }
+            _ => {}
         }
 
         match action {
-            Action::Copy => {
-                self.list_with_details.copy_details_to_clipboard();
-            },
-            Action::Enter | Action::Right => {
-                self.list_with_details.focus_on_details();
-            },
-            Action::Reload => {
-                self.list_with_details.loading();
+            Action::LoadAllItems => {
                 let tx = self.tx.clone().unwrap();
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {
@@ -71,54 +77,28 @@ impl Component for Clients<'_> {
                         .expect("Failed to send client ids loading finished action");
                 });
             }
-            Action::Up => {
-                let item = self.list_with_details.prev_item();
-                if let Some((client_id, details)) = item {
-                    if details.is_none() {
-                        let tx = self.tx.clone().unwrap();
-                        let hivemq_address = self.hivemq_address.clone();
-                        let client_id = client_id.to_owned();
-                        let handle = tokio::spawn(async move {
-                            let result = fetch_client_details(client_id, hivemq_address).await;
-                            tx.send(Action::ClientDetailsLoadingFinished(result))
-                                .expect("Failed to send client details loading finished action");
-                        });
+            Action::ClientDetailsLoadingFinished(result) => {
+                match result {
+                    Ok((client_id, details)) => {
+                        self.list_with_details.put(client_id, Some(details));
                     }
-                }
-            }
-            Action::Down => {
-                let item = self.list_with_details.next_item();
-                if let Some((client_id, details)) = item {
-                    if details.is_none() {
-                        let tx = self.tx.clone().unwrap();
-                        let hivemq_address = self.hivemq_address.clone();
-                        let client_id = client_id.to_owned();
-                        let handle = tokio::spawn(async move {
-                            let result = fetch_client_details(client_id, hivemq_address).await;
-                            tx.send(Action::ClientDetailsLoadingFinished(result))
-                                .expect("Failed to send client details loading finished action");
-                        });
+                    Err(msg) => {
+                        self.list_with_details.error(&msg);
                     }
-                }
-            }
-            Action::ClientDetailsLoadingFinished(result) => match result {
-                Ok((client_id, details)) => {
-                    self.list_with_details.put(client_id, Some(details));
-                }
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
                 }
             },
-            Action::ClientIdsLoadingFinished(result) => match result {
-                Ok(client_ids) => {
-                    let mut details = Vec::with_capacity(client_ids.len());
-                    for client_id in client_ids {
-                        details.push((client_id, None));
+            Action::ClientIdsLoadingFinished(result) => {
+                match result {
+                    Ok(client_ids) => {
+                        let mut details = Vec::with_capacity(client_ids.len());
+                        for client_id in client_ids {
+                            details.push((client_id, None));
+                        }
+                        self.list_with_details.update_items(details);
                     }
-                    self.list_with_details.update_items(details);
-                }
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
+                    Err(msg) => {
+                        self.list_with_details.error(&msg);
+                    }
                 }
             },
             _ => (),

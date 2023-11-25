@@ -37,32 +37,15 @@ impl Component for BackupsTab<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        self.list_with_details.send_key_event(key);
-        Ok(None)
+        self.list_with_details.handle_key_events(key)
     }
 
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if self.list_with_details.is_focus_on_details() {
-            return Ok(None);
-        }
+        let _ = self.list_with_details.update(action.clone());
 
         match action {
-            Action::Up => {
-                self.list_with_details.prev_item();
-            },
-            Action::Down => {
-                self.list_with_details.next_item();
-            },
-            Action::Copy => {
-                self.list_with_details.copy_details_to_clipboard();
-            },
-            Action::Enter | Action::Right => {
-                self.list_with_details.focus_on_details();
-            },
-            Action::Reload => {
-                self.list_with_details.loading();
-
+            Action::LoadAllItems => {
                 let tx = self.tx.clone().unwrap();
                 let hivemq_address = self.hivemq_address.clone();
                 let handle = tokio::spawn(async move {

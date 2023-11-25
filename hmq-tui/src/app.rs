@@ -139,6 +139,9 @@ impl App {
                             }
                         })?;
                     }
+                    Action::SwitchMode(mode) => {
+                        self.mode = mode;
+                    }
                     _ => {}
                 }
                 for component in self.components.iter_mut() {

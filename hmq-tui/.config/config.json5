@@ -1,16 +1,15 @@
 {
   "keybindings": {
     "Home": {
-      "<q>": "Quit", // Quit the application
-      "<Ctrl-d>": "Quit", // Another way to quit
-      "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend", // Suspend the application
-      "<r>": "Reload",
+      "<q>": "Quit",
+      "<Ctrl-d>": "Quit",
+      "<Ctrl-c>": "Quit",
+      "<Ctrl-z>": "Suspend",
+      "<r>": "LoadAllItems",
       "<c>": "Copy",
-      "<up>": "Up",
-      "<down>": "Down",
-      "<left>": "Left",
-      "<right>": "Right",
+      "<up>": "PrevItem",
+      "<down>": "NextItem",
+      "<right>": "FocusDetails",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
       "<enter>": "Enter",
@@ -21,6 +20,6 @@
       "<4>": "Tab4",
       "<5>": "Tab5",
       "<6>": "Tab6",
-    },
+    }
   }
 }
