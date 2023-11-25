@@ -13,11 +13,12 @@ use std::fmt::Display;
 use tui::Frame;
 use State::Loaded;
 use crate::action::Action;
-use crate::action::Action::SelectedItem;
+use crate::action::Action::{SelectedItem, SwitchMode};
 
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{Error, Loading};
 use crate::components::Component;
+use crate::mode::Mode;
 use crate::tui;
 
 
@@ -227,6 +228,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         if self.is_focus_on_details() {
             if action == Action::Escape {
                 self.focus_on_list();
+                return Ok(Some(SwitchMode(Mode::Main)));
             }
             return Ok(None);
         }
@@ -242,7 +244,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     return Ok(Some(SelectedItem(key.to_owned())));
                 }
             }
-            Action::FocusDetails => self.focus_on_details(),
+            Action::FocusDetails => {
+                self.focus_on_details();
+                return Ok(Some(SwitchMode(Mode::Editor)))
+            },
             Action::Enter => self.focus_on_details(),
             Action::LoadAllItems => self.loading(),
             Action::Copy => self.copy_details_to_clipboard(),

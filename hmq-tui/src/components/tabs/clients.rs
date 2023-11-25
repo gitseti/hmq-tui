@@ -64,6 +64,9 @@ impl Component for Clients<'_> {
                         });
                     }
             }
+            Ok(Some(Action::SwitchMode(_))) =>  {
+                return list_action;
+            }
             _ => {}
         }
 

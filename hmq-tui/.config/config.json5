@@ -1,6 +1,6 @@
 {
   "keybindings": {
-    "Home": {
+    "Main": {
       "<q>": "Quit",
       "<Ctrl-d>": "Quit",
       "<Ctrl-c>": "Quit",
@@ -20,6 +20,12 @@
       "<4>": "Tab4",
       "<5>": "Tab5",
       "<6>": "Tab6",
+    },
+    "Editor": {
+      "<Ctrl-d>": "Quit",
+      "<Ctrl-c>": "Quit",
+      "<Ctrl-z>": "Suspend",
+      "<esc>": "Escape"
     }
   }
 }

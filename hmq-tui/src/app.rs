@@ -29,7 +29,7 @@ impl App {
         let home = Home::new(hivemq_address.clone());
         let fps = FpsCounter::default();
         let config = Config::new()?;
-        let mode = Mode::Home;
+        let mode = Mode::Main;
         let mut components: Vec<Box<dyn Component>> = vec![Box::new(home)];
         if is_debug {
             components.push(Box::new(fps))

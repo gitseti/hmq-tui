@@ -42,7 +42,13 @@ impl Component for BackupsTab<'_> {
 
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let _ = self.list_with_details.update(action.clone());
+        let list_action = self.list_with_details.update(action.clone());
+        match list_action {
+            Ok(Some(Action::SwitchMode(_))) =>  {
+                return list_action;
+            }
+            _ => {}
+        }
 
         match action {
             Action::LoadAllItems => {
