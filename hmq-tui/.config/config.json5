@@ -9,6 +9,7 @@
       "<c>": "Copy",
       "<up>": "PrevItem",
       "<down>": "NextItem",
+      "<n>": "NewItem",
       "<right>": "FocusDetails",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
@@ -21,11 +22,12 @@
       "<5>": "Tab5",
       "<6>": "Tab6",
     },
-    "Editor": {
+    "Editing": {
       "<Ctrl-d>": "Quit",
       "<Ctrl-c>": "Quit",
       "<Ctrl-z>": "Suspend",
-      "<esc>": "Escape"
+      "<esc>": "Escape",
+      "<alt-enter>": "Submit"
     }
   }
 }

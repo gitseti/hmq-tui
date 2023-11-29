@@ -7,7 +7,7 @@ use hivemq_openapi::apis::data_hub_behavior_policies_api::{
 use hivemq_openapi::apis::data_hub_data_policies_api::{
     get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams,
 };
-use hivemq_openapi::apis::data_hub_schemas_api::{get_all_schemas, GetAllSchemasParams};
+use hivemq_openapi::apis::data_hub_schemas_api::{CreateSchemaParams, get_all_schemas, GetAllSchemasParams};
 use hivemq_openapi::apis::mqtt_clients_api::{
     get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
     GetMqttClientDetailsParams,
@@ -182,6 +182,22 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String
     }
 
     Ok(schemas)
+}
+
+pub async fn create_schema(host: String, schema: String) -> Result<Schema, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let schema: Schema = serde_json::from_str(schema.as_str()).or_else(|err| Err(err.to_string()))?;
+
+    let params = CreateSchemaParams {
+        schema
+    };
+
+    let response = hivemq_openapi::apis::data_hub_schemas_api::create_schema(&configuration, params).await
+        .or_else(|error| Err(transform_api_err(&error)))?;
+
+    Ok(response)
 }
 
 pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String> {

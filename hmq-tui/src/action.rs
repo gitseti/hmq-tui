@@ -26,6 +26,7 @@ pub enum Action {
     // Key Events
     PrevItem,
     NextItem,
+    NewItem,
     Left,
     FocusDetails,
     Enter,
@@ -48,6 +49,7 @@ pub enum Action {
 
     // Schemas
     SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
+    SchemaCreated(Result<Schema, String>),
 
     // Backups
     BackupsLoadingFinished(Result<Vec<(String, Backup)>, String>),
@@ -56,6 +58,7 @@ pub enum Action {
     TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
 
     SelectedItem(String),
+    Submit,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -88,8 +91,10 @@ impl<'de> Deserialize<'de> for Action {
                     "Copy" => Ok(Action::Copy),
                     "PrevItem" => Ok(Action::PrevItem),
                     "NextItem" => Ok(Action::NextItem),
+                    "NewItem" => Ok(Action::NewItem),
                     "FocusDetails" => Ok(Action::FocusDetails),
                     "Enter" => Ok(Action::Enter),
+                    "Submit" => Ok(Action::Submit),
                     "Escape" => Ok(Action::Escape),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),

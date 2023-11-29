@@ -2,7 +2,7 @@ use crate::action::Action;
 use crate::cli::Cli;
 use crate::components::home::Home;
 use crate::components::tabs::TabComponent;
-use crate::components::list_with_details::{Focus, ListWithDetails};
+use crate::components::list_with_details::{ListWithDetails};
 use crate::components::Component;
 use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
 use crate::{hivemq_rest_client, tui};
