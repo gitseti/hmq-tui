@@ -313,6 +313,7 @@ mod tests {
 
         let client_details = fetch_client_details("my-client".to_string(), broker.base_url()).await;
         let client_details = client_details.unwrap();
+        let client_details = client_details.1;
 
         // assert top level client details
         assert_eq!("my-client", client_details.id.unwrap().as_str());
