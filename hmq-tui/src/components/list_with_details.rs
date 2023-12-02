@@ -1,7 +1,10 @@
+use crate::action::Action;
+use crate::action::Action::{SelectedItem, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent};
+use futures::future::err;
 use indexmap::IndexMap;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Stylize;
@@ -10,18 +13,14 @@ use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::Serialize;
 use std::fmt::Display;
-use futures::future::err;
 use tui::Frame;
 use State::Loaded;
-use crate::action::Action;
-use crate::action::Action::{SelectedItem, SwitchMode};
 
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{Error, Loading};
 use crate::components::Component;
 use crate::mode::Mode;
 use crate::tui;
-
 
 pub struct ListWithDetails<'a, T> {
     list_title: String,
@@ -38,14 +37,14 @@ pub enum State<'a, T> {
 pub struct LoadedState<'a, T> {
     items: IndexMap<String, T>,
     list: Vec<ListItem<'a>>,
-    mode: LoadedMode<'a>,
+    focus_mode: FocusMode<'a>,
 }
 
-pub enum LoadedMode<'a> {
+pub enum FocusMode<'a> {
     FocusOnList(ListState),
     FocusOnDetails((ListState, Editor<'a>)),
-    Error((String, String)),
-    Loading,
+    NoFocus,
+    Error(String, String),
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
@@ -53,7 +52,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         let loaded_state = LoadedState {
             items: IndexMap::new(),
             list: vec![],
-            mode: LoadedMode::FocusOnList(ListState::default()),
+            focus_mode: FocusMode::FocusOnList(ListState::default()),
         };
         ListWithDetails {
             list_title,
@@ -66,7 +65,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         self.state = Loaded(LoadedState {
             items: IndexMap::new(),
             list: vec![],
-            mode: LoadedMode::FocusOnList(ListState::default()),
+            focus_mode: FocusMode::FocusOnList(ListState::default()),
         });
     }
 
@@ -103,7 +102,20 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn details_error(&mut self, title: String, message: String) {
         if let Loaded(loaded_state) = &mut self.state {
-            loaded_state.mode = LoadedMode::Error((title, message));
+            loaded_state.focus_mode = FocusMode::Error(title, message);
+        }
+    }
+
+    pub fn select_item(&mut self, item_key: String) {
+        if let Loaded(LoadedState {items, list, focus_mode: mode, ..}) = &mut self.state {
+            let index = items.get_index_of(&item_key);
+            *mode = FocusMode::FocusOnList(ListState::default().with_selected(index));
+        }
+    }
+
+    pub fn unfocus(&mut self) {
+        if let Loaded(LoadedState {focus_mode: mode, .. }) = &mut self.state {
+            *mode = FocusMode::NoFocus;
         }
     }
 
@@ -119,18 +131,24 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         let list = &mut state.list;
 
+        match &mut state.focus_mode {
+            FocusMode::FocusOnList(list_state) => {
+                let new_selected = match list_state.selected() {
+                    None if state.list.len() != 0 => 0,
+                    Some(i) if i + 1 < state.list.len() => i + 1,
+                    _ => return None,
+                };
 
-        if let LoadedMode::FocusOnList(list_state) = &mut state.mode {
-            let new_selected = match list_state.selected() {
-                None if state.list.len() != 0 => 0,
-                Some(i) if i + 1 < state.list.len() => i + 1,
-                _ => return None,
-            };
-
-            list_state.select(Some(new_selected));
-            Some(state.items.get_index(new_selected).unwrap())
-        } else {
-            None
+                list_state.select(Some(new_selected));
+                Some(state.items.get_index(new_selected).unwrap())
+            }
+            FocusMode::Error(_, _) => {
+                state.focus_mode = FocusMode::FocusOnList(ListState::default());
+                None
+            },
+             _ => {
+                None
+            }
         }
     }
 
@@ -141,16 +159,23 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         let list = &mut state.list;
 
-        if let LoadedMode::FocusOnList(list_state) = &mut state.mode {
-            let new_selected = match list_state.selected() {
-                Some(i) if i > 0 => i - 1,
-                _ => return None,
-            };
+        match &mut state.focus_mode {
+            FocusMode::FocusOnList(list_state) => {
+                let new_selected = match list_state.selected() {
+                    Some(i) if i > 0 => i - 1,
+                    _ => return None,
+                };
 
-            list_state.select(Some(new_selected));
-            Some(state.items.get_index(new_selected).unwrap())
-        } else {
-            None
+                list_state.select(Some(new_selected));
+                Some(state.items.get_index(new_selected).unwrap())
+            }
+            FocusMode::Error(_, _) => {
+                state.focus_mode = FocusMode::FocusOnList(ListState::default());
+                None
+            },
+            _ => {
+                None
+            }
         }
     }
 
@@ -159,8 +184,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return;
         };
 
-
-        if let LoadedMode::FocusOnList(selected) = &mut loaded_state.mode {
+        if let FocusMode::FocusOnList(selected) = &mut loaded_state.focus_mode {
             if let Some(selected) = selected.selected() {
                 let item = loaded_state.items.get_index(selected).unwrap();
                 let details = serde_json::to_string_pretty(item.1).unwrap();
@@ -172,7 +196,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     fn focus_on_list(&mut self, list_state: ListState) {
         if let Loaded(state) = &mut self.state {
-            (*state).mode = LoadedMode::FocusOnList(list_state);
+            (*state).focus_mode = FocusMode::FocusOnList(list_state);
         };
     }
 
@@ -181,7 +205,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return;
         };
 
-        let LoadedMode::FocusOnList(list_state) = &state.mode else {
+        let FocusMode::FocusOnList(list_state) = &state.focus_mode else {
             return;
         };
 
@@ -200,7 +224,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         editor.focus();
 
-        (*state).mode = LoadedMode::FocusOnDetails((list_state.clone(), editor));
+        (*state).focus_mode = FocusMode::FocusOnDetails((list_state.clone(), editor));
     }
 
     fn is_focus_on_details(&mut self) -> bool {
@@ -208,13 +232,26 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return false;
         };
 
-        match state.mode {
-            LoadedMode::FocusOnDetails(_) => true,
-            _ => false
+        match state.focus_mode {
+            FocusMode::FocusOnDetails(_) => true,
+            _ => false,
         }
     }
 
-    pub fn draw_list(&mut self, f: &mut Frame<'_>, area: Rect, dim: bool) {
+    pub fn draw_custom(
+        &mut self,
+        f: &mut Frame<'_>,
+        area: Rect,
+        custom_component: Option<&mut dyn Component>,
+    ) -> Result<()> {
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
+            .split(area);
+
+        let list_layout = layout[0];
+        let detail_layout = layout[1];
+        let detail_title = self.details_title.clone();
         let list_title = self.list_title.clone();
 
         match &mut self.state {
@@ -227,56 +264,100 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                             .borders(Borders::ALL)
                             .title(format!("Loading {list_title} failed")),
                     );
-                f.render_widget(p, area)
+                f.render_widget(p, list_layout);
+                f.render_widget(
+                    Block::default().borders(Borders::ALL).title(detail_title),
+                    detail_layout,
+                );
             }
             Loading() => {
                 let b = Block::default()
                     .borders(Borders::ALL)
                     .style(Style::default().fg(Color::LightBlue))
                     .title(format!("Loading {list_title}..."));
-                f.render_widget(b, area)
+                f.render_widget(b, area);
+                f.render_widget(
+                    Block::default().borders(Borders::ALL).title(detail_title),
+                    detail_layout,
+                );
             }
             Loaded(state) => {
-                let LoadedState {
-                    list,
-                    mode,
-                    ..
-                } = state;
+                let LoadedState { items, focus_mode: mode, list } = state;
 
-                let style = if dim {
+                let (list_state, list_style) =
+                    match mode {
+                    FocusMode::FocusOnList(list_state) => (list_state.clone(), Style::default().not_dim()),
+                    FocusMode::FocusOnDetails((list_state, _)) => (list_state.clone(), Style::default().dim()),
+                    FocusMode::Error(_, _) => (ListState::default(), Style::default().dim()),
+                    FocusMode::NoFocus => (ListState::default(), Style::default().dim()),
+                    };
+
+                let list_style = if custom_component.is_some() {
                     Style::default().dim()
                 } else {
-                    Style::default()
+                    list_style
                 };
 
-                let list_state = match &state.mode {
-                    LoadedMode::FocusOnList(list_state) => list_state.clone(),
-                    LoadedMode::FocusOnDetails((list_state, _)) => list_state.clone(),
-                    LoadedMode::Error(message) => ListState::default(),
-                    LoadedMode::Loading => ListState::default()
-                };
-
-                let list_widget = List::new(list.clone()) //FIXME: Keep whole list in memory
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(format!(
-                                "{} ({}/{})",
-                                list_title,
-                                list_state.selected().map_or(0, |i| i + 1),
-                                list.len()
-                            )),
-                    )
+                let list_widget = List::new(list.clone())
+                    .block(Block::default().borders(Borders::ALL).title(format!(
+                        "{} ({}/{})",
+                        list_title,
+                        list_state.selected().map_or(0, |i| i + 1),
+                        list.len()
+                    )))
                     .highlight_style(
                         Style::default()
                             .bg(Color::Green)
                             .add_modifier(Modifier::BOLD),
                     )
-                    .set_style(style);
+                    .set_style(list_style);
 
-                f.render_stateful_widget(list_widget, area, &mut list_state.clone());
+                f.render_stateful_widget(list_widget, list_layout, &mut list_state.clone());
+
+                if let Some(custom_component) = custom_component {
+                    custom_component.draw(f, detail_layout).unwrap();
+                    return Ok(());
+                }
+
+                match mode {
+                    FocusMode::FocusOnList(list_state) => match list_state.selected() {
+                        None => {
+                            f.render_widget(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .title(detail_title),
+                                detail_layout,
+                            );
+                        }
+                        Some(selected) => {
+                            let item = items.get_index(selected).unwrap();
+                            let mut editor = Editor::readonly(
+                                serde_json::to_string_pretty(item.1).unwrap(),
+                                self.details_title.to_owned(),
+                            );
+                            editor.unfocus();
+                            editor.draw(f, detail_layout).unwrap();
+                        }
+                    },
+                    FocusMode::FocusOnDetails((_, editor)) => {
+                        editor.draw(f, detail_layout).unwrap();
+                    }
+                    FocusMode::Error(title, message) => {
+                        let p = Paragraph::new(message.clone())
+                            .wrap(Wrap { trim: true })
+                            .style(Style::default().fg(Color::Red))
+                            .block(
+                                Block::default()
+                                    .borders(Borders::ALL)
+                                    .title(title.to_owned()),
+                            );
+                        f.render_widget(p, detail_layout);
+                    }
+                    _ => {}
+                }
             }
         }
+        Ok(())
     }
 }
 
@@ -286,7 +367,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             return Ok(None);
         };
 
-        if let LoadedMode::FocusOnDetails((_, editor)) = &mut state.mode {
+        if let FocusMode::FocusOnDetails((_, editor)) = &mut state.focus_mode {
             return editor.handle_key_events(key);
         }
 
@@ -294,10 +375,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if let Loaded(LoadedState { mode, ..}) = &mut self.state {
-            if let LoadedMode::FocusOnDetails((selected, _)) = mode {
+        if let Loaded(LoadedState { focus_mode: mode, .. }) = &mut self.state {
+            if let FocusMode::FocusOnDetails((selected, _)) = mode {
                 if action == Action::Escape {
-                    *mode = LoadedMode::FocusOnList(selected.clone());
+                    *mode = FocusMode::FocusOnList(selected.clone());
                     return Ok(Some(SwitchMode(Mode::Main)));
                 }
                 return Ok(None);
@@ -321,6 +402,11 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     return Ok(Some(SwitchMode(Mode::Editing)));
                 }
             }
+            Action::Escape => {
+                if let Loaded(LoadedState{ focus_mode: mode, ..}) = &mut self.state {
+                    *mode = FocusMode::FocusOnList(ListState::default());
+                }
+            },
             Action::Enter => self.focus_on_details(),
             Action::LoadAllItems => self.loading(),
             Action::Copy => self.copy_details_to_clipboard(),
@@ -331,86 +417,6 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
-            .split(area);
-
-        let list_view = layout[0];
-        let detail_view = layout[1];
-        let detail_title = self.details_title.clone();
-
-        if let Loaded(LoadedState { mode, .. }) = &self.state {
-            let dim = match mode {
-                LoadedMode::FocusOnDetails(_) => true,
-                _ => false
-            };
-            self.draw_list(f, list_view, dim);
-        } else {
-            self.draw_list(f, list_view, false);
-        };
-
-
-        match &mut self.state {
-            Error(msg) => {
-                f.render_widget(
-                    Block::default().borders(Borders::ALL).title(detail_title),
-                    detail_view,
-                );
-            }
-            Loading() => {
-                f.render_widget(
-                    Block::default().borders(Borders::ALL).title(detail_title),
-                    detail_view,
-                );
-            }
-            Loaded(state) => {
-                let LoadedState { items, mode, .. } = state;
-                let (dim, details_color) = match mode {
-                    LoadedMode::FocusOnDetails(_) => (true, Color::default()),
-                    _ => (false, Color::Gray)
-                };
-
-                match mode {
-                    LoadedMode::FocusOnList(list_state) => match list_state.selected() {
-                        None => {
-                            f.render_widget(
-                                Block::default()
-                                    .borders(Borders::ALL)
-                                    .style(Style::default().fg(details_color))
-                                    .title(detail_title),
-                                detail_view,
-                            );
-                        }
-                        Some(selected) => {
-                            let item = items.get_index(selected).unwrap();
-                            let mut editor = Editor::readonly(
-                                serde_json::to_string_pretty(item.1).unwrap(),
-                                self.details_title.to_owned(),
-                            );
-                            editor.unfocus();
-                            editor.draw(f, detail_view).unwrap();
-                        }
-                    },
-                    LoadedMode::FocusOnDetails((_, editor)) => {
-                        editor.draw(f, detail_view).unwrap();
-                    }
-                    LoadedMode::Error((title, message)) => {
-                        let p = Paragraph::new(message.clone())
-                            .wrap(Wrap { trim: true })
-                            .style(Style::default().fg(Color::Red))
-                            .block(
-                                Block::default()
-                                    .borders(Borders::ALL)
-                                    .title(title.to_owned()),
-                            );
-                        f.render_widget(p, detail_view);
-                    }
-                    LoadedMode::Loading => {}
-                }
-            }
-        }
-
-        Ok(())
+        self.draw_custom(f, area, None)
     }
 }

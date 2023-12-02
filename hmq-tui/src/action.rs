@@ -3,11 +3,11 @@ use hivemq_openapi::models::{
 };
 use std::fmt;
 
+use crate::mode::Mode;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-use crate::mode::Mode;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Action {

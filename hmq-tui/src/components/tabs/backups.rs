@@ -1,17 +1,17 @@
 use crate::action::Action;
-use crate::components::tabs::TabComponent;
 use crate::components::list_with_details::{ListWithDetails, State};
+use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::fetch_backups;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
+use crossterm::event::KeyEvent;
 use hivemq_openapi::models::Backup;
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use crossterm::event::KeyEvent;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct BackupsTab<'a> {
@@ -40,11 +40,10 @@ impl Component for BackupsTab<'_> {
         self.list_with_details.handle_key_events(key)
     }
 
-
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
         match list_action {
-            Ok(Some(Action::SwitchMode(_))) =>  {
+            Ok(Some(Action::SwitchMode(_))) => {
                 return list_action;
             }
             _ => {}

@@ -25,7 +25,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64, hivemq_address: String, is_debug: bool) -> Result<Self> {
+    pub fn new(
+        tick_rate: f64,
+        frame_rate: f64,
+        hivemq_address: String,
+        is_debug: bool,
+    ) -> Result<Self> {
         let home = Home::new(hivemq_address.clone());
         let fps = FpsCounter::default();
         let config = Config::new()?;

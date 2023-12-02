@@ -8,7 +8,6 @@ use crate::utils::version;
 #[command(author, version = version(), about)]
 #[clap(disable_help_flag = true)]
 pub struct Cli {
-
     #[arg(
         long,
         action = clap::ArgAction::HelpLong

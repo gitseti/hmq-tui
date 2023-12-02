@@ -1,29 +1,30 @@
 use crate::action::Action;
-use crate::components::tabs::TabComponent;
+use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
+use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::{create_schema, fetch_schemas};
+use crate::mode::Mode;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
+use color_eyre::owo_colors::OwoColorize;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use hivemq_openapi::models::Schema;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::text::Text;
 use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use color_eyre::owo_colors::OwoColorize;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::style::{Color, Style};
-use ratatui::text::Text;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::editor::Editor;
-use crate::mode::Mode;
+use crate::mode::Mode::Main;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Schema>,
-    create_editor: Option<Editor<'a>>,
+    new_item_editor: Option<Editor<'a>>,
 }
 
 impl SchemasTab<'_> {
@@ -32,7 +33,7 @@ impl SchemasTab<'_> {
             hivemq_address: hivemq_address.clone(),
             tx: None,
             list_with_details: ListWithDetails::new("Schemas".to_owned(), "Schema".to_owned()),
-            create_editor: None,
+            new_item_editor: None,
         }
     }
 }
@@ -44,9 +45,9 @@ impl Component for SchemasTab<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if let Some(editor) = &mut self.create_editor {
+        if let Some(editor) = &mut self.new_item_editor {
             if KeyCode::Enter == key.code && key.modifiers == KeyModifiers::ALT {
-                return Ok(None)
+                return Ok(None);
             }
             editor.handle_key_events(key)
         } else {
@@ -74,17 +75,18 @@ impl Component for SchemasTab<'_> {
                 });
             }
             Action::Escape => {
-                if let Some(editor) = &mut self.create_editor {
-                    self.create_editor = None;
+                if let Some(editor) = &mut self.new_item_editor {
+                    self.new_item_editor = None;
                     return Ok(Some(Action::SwitchMode(Mode::Main)));
                 }
             }
             Action::NewItem => {
-                self.create_editor = Some(Editor::writeable("Create New Schema".to_owned()));
+                self.list_with_details.unfocus();
+                self.new_item_editor = Some(Editor::writeable("Create New Schema".to_owned()));
                 return Ok(Some(Action::SwitchMode(Mode::Editing)));
             }
             Action::Submit => {
-                if let Some(editor) = &mut self.create_editor{
+                if let Some(editor) = &mut self.new_item_editor {
                     let text = editor.get_text();
                     let host = self.hivemq_address.clone();
                     let tx = self.tx.clone().unwrap();
@@ -95,15 +97,19 @@ impl Component for SchemasTab<'_> {
                 }
             }
             Action::SchemaCreated(result) => {
+                self.new_item_editor = None;
                 match result {
                     Ok(schema) => {
-                        self.list_with_details.put(schema.id.to_owned(), schema);
+                        let schema_id = schema.id.clone();
+                        self.list_with_details.put(schema_id.clone(), schema);
+                        self.list_with_details.select_item(schema_id)
                     }
                     Err(error) => {
-                        self.list_with_details.details_error("Schema creation failed".to_owned(), error);
+                        self.list_with_details
+                            .details_error("Schema creation failed".to_owned(), error);
                     }
                 }
-                return Ok(Some(Action::Escape));
+                return Ok(Some(Action::SwitchMode(Main)));
             }
             Action::SchemasLoadingFinished(result) => match result {
                 Ok(schemas) => self.list_with_details.update_items(schemas),
@@ -118,21 +124,11 @@ impl Component for SchemasTab<'_> {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
-            .split(area);
-
-        let list_layout = layout[0];
-        let editor_layout = layout[1];
-
-        if let Some(editor) = &mut self.create_editor {
-            self.list_with_details.draw_list(f, list_layout, true);
-            editor.draw(f, editor_layout).unwrap();
-        } else {
-            self.list_with_details.draw(f, area).unwrap();
-        }
-
+        let component = self
+            .new_item_editor
+            .as_mut()
+            .map(|x| x as &mut dyn Component);
+        self.list_with_details.draw_custom(f, area, component)?;
         Ok(())
     }
 }
