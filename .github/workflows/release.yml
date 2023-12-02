@@ -69,6 +69,7 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v2
       - name: Install Build Dependencies
+        shell: bash
         run: |
           if [[ ${{ matrix.os }} == ubuntu-latest ]]; then
             sudo apt-get update && sudo apt-get install libssl-dev pkg-config
@@ -80,8 +81,6 @@ jobs:
           use-cross: ${{ matrix.use-cross }}
           toolchain: stable
           args: --release --target ${{ matrix.target }}
-
-
       - name: install strip command
         shell: bash
         run: |
