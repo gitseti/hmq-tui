@@ -6,6 +6,7 @@ use crate::components::{list_with_details, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::{create_schema, fetch_schemas};
 use crate::mode::Mode;
+use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
@@ -18,7 +19,6 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc::UnboundedSender;
-use crate::mode::Mode::Main;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,

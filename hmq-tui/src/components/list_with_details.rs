@@ -107,14 +107,23 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     pub fn select_item(&mut self, item_key: String) {
-        if let Loaded(LoadedState {items, list, focus_mode: mode, ..}) = &mut self.state {
+        if let Loaded(LoadedState {
+            items,
+            list,
+            focus_mode: mode,
+            ..
+        }) = &mut self.state
+        {
             let index = items.get_index_of(&item_key);
             *mode = FocusMode::FocusOnList(ListState::default().with_selected(index));
         }
     }
 
     pub fn unfocus(&mut self) {
-        if let Loaded(LoadedState {focus_mode: mode, .. }) = &mut self.state {
+        if let Loaded(LoadedState {
+            focus_mode: mode, ..
+        }) = &mut self.state
+        {
             *mode = FocusMode::NoFocus;
         }
     }
@@ -145,10 +154,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             FocusMode::Error(_, _) => {
                 state.focus_mode = FocusMode::FocusOnList(ListState::default());
                 None
-            },
-             _ => {
-                None
             }
+            _ => None,
         }
     }
 
@@ -172,10 +179,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             FocusMode::Error(_, _) => {
                 state.focus_mode = FocusMode::FocusOnList(ListState::default());
                 None
-            },
-            _ => {
-                None
             }
+            _ => None,
         }
     }
 
@@ -282,15 +287,22 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 );
             }
             Loaded(state) => {
-                let LoadedState { items, focus_mode: mode, list } = state;
+                let LoadedState {
+                    items,
+                    focus_mode: mode,
+                    list,
+                } = state;
 
-                let (list_state, list_style) =
-                    match mode {
-                    FocusMode::FocusOnList(list_state) => (list_state.clone(), Style::default().not_dim()),
-                    FocusMode::FocusOnDetails((list_state, _)) => (list_state.clone(), Style::default().dim()),
+                let (list_state, list_style) = match mode {
+                    FocusMode::FocusOnList(list_state) => {
+                        (list_state.clone(), Style::default().not_dim())
+                    }
+                    FocusMode::FocusOnDetails((list_state, _)) => {
+                        (list_state.clone(), Style::default().dim())
+                    }
                     FocusMode::Error(_, _) => (ListState::default(), Style::default().dim()),
                     FocusMode::NoFocus => (ListState::default(), Style::default().dim()),
-                    };
+                };
 
                 let list_style = if custom_component.is_some() {
                     Style::default().dim()
@@ -323,9 +335,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnList(list_state) => match list_state.selected() {
                         None => {
                             f.render_widget(
-                                Block::default()
-                                    .borders(Borders::ALL)
-                                    .title(detail_title),
+                                Block::default().borders(Borders::ALL).title(detail_title),
                                 detail_layout,
                             );
                         }
@@ -375,7 +385,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if let Loaded(LoadedState { focus_mode: mode, .. }) = &mut self.state {
+        if let Loaded(LoadedState {
+            focus_mode: mode, ..
+        }) = &mut self.state
+        {
             if let FocusMode::FocusOnDetails((selected, _)) = mode {
                 if action == Action::Escape {
                     *mode = FocusMode::FocusOnList(selected.clone());
@@ -403,10 +416,13 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 }
             }
             Action::Escape => {
-                if let Loaded(LoadedState{ focus_mode: mode, ..}) = &mut self.state {
+                if let Loaded(LoadedState {
+                    focus_mode: mode, ..
+                }) = &mut self.state
+                {
                     *mode = FocusMode::FocusOnList(ListState::default());
                 }
-            },
+            }
             Action::Enter => self.focus_on_details(),
             Action::LoadAllItems => self.loading(),
             Action::Copy => self.copy_details_to_clipboard(),
