@@ -85,6 +85,10 @@ impl TabComponent for TraceRecordingsTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy")]
+        vec![
+            ("R", "Load"),
+            ("C", "Copy JSON"),
+            ("ESC", "Escape"),
+        ]
     }
 }

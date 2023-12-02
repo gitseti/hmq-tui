@@ -19,7 +19,6 @@ pub struct BackupsTab<'a> {
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Backup>,
 }
-
 impl BackupsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
         BackupsTab {
@@ -83,6 +82,10 @@ impl TabComponent for BackupsTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy")]
+        vec![
+            ("R", "Load"),
+            ("C", "Copy JSON"),
+            ("ESC", "Escape"),
+        ]
     }
 }

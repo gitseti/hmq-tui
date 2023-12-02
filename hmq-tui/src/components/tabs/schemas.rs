@@ -27,6 +27,7 @@ pub struct SchemasTab<'a> {
     new_item_editor: Option<Editor<'a>>,
 }
 
+
 impl SchemasTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
         SchemasTab {
@@ -73,7 +74,7 @@ impl Component for SchemasTab<'_> {
                     tx.send(Action::SchemasLoadingFinished(result))
                         .expect("Failed to send schemas loading finished action")
                 });
-            },
+            }
             Action::SchemasLoadingFinished(result) => match result {
                 Ok(schemas) => self.list_with_details.update_items(schemas),
                 Err(msg) => {
@@ -139,6 +140,12 @@ impl TabComponent for SchemasTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy")]
+        vec![
+            ("R", "Load"),
+            ("N", "New Schema"),
+            ("C", "Copy JSON"),
+            ("ALT + ENTER", "Submit"),
+            ("ESC", "Escape"),
+        ]
     }
 }

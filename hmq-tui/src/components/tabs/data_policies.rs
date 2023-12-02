@@ -136,6 +136,12 @@ impl TabComponent for DataPoliciesTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy")]
+        vec![
+            ("R", "Load"),
+            ("N", "New Policy"),
+            ("C", "Copy JSON"),
+            ("ALT + ENTER", "Submit"),
+            ("ESC", "Escape"),
+        ]
     }
 }
