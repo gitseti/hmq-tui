@@ -14,7 +14,7 @@ panic = 'abort'
 strip = true
 
 [dependencies]
-hivemq-openapi = { version = "4.21.0", path = "../hivemq-openapi" }
+hivemq-openapi = { version = "4.21.0", path = "hivemq-openapi" }
 httpmock = "0.6"
 better-panic = "0.3.0"
 clap = { version = "4.4.5", features = ["derive", "cargo", "wrap_help", "unicode", "string", "unstable-styles"] }
