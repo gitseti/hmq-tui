@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc::UnboundedSender;
+use crate::action::Action::Submit;
 use crate::components::editor::Editor;
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
@@ -43,8 +44,8 @@ impl Component for BehaviorPoliciesTab<'_> {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Enter == key.code && key.modifiers == KeyModifiers::ALT {
-                return Ok(None);
+            if KeyCode::Char('n')  == key.code && key.modifiers == KeyModifiers::CONTROL {
+                return Ok(Some(Submit));
             }
             editor.handle_key_events(key)
         } else {
@@ -140,7 +141,7 @@ impl TabComponent for BehaviorPoliciesTab<'_> {
             ("R", "Load"),
             ("N", "New Policy"),
             ("C", "Copy JSON"),
-            ("ALT + ENTER", "Submit"),
+            ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]
     }

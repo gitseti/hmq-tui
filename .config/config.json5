@@ -27,7 +27,6 @@
       "<Ctrl-c>": "Quit",
       "<Ctrl-z>": "Suspend",
       "<esc>": "Escape",
-      "<alt-enter>": "Submit"
     }
   }
 }

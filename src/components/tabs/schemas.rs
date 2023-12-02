@@ -18,7 +18,10 @@ use ratatui::text::Text;
 use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use libc::printf;
+use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::action::Action::Submit;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
@@ -47,8 +50,8 @@ impl Component for SchemasTab<'_> {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Enter == key.code && key.modifiers == KeyModifiers::ALT {
-                return Ok(None);
+            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
+                return Ok(Some(Submit));
             }
             editor.handle_key_events(key)
         } else {
@@ -144,7 +147,7 @@ impl TabComponent for SchemasTab<'_> {
             ("R", "Load"),
             ("N", "New Schema"),
             ("C", "Copy JSON"),
-            ("ALT + ENTER", "Submit"),
+            ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]
     }

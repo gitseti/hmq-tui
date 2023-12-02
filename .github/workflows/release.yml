@@ -68,12 +68,6 @@ jobs:
           profile: minimal
           override: true
       - uses: Swatinem/rust-cache@v2
-      - name: Install Build Dependencies
-        shell: bash
-        run: |
-          if [[ ${{ matrix.os }} == ubuntu-latest ]]; then
-            sudo apt-get update && sudo apt-get install libssl-dev pkg-config
-          fi
       - name: Cargo build
         uses: actions-rs/cargo@v1
         with:
