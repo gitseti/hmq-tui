@@ -37,15 +37,20 @@ pub enum Action {
     LoadAllItems,
     Copy,
 
+    Submit,
+    SelectedItem(String),
+
     // Clients view
     ClientIdsLoadingFinished(Result<Vec<String>, String>),
     ClientDetailsLoadingFinished(Result<(String, ClientDetails), String>),
 
     // Data Policies
     DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>),
+    DataPolicyCreated(Result<DataPolicy, String>),
 
     // Behavior Policies
     BehaviorPoliciesLoadingFinished(Result<Vec<(String, BehaviorPolicy)>, String>),
+    BehaviorPolicyCreated(Result<BehaviorPolicy, String>),
 
     // Schemas
     SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
@@ -56,9 +61,6 @@ pub enum Action {
 
     // Trace Recordings
     TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
-
-    SelectedItem(String),
-    Submit,
 }
 
 impl<'de> Deserialize<'de> for Action {

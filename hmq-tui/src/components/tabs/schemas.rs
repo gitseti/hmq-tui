@@ -73,7 +73,13 @@ impl Component for SchemasTab<'_> {
                     tx.send(Action::SchemasLoadingFinished(result))
                         .expect("Failed to send schemas loading finished action")
                 });
-            }
+            },
+            Action::SchemasLoadingFinished(result) => match result {
+                Ok(schemas) => self.list_with_details.update_items(schemas),
+                Err(msg) => {
+                    self.list_with_details.error(&msg);
+                }
+            },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
@@ -111,12 +117,6 @@ impl Component for SchemasTab<'_> {
                 }
                 return Ok(Some(Action::SwitchMode(Main)));
             }
-            Action::SchemasLoadingFinished(result) => match result {
-                Ok(schemas) => self.list_with_details.update_items(schemas),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
-                }
-            },
             _ => {}
         }
 
