@@ -2,7 +2,8 @@
 name = "hmq-tui"
 version = "0.1.0"
 edition = "2021"
-description = "tui for hivemq rest api"
+license = "MIT License"
+description = "Unofficial TUI for interacting with the HiveMQ REST API"
 
 authors = ["gitseti <till.seeberger@hivemq.com>"]
 
@@ -44,3 +45,21 @@ indexmap = "2.1.0"
 arboard = "3.2.1"
 tui-textarea = "0.3.1"
 openssl = { version = "0.10.60", features = ["vendored"] }
+
+
+# https://crates.io/crates/cargo-deb
+[package.metadata.deb]
+depends = ""
+assets = [
+    ["target/release/hmq-tui", "/usr/bin/hmq-tui", "755"],
+    ["LICENSE", "/usr/share/licenses/hmq-tui/LICENSE", "644"],
+    ["README.md", "/usr/share/doc/hmq-tui/README.md", "644"],
+]
+
+# https://crates.io/crates/cargo-generate-rpm
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/hmq-tui", dest = "/usr/bin/hmq-tui", mode = "755" },
+    { source = "LICENSE", dest = "/usr/share/licenses/hmq-tui/LICENSE", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/hmq-tui/README.md", mode = "644", doc = true },
+]

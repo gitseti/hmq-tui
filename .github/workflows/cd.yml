@@ -1,0 +1,121 @@
+name: Release hmq-tui
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  github-release:
+    name: Release ${{ matrix.triple }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # LINUX
+          - triple: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            rpm: true
+          - triple: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            rpm: true
+          - triple: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            rpm: true
+          - triple: arm-unknown-linux-gnueabihf
+            os: ubuntu-latest
+          - triple: riscv64gc-unknown-linux-gnu
+            os: ubuntu-latest
+
+          # MACOS
+          - triple: x86_64-apple-darwin
+            os: macos-latest
+          - triple: aarch64-apple-darwin
+            os: macos-latest
+
+          # WINDOWS
+          - triple: x86_64-pc-windows-msvc
+            os: windows-latest
+          - triple: aarch64-pc-windows-msvc
+            os: windows-latest
+
+    steps:
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: ${{ matrix.triple }}
+
+      - name: Install cargo tools
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross,cargo-deb,cargo-generate-rpm
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set artifact name
+        shell: bash
+        run: |
+          version="${{ github.ref_name }}"
+          echo "version: $version"
+          echo "GIT_TAG_VERSION=$version" >> $GITHUB_ENV
+
+          name="hmq-tui-$version-${{ matrix.triple }}"
+          echo "artifact: $name"
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
+
+      - name: Fetch dependencies
+        run: cargo fetch --verbose
+
+      - name: Build
+        run: ${{ runner.os == 'Linux' && 'cross' || 'cargo' }} build --release --verbose --locked --target ${{ matrix.triple }}
+
+      - name: Package tar.gz (*nix)
+        if: runner.os != 'Windows'
+        run: >
+          tar -cv
+          LICENSE README.md
+          -C target/${{ matrix.triple }}/release/ hmq-tui
+          | gzip --best > ${{ env.ARTIFACT_NAME }}.tar.gz
+
+      - name: Package zip (Windows)
+        if: runner.os == 'Windows'
+        run: >
+          7z a ${{ env.ARTIFACT_NAME }}.zip
+          LICENSE README.md
+          ./target/${{ matrix.triple }}/release/hmq-tui.exe
+
+      - name: Package deb
+        if: runner.os == 'Linux'
+        run: cargo deb --verbose --no-build --no-strip --target ${{ matrix.triple }} --output ${{ env.ARTIFACT_NAME }}.deb
+
+      - name: Package rpm
+        if: matrix.rpm
+        run: cargo generate-rpm --auto-req disabled --target ${{ matrix.triple }} --output ${{ env.ARTIFACT_NAME }}.rpm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.triple }}
+          path: |
+            *.deb
+            *.rpm
+            *.tar.gz
+            *.zip
+
+      - name: Releasing assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            *.deb
+            *.rpm
+            *.tar.gz
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
