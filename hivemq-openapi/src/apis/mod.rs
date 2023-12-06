@@ -95,6 +95,7 @@ pub mod data_hub_behavior_policies_api;
 pub mod data_hub_data_policies_api;
 pub mod data_hub_management_api;
 pub mod data_hub_schemas_api;
+pub mod data_hub_scripts_api;
 pub mod data_hub_state_api;
 pub mod diagnostic_archive_api;
 pub mod mqtt_clients_api;

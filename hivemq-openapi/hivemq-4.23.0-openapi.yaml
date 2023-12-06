@@ -78,7 +78,7 @@ info:
     ## OpenAPI
     HiveMQ's REST API provides an OpenAPI 3.0 schema definition that can imported into popular API tooling (e.g. Postman) or can be used to generate client-code for multiple programming languages.
   title: HiveMQ REST API
-  version: 4.21.0
+  version: 4.23.0
   x-logo:
     url: https://www.hivemq.com/img/svg/hivemq-bee.svg
 tags:
@@ -126,6 +126,13 @@ tags:
 
     For more information on how to define and use a schema in HiveMQ, see [Schemas](https://docs.hivemq.com/hivemq/latest/data-hub/schemas.html).
   name: Data Hub - Schemas
+- description: |-
+    A script represents custom logic that can be executed in response to MQTT messages.
+
+    This endpoint can be used to create, get, and delete scripts.
+
+    For more information on how to define and use a script in HiveMQ, see [Scripts](https://docs.hivemq.com/hivemq/latest/data-hub/scripts.html).
+  name: Data Hub - Scripts
 - description: |+
     These endpoints can be used to retrieve states of clients for the Data Hub.
 
@@ -495,6 +502,19 @@ paths:
           content:
             application/json:
               examples:
+                referenced-incompatible-policy-functions:
+                  description: Example response when not all cluster nodes support
+                    the referenced script functions yet.
+                  summary: At least one referenced script function is not yet supported
+                    by all cluster nodes
+                  value:
+                    errors:
+                    - title: Incompatible policy
+                      detail: "The policy with id 'policy' could not be added because\
+                        \ its functions [fn:my-transform.js:1, fn:my-transform.js:2]\
+                        \ require at least HiveMQ version 4.23.0, but not all cluster\
+                        \ nodes have been updated to this version yet. Please try\
+                        \ again later."
                 temporarily-not-available:
                   description: The endpoint is temporarily not available
                   summary: Temporarily not available
@@ -820,6 +840,19 @@ paths:
           content:
             application/json:
               examples:
+                referenced-incompatible-policy-functions:
+                  description: Example response when not all cluster nodes support
+                    the referenced script functions yet.
+                  summary: At least one referenced script function is not yet supported
+                    by all cluster nodes
+                  value:
+                    errors:
+                    - title: Incompatible policy
+                      detail: "The policy with id 'policy' could not be added because\
+                        \ its functions [fn:my-transform.js:1, fn:my-transform.js:2]\
+                        \ require at least HiveMQ version 4.23.0, but not all cluster\
+                        \ nodes have been updated to this version yet. Please try\
+                        \ again later."
                 version-check-failed:
                   description: Version check failed
                   summary: Version check failed
@@ -1360,6 +1393,19 @@ paths:
           content:
             application/json:
               examples:
+                referenced-incompatible-policy-functions:
+                  description: Example response when not all cluster nodes support
+                    the referenced script functions yet.
+                  summary: At least one referenced script function is not yet supported
+                    by all cluster nodes
+                  value:
+                    errors:
+                    - title: Incompatible policy
+                      detail: "The policy with id 'policy' could not be added because\
+                        \ its functions [fn:my-transform.js:1, fn:my-transform.js:2]\
+                        \ require at least HiveMQ version 4.23.0, but not all cluster\
+                        \ nodes have been updated to this version yet. Please try\
+                        \ again later."
                 temporarily-not-available:
                   description: The endpoint is temporarily not available
                   summary: Temporarily not available
@@ -1706,6 +1752,19 @@ paths:
           content:
             application/json:
               examples:
+                referenced-incompatible-policy-functions:
+                  description: Example response when not all cluster nodes support
+                    the referenced script functions yet.
+                  summary: At least one referenced script function is not yet supported
+                    by all cluster nodes
+                  value:
+                    errors:
+                    - title: Incompatible policy
+                      detail: "The policy with id 'policy' could not be added because\
+                        \ its functions [fn:my-transform.js:1, fn:my-transform.js:2]\
+                        \ require at least HiveMQ version 4.23.0, but not all cluster\
+                        \ nodes have been updated to this version yet. Please try\
+                        \ again later."
                 version-check-failed:
                   description: Version check failed
                   summary: Version check failed
@@ -1861,7 +1920,7 @@ paths:
                       schemaDefinition: ewogICIkaWQiOiAiaHR0cHM6Ly9leGFtcGxlLmNvbS9hZGRyZXNzLmpzb24iLAogICIkc2NoZW1hIjogImh0dHA6Ly9qc29uLXNjaGVtYS5vcmcvZHJhZnQtMDcvc2NoZW1hIiwKICAidHlwZSI6ICJvYmplY3QiLAogICJwcm9wZXJ0aWVzIjogewogICAgInN0cmVldF9hZGRyZXNzIjogeyAidHlwZSI6ICJzdHJpbmciIH0sCiAgICAiY2l0eSI6IHsgInR5cGUiOiAic3RyaW5nIiB9LAogICAgInN0YXRlIjogeyAidHlwZSI6ICJzdHJpbmciIH0KICB9LAogICJyZXF1aXJlZCI6IFsic3RyZWV0X2FkZHJlc3MiLCAiY2l0eSIsICJzdGF0ZSJdCn0=
                       createdAt: 2023-03-01T13:48:35.164Z
                     _links:
-                      next: /api/v1/data-validation/schemas?cursor=a-eqj-GE9B5DkV-nhwVBk-nTL807ty&limit=3
+                      next: /api/v1/data-hub/schemas?cursor=a-eqj-GE9B5DkV-nhwVBk-nTL807ty&limit=3
                 list-response-c:
                   description: Example response with requested fields and multiple
                     schemas. More pages left
@@ -1872,7 +1931,7 @@ paths:
                     - id: schema2
                     - id: schema3
                     _links:
-                      next: /api/v1/data-validation/schemas?cursor=a-eqj-GE9B5DkV-nhwVBk-nTL807ty&limit=3&fields=id
+                      next: /api/v1/data-hub/schemas?cursor=a-eqj-GE9B5DkV-nhwVBk-nTL807ty&limit=3&fields=id
                 list-response-d:
                   description: Example response with a single schema
                   summary: Single Result
@@ -2155,6 +2214,347 @@ paths:
       summary: Get a schema
       tags:
       - Data Hub - Schemas
+  /api/v1/data-hub/scripts:
+    get:
+      description: Get all scripts.
+      operationId: getAllScripts
+      parameters:
+      - description: "Comma-separated list of fields to include in the response. Allowed\
+          \ values are: id, version, description, runtime, functionType, createdAt"
+        example: "id,createdAt,source"
+        in: query
+        name: fields
+        schema:
+          type: string
+      - description: Comma-separated list of function types used for filtering. Multiple
+          filters can be applied together.
+        example: TRANSFORMATION
+        in: query
+        name: functionTypes
+        schema:
+          type: string
+      - description: Comma-separated list of script ids used for filtering. Multiple
+          filters can be applied together.
+        example: "script1,script2"
+        in: query
+        name: scriptIds
+        schema:
+          type: string
+      - description: Specifies the page size for the returned results. Has to be between
+          10 and 500. Default page size is 50.
+        example: 100
+        in: query
+        name: limit
+        schema:
+          type: integer
+          format: int32
+      - description: The cursor that has been returned by the previous result page.
+          Do not pass this parameter if you want to fetch the first page.
+        in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              examples:
+                list-response-1:
+                  description: Example response with a single script
+                  summary: Single Result
+                  value:
+                    items:
+                    - id: my-transform.js
+                      version: 1
+                      createdAt: 2023-11-21T13:08:09.898Z
+                      description: This script prefixes topics with 'transformed/'
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+                list-response-b:
+                  description: Example response with multiple sripts. More pages left
+                  summary: "Multiple results, more pages left"
+                  value:
+                    items:
+                    - id: my-transform.js
+                      version: 1
+                      createdAt: 2023-11-21T13:08:09.898Z
+                      description: This script prefixes topics with 'transformed/'
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+                    - id: my-transform-new.js
+                      version: 1
+                      createdAt: 2023-11-21T13:17:53.085Z
+                      description: "This script adds the user property ('foo', 'bar')\
+                        \ to a publish"
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsgcHVibGlzaC51c2VyUHJvcGVydGllcy5wdXNoKHtuYW1lOiAnZm9vJywgdmFsdWU6ICdiYXInfSk7IHJldHVybiBwdWJsaXNoOyB9
+                    _links:
+                      next: /api/v1/data-hub/scripts?cursor=a-WfW-QB4L4Q==&limit=3
+                list-response-c:
+                  description: Example response with requested fields and multiple
+                    scripts. More pages left
+                  summary: "Multiple results, requested 'id' field"
+                  value:
+                    items:
+                    - id: script1
+                    - id: script2
+                    - id: script3
+                    _links:
+                      next: /api/v1/data-hub/scripts?cursor=a-eqj-GE9B5DkV-nhwVBk-nTL807ty&limit=3&fields=id
+                list-response-e:
+                  description: Example response with all versions of specific script
+                    id.
+                  summary: "List versions of one script, last page"
+                  value:
+                    items:
+                    - id: my-transform.js
+                      version: 1
+                      createdAt: 2023-11-21T13:08:09.898Z
+                      description: This script prefixes topics with 'transformed/'
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+                    - id: my-transform.js
+                      version: 2
+                      createdAt: 2023-11-21T13:17:53.085Z
+                      description: This script prefixes topics with 'transformed/'
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsgcHVibGlzaC51c2VyUHJvcGVydGllcy5wdXNoKHtuYW1lOiAnZm9vJywgdmFsdWU6ICdiYXInfSk7IHJldHVybiBwdWJsaXNoOyB9
+                list-response-many:
+                  description: Example response with multiple scripts
+                  summary: Multiple results
+                  value:
+                    items:
+                    - id: my-transform.js
+                      version: 1
+                      createdAt: 2023-11-21T13:08:09.898Z
+                      description: This script prefixes topics with 'transformed/'
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+                    - id: my-transform-new.js
+                      version: 1
+                      createdAt: 2023-11-21T13:17:53.085Z
+                      description: "This script adds the user property ('foo', 'bar')\
+                        \ to a publish"
+                      functionType: TRANSFORMATION
+                      source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsgcHVibGlzaC51c2VyUHJvcGVydGllcy5wdXNoKHtuYW1lOiAnZm9vJywgdmFsdWU6ICdiYXInfSk7IHJldHVybiBwdWJsaXNoOyB9
+              schema:
+                $ref: '#/components/schemas/ScriptList'
+          description: Success
+        "503":
+          content:
+            application/json:
+              examples:
+                version-check-failed:
+                  description: Version check failed
+                  summary: Version check failed
+                  value:
+                    errors:
+                    - title: Endpoint not active yet
+                      detail: "Not all cluster nodes support this endpoint yet, please\
+                        \ try again later"
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Not all cluster nodes at minimum version
+      summary: Get all scripts
+      tags:
+      - Data Hub - Scripts
+    post:
+      description: Creates a script
+      operationId: createScript
+      requestBody:
+        content:
+          application/json:
+            example:
+              id: my-transform.js
+              description: This script prefixes topics with 'transformed/'
+              functionType: TRANSFORMATION
+              source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+            schema:
+              $ref: '#/components/schemas/Script'
+        description: The script that should be created.
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              examples:
+                response-example:
+                  description: Example response.
+                  summary: Script was created successfully
+                  value:
+                    id: my-transform.js
+                    version: 1
+                    createdAt: 2023-11-21T13:08:09.898Z
+                    description: This script prefixes topics with 'transformed/'
+                    functionType: TRANSFORMATION
+                    source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+              schema:
+                $ref: '#/components/schemas/Script'
+          description: Success
+        "400":
+          content:
+            application/json:
+              examples:
+                input-cannot-be-parsed:
+                  description: Example response when input cannot be parsed.
+                  summary: Unable to parse JSON body
+                  value:
+                    errors:
+                    - title: Invalid input
+                      detail: Unable to parse JSON body
+                script-already-present:
+                  description: Example response when the script is already present.
+                  summary: The given script is identical to the latest version
+                  value:
+                    errors:
+                    - title: Script already present
+                      detail: The given script is identical to the latest version
+                        of the script with id 'scriptId'.
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Bad request
+        "503":
+          content:
+            application/json:
+              examples:
+                version-check-failed:
+                  description: Version check failed
+                  summary: Version check failed
+                  value:
+                    errors:
+                    - title: Endpoint not active yet
+                      detail: "Not all cluster nodes support this endpoint yet, please\
+                        \ try again later"
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Not all cluster nodes at minimum version
+      summary: Create a new script
+      tags:
+      - Data Hub - Scripts
+  /api/v1/data-hub/scripts/{scriptId}:
+    delete:
+      description: Deletes the selected script.
+      operationId: deleteScript
+      parameters:
+      - description: The script identifier of the script to delete.
+        example: hello_world_function
+        in: path
+        name: scriptId
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: "Success, no response body"
+        "400":
+          content:
+            application/json:
+              examples:
+                param-missing:
+                  description: Bad request
+                  summary: Required URL parameter missing
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Bad request
+        "404":
+          content:
+            application/json:
+              examples:
+                not-found:
+                  description: Resource not found
+                  summary: Not found
+                  value:
+                    errors:
+                    - title: Resource not found
+                      detail: Resource with id 'my-resource-id' not found
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Resource not found
+        "503":
+          content:
+            application/json:
+              examples:
+                version-check-failed:
+                  description: Version check failed
+                  summary: Version check failed
+                  value:
+                    errors:
+                    - title: Endpoint not active yet
+                      detail: "Not all cluster nodes support this endpoint yet, please\
+                        \ try again later"
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Not all cluster nodes at minimum version
+      summary: Delete a script
+      tags:
+      - Data Hub - Scripts
+    get:
+      description: Get a specific script.
+      operationId: getScript
+      parameters:
+      - description: The identifier of the script.
+        example: hello_world_function
+        in: path
+        name: scriptId
+        required: true
+        schema:
+          type: string
+      - description: "Comma-separated list of fields to include in the response. Allowed\
+          \ values are: id, version, description, runtime, functionType, createdAt"
+        example: "id,createdAt,source"
+        in: query
+        name: fields
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              examples:
+                get-response:
+                  description: Get script
+                  summary: Get script
+                  value:
+                    id: my-transform.js
+                    version: 1
+                    createdAt: 2023-11-21T13:08:09.898Z
+                    description: This script prefixes topics with 'transformed/'
+                    functionType: TRANSFORMATION
+                    source: ZnVuY3Rpb24gdHJhbnNmb3JtKHB1Ymxpc2gsIGNvbnRleHQpIHsKICAgcHVibGlzaC50b3BpYyA9ICJ0cmFuc2Zvcm1lZC8iICsgcHVibGlzaC50b3BpYzsKICAgcmV0dXJuIHB1Ymxpc2g7Cn0=
+              schema:
+                $ref: '#/components/schemas/Script'
+          description: Success
+        "400":
+          content:
+            application/json:
+              examples:
+                param-missing:
+                  description: Bad request
+                  summary: Required URL parameter missing
+                  value:
+                    errors:
+                    - title: Required parameter missing
+                      detail: Required URL parameter 'parameterName' is missing
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Bad request
+        "404":
+          content:
+            application/json:
+              examples:
+                not-found:
+                  description: Resource not found
+                  summary: Not found
+                  value:
+                    errors:
+                    - title: Resource not found
+                      detail: Resource with id 'my-resource-id' not found
+              schema:
+                $ref: '#/components/schemas/Errors'
+          description: Resource not found
+      summary: Get a script
+      tags:
+      - Data Hub - Scripts
   /api/v1/management/backups:
     get:
       description: |-
@@ -3978,6 +4378,47 @@ components:
       required:
       - schemaId
       - version
+    Script:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          description: The formatted UTC timestamp when the script was created.
+          readOnly: true
+        description:
+          type: string
+          description: A string of free-form text describing the function.
+        functionType:
+          type: string
+          description: The type of the function.
+          enum:
+          - TRANSFORMATION
+        id:
+          type: string
+          description: The unique identifier of the script.
+        source:
+          type: string
+          description: The base64 encoded function source code.
+        version:
+          type: integer
+          format: int32
+          description: The version of the script.
+          readOnly: true
+      required:
+      - functionType
+      - id
+      - source
+    ScriptList:
+      type: object
+      description: A listing of scripts.
+      properties:
+        _links:
+          $ref: '#/components/schemas/PaginationCursor'
+        items:
+          type: array
+          description: List of result items that are returned by this endpoint
+          items:
+            $ref: '#/components/schemas/Script'
     TLV:
       type: object
       description: Additional TLV fields contained in the proxy protocol information
