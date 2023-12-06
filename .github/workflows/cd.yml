@@ -80,7 +80,7 @@ jobs:
         run: >
           tar -cv
           LICENSE README.md
-          -C target/${{ matrix.triple }}/release/ hmq-tui
+          -C target/${{ matrix.triple }}/release/ hmq
           | gzip --best > ${{ env.ARTIFACT_NAME }}.tar.gz
 
       - name: Package zip (Windows)
@@ -88,7 +88,7 @@ jobs:
         run: >
           7z a ${{ env.ARTIFACT_NAME }}.zip
           LICENSE README.md
-          ./target/${{ matrix.triple }}/release/hmq-tui.exe
+          ./target/${{ matrix.triple }}/release/hmq.exe
 
       - name: Package deb
         if: runner.os == 'Linux'

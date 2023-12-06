@@ -2,9 +2,8 @@
 name = "hmq-tui"
 version = "0.0.1"
 edition = "2021"
-license = "MIT License"
 description = "Unofficial TUI for interacting with the HiveMQ REST API"
-
+license = "MIT License"
 authors = ["Till Seeberger <seebergertill@gmail.com>", "Markus Scully <markusscully@gmail.com>"]
 
 [profile.release]
@@ -13,6 +12,11 @@ lto = true
 codegen-units = 1
 panic = 'abort'
 strip = true
+
+[[bin]]
+name = "hmq"
+path = "src/main.rs"
+bench = false
 
 [dependencies]
 hivemq-openapi = { path = "hivemq-openapi" }
