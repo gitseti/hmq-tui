@@ -55,7 +55,7 @@ openssl = { version = "0.10.60", features = ["vendored"] }
 [package.metadata.deb]
 depends = ""
 assets = [
-    ["target/release/hmq-tui", "/usr/bin/hmq-tui", "755"],
+    ["target/release/hmq", "/usr/bin/hmq", "755"],
     ["LICENSE", "/usr/share/licenses/hmq-tui/LICENSE", "644"],
     ["README.md", "/usr/share/doc/hmq-tui/README.md", "644"],
 ]
@@ -63,7 +63,7 @@ assets = [
 # https://crates.io/crates/cargo-generate-rpm
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/hmq-tui", dest = "/usr/bin/hmq-tui", mode = "755" },
+    { source = "target/release/hmq", dest = "/usr/bin/hmq", mode = "755" },
     { source = "LICENSE", dest = "/usr/share/licenses/hmq-tui/LICENSE", mode = "644", doc = true },
     { source = "README.md", dest = "/usr/share/doc/hmq-tui/README.md", mode = "644", doc = true },
 ]
