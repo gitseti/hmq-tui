@@ -1,9 +1,13 @@
 use crate::action::Action;
+use crate::action::Action::Submit;
+use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::{create_data_policy, fetch_data_policies};
+use crate::mode::Mode;
+use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -13,10 +17,6 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc::UnboundedSender;
-use crate::action::Action::Submit;
-use crate::components::editor::Editor;
-use crate::mode::Mode;
-use crate::mode::Mode::Main;
 
 pub struct DataPoliciesTab<'a> {
     hivemq_address: String,
@@ -31,7 +31,7 @@ impl DataPoliciesTab<'_> {
             hivemq_address,
             tx: None,
             list_with_details: ListWithDetails::new("Policies".to_owned(), "Policy".to_owned()),
-            new_item_editor: None
+            new_item_editor: None,
         }
     }
 }

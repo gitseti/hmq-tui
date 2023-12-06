@@ -82,10 +82,6 @@ impl TabComponent for BackupsTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![
-            ("R", "Load"),
-            ("C", "Copy JSON"),
-            ("ESC", "Escape"),
-        ]
+        vec![("R", "Load"), ("C", "Copy JSON"), ("ESC", "Escape")]
     }
 }

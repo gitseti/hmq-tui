@@ -1,4 +1,5 @@
 use crate::action::Action;
+use crate::action::Action::Submit;
 use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
@@ -12,16 +13,15 @@ use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use hivemq_openapi::models::Schema;
+use libc::printf;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::Text;
 use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use libc::printf;
-use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::action::Action::Submit;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
@@ -29,7 +29,6 @@ pub struct SchemasTab<'a> {
     list_with_details: ListWithDetails<'a, Schema>,
     new_item_editor: Option<Editor<'a>>,
 }
-
 
 impl SchemasTab<'_> {
     pub fn new(hivemq_address: String) -> Self {

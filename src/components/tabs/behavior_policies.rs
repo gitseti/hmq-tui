@@ -1,9 +1,13 @@
 use crate::action::Action;
+use crate::action::Action::Submit;
+use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
 use crate::hivemq_rest_client::{create_behavior_policy, fetch_behavior_policies};
+use crate::mode::Mode;
+use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -13,10 +17,6 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc::UnboundedSender;
-use crate::action::Action::Submit;
-use crate::components::editor::Editor;
-use crate::mode::Mode;
-use crate::mode::Mode::Main;
 
 pub struct BehaviorPoliciesTab<'a> {
     hivemq_address: String,
@@ -31,7 +31,7 @@ impl BehaviorPoliciesTab<'_> {
             hivemq_address,
             tx: None,
             list_with_details: ListWithDetails::new("Policies".to_owned(), "Policy".to_owned()),
-            new_item_editor: None
+            new_item_editor: None,
         }
     }
 }
@@ -44,7 +44,7 @@ impl Component for BehaviorPoliciesTab<'_> {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Char('n')  == key.code && key.modifiers == KeyModifiers::CONTROL {
+            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
                 return Ok(Some(Submit));
             }
             editor.handle_key_events(key)
@@ -86,7 +86,8 @@ impl Component for BehaviorPoliciesTab<'_> {
             }
             Action::NewItem => {
                 self.list_with_details.unfocus();
-                self.new_item_editor = Some(Editor::writeable("Create New Behavior Policy".to_owned()));
+                self.new_item_editor =
+                    Some(Editor::writeable("Create New Behavior Policy".to_owned()));
                 return Ok(Some(Action::SwitchMode(Mode::Editing)));
             }
             Action::Submit => {

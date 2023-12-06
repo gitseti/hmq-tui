@@ -1,8 +1,13 @@
 use futures::future::err;
 use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_behavior_policies_api::{CreateBehaviorPolicyParams, get_all_behavior_policies, GetAllBehaviorPoliciesParams};
-use hivemq_openapi::apis::data_hub_data_policies_api::{CreateDataPolicyParams, get_all_data_policies, GetAllDataPoliciesError, GetAllDataPoliciesParams};
+use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+    get_all_behavior_policies, CreateBehaviorPolicyParams, GetAllBehaviorPoliciesParams,
+};
+use hivemq_openapi::apis::data_hub_data_policies_api::{
+    get_all_data_policies, CreateDataPolicyParams, GetAllDataPoliciesError,
+    GetAllDataPoliciesParams,
+};
 use hivemq_openapi::apis::data_hub_schemas_api::{
     get_all_schemas, CreateSchemaParams, GetAllSchemasParams,
 };
@@ -117,13 +122,14 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Dat
     let data_policy: DataPolicy =
         serde_json::from_str(data_policy.as_str()).or_else(|err| Err(err.to_string()))?;
 
-
     let params = CreateDataPolicyParams { data_policy };
 
-    let response =
-        hivemq_openapi::apis::data_hub_data_policies_api::create_data_policy(&configuration, params)
-            .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+    let response = hivemq_openapi::apis::data_hub_data_policies_api::create_data_policy(
+        &configuration,
+        params,
+    )
+    .await
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(response)
 }
@@ -165,20 +171,24 @@ pub async fn fetch_behavior_policies(
     Ok(policies)
 }
 
-pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Result<BehaviorPolicy, String> {
+pub async fn create_behavior_policy(
+    host: String,
+    behavior_policy: String,
+) -> Result<BehaviorPolicy, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
     let behavior_policy: BehaviorPolicy =
         serde_json::from_str(behavior_policy.as_str()).or_else(|err| Err(err.to_string()))?;
 
-
     let params = CreateBehaviorPolicyParams { behavior_policy };
 
-    let response =
-        hivemq_openapi::apis::data_hub_behavior_policies_api::create_behavior_policy(&configuration, params)
-            .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+    let response = hivemq_openapi::apis::data_hub_behavior_policies_api::create_behavior_policy(
+        &configuration,
+        params,
+    )
+    .await
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(response)
 }
