@@ -5,7 +5,7 @@ use clap::Parser;
 use crate::utils::version;
 
 #[derive(Parser, Debug)]
-#[command(author, version = version(), about)]
+#[command(author, version, about)]
 #[clap(disable_help_flag = true)]
 pub struct Cli {
     #[arg(
