@@ -11,9 +11,12 @@ hmq
 ## Setup
 
 ### MacOs (Homebrew)
+
 ```bash
 brew install gitseti/hmq-tui/hmq-tui
 ```
+
+---
 
 ### Windows
 
@@ -23,20 +26,24 @@ brew install gitseti/hmq-tui/hmq-tui
 
 ### Arm64
 [Download](https://github.com/gitseti/hmq-tui/releases/download/0.1.0/hmq-tui-0.1.0-aarch64-pc-windows-msvc.zip)
+
+---
+
 ### Linux (Deb)
 
 #### x86_64
 ```bash
 wget https://github.com/gitseti/hmq-tui/releases/download/0.1.0/hmq-tui-0.1.0-x86_64-unknown-linux-gnu.deb
-udo apt install ./hmq-tui-0.1.0-x86_64-unknown-linux-gnu.deb
+sudo apt install ./hmq-tui-0.1.0-x86_64-unknown-linux-gnu.deb
 ```
 
 #### Arm64
 ```bash
 wget https://github.com/gitseti/hmq-tui/releases/download/0.1.0/hmq-tui-0.1.0-aarch64-unknown-linux-gnu.deb
-udo apt install ./hmq-tui-0.1.0-aarch64-unknown-linux-gnu.deb
+sudo apt install ./hmq-tui-0.1.0-aarch64-unknown-linux-gnu.deb
 ```
 
+---
 
 ### Linux (RPM)
 
