@@ -1,5 +1,5 @@
 use hivemq_openapi::models::{
-    Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, TraceRecording,
+    Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, Script, TraceRecording,
 };
 use std::fmt;
 
@@ -55,6 +55,10 @@ pub enum Action {
     // Schemas
     SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
     SchemaCreated(Result<Schema, String>),
+
+    // Scripts
+    ScriptsLoadingFinished(Result<Vec<(String, Script)>, String>),
+    ScriptCreated(Result<Script, String>),
 
     // Backups
     BackupsLoadingFinished(Result<Vec<(String, Backup)>, String>),

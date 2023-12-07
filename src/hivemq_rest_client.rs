@@ -11,6 +11,9 @@ use hivemq_openapi::apis::data_hub_data_policies_api::{
 use hivemq_openapi::apis::data_hub_schemas_api::{
     get_all_schemas, CreateSchemaParams, GetAllSchemasParams,
 };
+use hivemq_openapi::apis::data_hub_scripts_api::{
+    get_all_scripts, CreateScriptParams, GetAllScriptsParams,
+};
 use hivemq_openapi::apis::mqtt_clients_api::{
     get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
     GetMqttClientDetailsParams,
@@ -18,7 +21,8 @@ use hivemq_openapi::apis::mqtt_clients_api::{
 use hivemq_openapi::apis::trace_recordings_api::get_all_trace_recordings;
 use hivemq_openapi::apis::{mqtt_clients_api, Error};
 use hivemq_openapi::models::{
-    Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, TraceRecording,
+    Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
+    TraceRecording,
 };
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
@@ -245,6 +249,56 @@ pub async fn create_schema(host: String, schema: String) -> Result<Schema, Strin
     Ok(response)
 }
 
+pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Script)>, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let mut params = GetAllScriptsParams {
+        fields: None,
+        function_types: None,
+        limit: Some(500),
+        cursor: None,
+        script_ids: None,
+    };
+
+    let mut scripts = vec![];
+    loop {
+        let response = get_all_scripts(&configuration, params.clone())
+            .await
+            .or_else(|error| Err(transform_api_err(&error)))?;
+
+        for script in response.items.unwrap() {
+            scripts.push((script.id.clone(), script));
+        }
+
+        let cursor = match response._links {
+            None => {
+                break;
+            }
+            Some(cursor) => cursor.unwrap().next,
+        };
+        params.cursor = cursor;
+    }
+
+    Ok(scripts)
+}
+
+pub async fn create_script(host: String, script: String) -> Result<Script, String> {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host;
+
+    let script: Script =
+        serde_json::from_str(script.as_str()).or_else(|err| Err(err.to_string()))?;
+
+    let params = CreateScriptParams { script };
+
+    let response =
+        hivemq_openapi::apis::data_hub_scripts_api::create_script(&configuration, params)
+            .await
+            .or_else(|error| Err(transform_api_err(&error)))?;
+
+    Ok(response)
+}
 pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;

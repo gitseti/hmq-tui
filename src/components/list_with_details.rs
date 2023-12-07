@@ -376,12 +376,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         let state = match &mut self.state {
             Error(_) => {
                 self.reset();
-                return Ok(None)
+                return Ok(None);
             }
-            Loading() => {
-                return Ok(None)
-            }
-            Loaded(state) => state
+            Loading() => return Ok(None),
+            Loaded(state) => state,
         };
 
         if let FocusMode::FocusOnDetails((_, editor)) = &mut state.focus_mode {

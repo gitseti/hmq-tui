@@ -14,6 +14,7 @@ use crate::components::tabs::behavior_policies::BehaviorPoliciesTab;
 use crate::components::tabs::clients::Clients;
 use crate::components::tabs::data_policies::DataPoliciesTab;
 use crate::components::tabs::schemas::SchemasTab;
+use crate::components::tabs::scripts::ScriptsTab;
 use crate::components::tabs::trace_recordings::TraceRecordingsTab;
 use crate::components::tabs::TabComponent;
 use crate::tui::Event;
@@ -25,7 +26,7 @@ use crate::{
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
-    tabs: [Box<dyn TabComponent>; 6],
+    tabs: [Box<dyn TabComponent>; 7],
     active_tab: usize,
 }
 
@@ -37,6 +38,7 @@ impl Home {
             tabs: [
                 Box::new(Clients::new(hivemq_address.to_owned())),
                 Box::new(SchemasTab::new(hivemq_address.to_owned())),
+                Box::new(ScriptsTab::new(hivemq_address.to_owned())),
                 Box::new(DataPoliciesTab::new(hivemq_address.to_owned())),
                 Box::new(BehaviorPoliciesTab::new(hivemq_address.to_owned())),
                 Box::new(TraceRecordingsTab::new(hivemq_address.to_owned())),
