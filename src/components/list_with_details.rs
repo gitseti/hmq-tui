@@ -373,8 +373,15 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
 impl<T: Serialize> Component for ListWithDetails<'_, T> {
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        let Loaded(state) = &mut self.state else {
-            return Ok(None);
+        let state = match &mut self.state {
+            Error(_) => {
+                self.reset();
+                return Ok(None)
+            }
+            Loading() => {
+                return Ok(None)
+            }
+            Loaded(state) => state
         };
 
         if let FocusMode::FocusOnDetails((_, editor)) = &mut state.focus_mode {
