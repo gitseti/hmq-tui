@@ -12,19 +12,27 @@ hmq
 
 ### MacOs (Homebrew)
 
+#### x86_64
+
 ```bash
-brew install gitseti/hmq-tui/hmq-tui
+brew install gitseti/tap/hmq-tui
+```
+
+#### Arm64
+
+```bash
+brew install --build-from-source gitseti/tap/hmq-tui
 ```
 
 ---
 
 ### Windows
 
-### x86_64
+#### x86_64
 
 [Download](https://github.com/gitseti/hmq-tui/releases/download/0.1.0/hmq-tui-0.1.0-x86_64-pc-windows-msvc.zip)
 
-### Arm64
+#### Arm64
 [Download](https://github.com/gitseti/hmq-tui/releases/download/0.1.0/hmq-tui-0.1.0-aarch64-pc-windows-msvc.zip)
 
 ---
