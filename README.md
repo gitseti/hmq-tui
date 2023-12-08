@@ -1,7 +1,10 @@
-# hmq-tui
-![hmq-tui.png](assets/hmq-tui.png)
+<div align="center">
 
-hmq-tui sets out to give easy access to [HiveMQ  REST API](https://docs.hivemq.com/hivemq/4.21/rest-api/specification/).
+# hmq-tui
+![hmq-tui.gif](assets/hmq-tui.gif)
+
+hmq-tui sets out to give easy access to the [HiveMQ  REST API](https://docs.hivemq.com/hivemq/4.21/rest-api/specification/).
+</div>
 
 Simply use the `hmq` command to start the TUI:
 ```
@@ -12,16 +15,8 @@ hmq
 
 ### MacOs (Homebrew)
 
-#### x86_64
-
 ```bash
 brew install gitseti/tap/hmq-tui
-```
-
-#### Arm64
-
-```bash
-brew install --build-from-source gitseti/tap/hmq-tui
 ```
 
 ---
