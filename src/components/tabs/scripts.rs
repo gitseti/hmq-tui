@@ -35,7 +35,7 @@ impl ScriptsTab<'_> {
         ScriptsTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            list_with_details: ListWithDetails::new("Scripts".to_owned(), "Scripts".to_owned()),
+            list_with_details: ListWithDetails::new("Scripts".to_owned(), "Script".to_owned()),
             new_item_editor: None,
         }
     }
