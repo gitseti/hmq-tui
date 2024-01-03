@@ -144,23 +144,18 @@ impl Component for Home {
             .split(f.size());
         let tab_area = layout[1];
 
-        let spans: Vec<Span> = self
+        let titles: Vec<String> = self
             .tabs
             .iter()
             .enumerate()
-            .map(|(i, tab)| {
-                let style = if i == self.active_tab {
-                    Style::default().bg(Color::Green).bold()
-                } else {
-                    Style::default()
-                };
-
-                let index = i + 1;
-                let name = tab.get_name();
-                Span::styled(format!(" [{index}] {name} "), style)
-            })
+            .map(|(index, tab)| format!(" [{}] {} ", index + 1, tab.get_name().to_string()))
             .collect();
-        f.render_widget(Paragraph::new(Line::from(spans)), layout[0]);
+        let tabs = Tabs::new(titles.to_vec())
+            .highlight_style(Style::default().bg(Color::Green))
+            .select(self.active_tab)
+            .padding("", "")
+            .divider("");
+        f.render_widget(tabs, layout[0]);
 
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
