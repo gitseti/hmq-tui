@@ -23,7 +23,6 @@ use std::collections::HashMap;
 use std::fmt::{format, Display, Formatter};
 use std::future::Future;
 use std::sync::Arc;
-use async_trait::async_trait;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct SchemasTab<'a> {

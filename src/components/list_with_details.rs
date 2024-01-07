@@ -1,5 +1,5 @@
 use crate::action::Action;
-use crate::action::Action::{CreateConfirmPopup, ItemDelete, SelectedItem, SwitchMode};
+use crate::action::Action::{CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
@@ -260,19 +260,21 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    fn copy_details_to_clipboard(&mut self) {
+    fn copy_details_to_clipboard(&mut self) -> Result<(), String> {
         let Loaded(loaded_state) = &mut self.state else {
-            return;
+            return Ok(());
         };
 
         if let FocusMode::FocusOnList(selected) = &mut loaded_state.focus_mode {
             if let Some(selected) = selected.selected() {
                 let item = loaded_state.items.get_index(selected).unwrap();
                 let details = serde_json::to_string_pretty(item.1).unwrap();
-                let mut clipboard = Clipboard::new().unwrap();
+                let mut clipboard = Clipboard::new().or_else(|err| Err(err.to_string()))?;
                 clipboard.set_text(details).unwrap();
             }
         }
+
+        Ok(())
     }
 
     fn focus_on_list(&mut self, list_state: ListState) {
@@ -552,7 +554,11 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             }
             Action::Enter => self.focus_on_details(),
             Action::LoadAllItems => self.loading(),
-            Action::Copy => self.copy_details_to_clipboard(),
+            Action::Copy => {
+                if let Err(message) = self.copy_details_to_clipboard() {
+                    return Ok(Some(CreateErrorPopup { title: "Could not copy to clipboard".to_string(), message }))
+                }
+            },
             _ => {}
         }
 
