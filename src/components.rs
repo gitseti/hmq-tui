@@ -14,6 +14,7 @@ pub mod fps;
 pub mod home;
 pub mod list_with_details;
 pub mod tabs;
+pub mod popup;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 /// Implementors of this trait can be registered with the main application loop and will be able to receive events,

@@ -3,7 +3,7 @@ use hivemq_openapi::models::{
 };
 use std::fmt;
 
-use crate::mode::Mode;
+use crate::{mode::Mode};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -21,12 +21,16 @@ pub enum Action {
     Error(String),
     Help,
 
+    CreateErrorPopup { title: String, message: String},
+    CreateConfirmPopup { title: String, message: String, confirm_action: Box<Action>},
+    ClosePopup,
     SwitchMode(Mode),
 
     // Key Events
     PrevItem,
     NextItem,
     NewItem,
+    Delete,
     Left,
     FocusDetails,
     Enter,
@@ -39,6 +43,10 @@ pub enum Action {
 
     Submit,
     SelectedItem(String),
+
+    // ListWithDetails
+    ItemDelete { item_type: String, item_id: String },
+    ItemDeleted{ item_type: String, result: Result<String, String> },
 
     // Clients view
     ClientIdsLoadingFinished(Result<Vec<String>, String>),
@@ -54,6 +62,8 @@ pub enum Action {
 
     // Schemas
     SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
+    SchemaDelete(String),
+    SchemaDeleted(Result<String, String>),
     SchemaCreated(Result<Schema, String>),
 
     // Scripts
@@ -98,6 +108,7 @@ impl<'de> Deserialize<'de> for Action {
                     "PrevItem" => Ok(Action::PrevItem),
                     "NextItem" => Ok(Action::NextItem),
                     "NewItem" => Ok(Action::NewItem),
+                    "DeleteItem" => Ok(Action::Delete),
                     "FocusDetails" => Ok(Action::FocusDetails),
                     "Enter" => Ok(Action::Enter),
                     "Submit" => Ok(Action::Submit),
@@ -110,6 +121,7 @@ impl<'de> Deserialize<'de> for Action {
                     "Tab4" => Ok(Action::SelectTab(3)),
                     "Tab5" => Ok(Action::SelectTab(4)),
                     "Tab6" => Ok(Action::SelectTab(5)),
+                    "Tab7" => Ok(Action::SelectTab(6)),
                     data if data.starts_with("Error(") => {
                         let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
                         Ok(Action::Error(error_msg.to_string()))

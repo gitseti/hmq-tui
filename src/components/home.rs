@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, Ok};
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use ratatui::{prelude::*, widgets::*};
@@ -22,12 +22,15 @@ use crate::{
     action::Action,
     config::{Config, KeyBindings},
 };
+use crate::components::popup::{ConfirmPopup, ErrorPopup, Popup};
+use crate::mode::Mode;
 
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     tabs: [Box<dyn TabComponent>; 7],
     active_tab: usize,
+    popup: Option<Box<dyn Popup>>,
 }
 
 impl Home {
@@ -45,6 +48,7 @@ impl Home {
                 Box::new(BackupsTab::new(hivemq_address.to_owned())),
             ],
             active_tab: 0,
+            popup: None,
         };
     }
 
@@ -118,16 +122,33 @@ impl Component for Home {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let tab_action = self.tabs[self.active_tab].update(action.clone())?;
-        if tab_action.is_some() {
-            self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
+
+        if let Some(popup) = &mut self.popup {
+            let action = popup.update(action)?;
+            if let Some(action) = action {
+                if action == Action::ClosePopup {
+                    self.popup = None;
+                    return Ok(Some(Action::SwitchMode(Mode::Main)));
+                }
+            }
+            return Ok(None);
         }
 
         match action {
             Action::SelectTab(tab) => self.select_tab(tab),
             Action::NextTab => self.next_tab(),
             Action::PrevTab => self.prev_tab(),
-            _ => {}
+            Action::CreateConfirmPopup { title, message, confirm_action } => {
+                let popup = ConfirmPopup { title, message, tx: self.command_tx.clone().unwrap(), action: *confirm_action };
+                self.popup = Some(Box::new(popup));
+                return Ok(Some(Action::SwitchMode(Mode::ConfirmPopup)));
+            }
+            Action::CreateErrorPopup { title, message } => {
+                let popup = ErrorPopup { title, message };
+                self.popup = Some(Box::new(popup));
+                return Ok(Some(Action::SwitchMode(Mode::ErrorPopup)));
+            }
+            _ => return self.tabs[self.active_tab].update(action)
         }
 
         Ok(None)
@@ -168,6 +189,11 @@ impl Component for Home {
         let mappings = mappings.join("");
         f.render_widget(Paragraph::new(mappings), layout[2]);
 
+        if let Some(popup) = &mut self.popup {
+            popup.draw(f, area)?;
+        }
+
         Ok(())
     }
 }
+

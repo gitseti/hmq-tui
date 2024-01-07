@@ -5,7 +5,7 @@ use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_data_policy, fetch_data_policies};
+use crate::hivemq_rest_client::{create_data_policy, delete_data_policy, fetch_data_policies};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
@@ -27,10 +27,12 @@ pub struct DataPoliciesTab<'a> {
 
 impl DataPoliciesTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let mut list_with_details = ListWithDetails::new("Policies".to_owned(), "Policy".to_owned(), hivemq_address.clone());
+        list_with_details.register_delete_fn(delete_data_policy);
         DataPoliciesTab {
             hivemq_address,
             tx: None,
-            list_with_details: ListWithDetails::new("Policies".to_owned(), "Policy".to_owned()),
+            list_with_details,
             new_item_editor: None,
         }
     }
@@ -38,7 +40,8 @@ impl DataPoliciesTab<'_> {
 
 impl Component for DataPoliciesTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
+        self.tx = Some(tx.clone());
+        self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
 
@@ -55,11 +58,8 @@ impl Component for DataPoliciesTab<'_> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
-            }
-            _ => {}
+        if let Ok(Some(action)) = list_action {
+            return Ok(Some(action));
         }
 
         match action {
@@ -140,6 +140,7 @@ impl TabComponent for DataPoliciesTab<'_> {
         vec![
             ("R", "Load"),
             ("N", "New Policy"),
+            ("D", "Delete Policy"),
             ("C", "Copy JSON"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),

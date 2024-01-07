@@ -1,10 +1,10 @@
 use crate::action::Action;
-use crate::action::Action::{SelectedItem, SwitchMode};
+use crate::action::Action::{CreateConfirmPopup, ItemDelete, SelectedItem, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent};
-use futures::future::err;
+use futures::future::{BoxFuture, err};
 use indexmap::IndexMap;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Stylize;
@@ -13,19 +13,40 @@ use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::Serialize;
 use std::fmt::Display;
+use std::future::Future;
+use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 use State::Loaded;
 
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{Error, Loading};
 use crate::components::Component;
+use crate::hivemq_rest_client::create_data_policy;
 use crate::mode::Mode;
 use crate::tui;
+
+pub trait DeleteFn: Send + Sync {
+    fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>>;
+}
+
+impl<T, F> DeleteFn for T
+    where
+        T: Fn(String, String) -> F + Sync + Send,
+        F: Future<Output=Result<String, String>> + 'static + Send,
+{
+    fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>> {
+        Box::pin(self(host, id))
+    }
+}
 
 pub struct ListWithDetails<'a, T> {
     list_title: String,
     details_title: String,
     state: State<'a, T>,
+    tx: Option<UnboundedSender<Action>>,
+    hivemq_address: String,
+    delete_fn: Option<Arc<dyn DeleteFn>>,
 }
 
 pub enum State<'a, T> {
@@ -48,7 +69,7 @@ pub enum FocusMode<'a> {
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
-    pub fn new(list_title: String, details_title: String) -> Self {
+    pub fn new(list_title: String, details_title: String, hivemq_address: String) -> Self {
         let loaded_state = LoadedState {
             items: IndexMap::new(),
             list: vec![],
@@ -58,7 +79,14 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             list_title,
             details_title,
             state: Loaded(loaded_state),
+            tx: None,
+            hivemq_address,
+            delete_fn: None,
         }
+    }
+
+    pub fn register_delete_fn(&mut self, f: impl DeleteFn + 'static) {
+        self.delete_fn = Some(Arc::new(f));
     }
 
     pub fn reset(&mut self) {
@@ -88,11 +116,59 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
+    pub fn remove(&mut self, key: String) -> Option<T> {
+        let Loaded(loaded) = &mut self.state else {
+            return None;
+        };
+
+        let Some((index, _, item)) = loaded.items.shift_remove_full(&key) else {
+            return None;
+        };
+
+        loaded.list.remove(index);
+
+        let list_state = match &mut loaded.focus_mode {
+            FocusMode::FocusOnList(list_state) => list_state,
+            FocusMode::FocusOnDetails((list_state, _)) => list_state,
+            _ => return Some(item)
+        };
+
+        if index > loaded.list.len().saturating_sub(1) {
+            list_state.select(Some(index.saturating_sub(1)))
+        }
+
+        if loaded.list.len() == 0 {
+            list_state.select(None);
+        }
+
+        Some(item)
+    }
+
     pub fn get(&mut self, key: String) -> Option<&T> {
         if let Loaded(state) = &mut self.state {
             return state.items.get(&key);
         }
         None
+    }
+
+    pub fn get_selected(&self) -> Option<(&String, &T)> {
+        let Loaded(state) = &self.state else {
+            return None;
+        };
+
+        let FocusMode::FocusOnList(ref list_state) = state.focus_mode else {
+            return None;
+        };
+
+        let Some(index) = list_state.selected() else {
+            return None;
+        };
+
+        let Some((key, item)) = state.items.get_index(index) else {
+            return None;
+        };
+
+        Some((key, item))
     }
 
     pub fn error(&mut self, msg: &str) {
@@ -108,11 +184,11 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn select_item(&mut self, item_key: String) {
         if let Loaded(LoadedState {
-            items,
-            list,
-            focus_mode: mode,
-            ..
-        }) = &mut self.state
+                          items,
+                          list,
+                          focus_mode: mode,
+                          ..
+                      }) = &mut self.state
         {
             let index = items.get_index_of(&item_key);
             *mode = FocusMode::FocusOnList(ListState::default().with_selected(index));
@@ -121,8 +197,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn unfocus(&mut self) {
         if let Loaded(LoadedState {
-            focus_mode: mode, ..
-        }) = &mut self.state
+                          focus_mode: mode, ..
+                      }) = &mut self.state
         {
             *mode = FocusMode::NoFocus;
         }
@@ -372,6 +448,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 }
 
 impl<T: Serialize> Component for ListWithDetails<'_, T> {
+    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
+        self.tx = Some(tx);
+        Ok(())
+    }
+
+
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         let state = match &mut self.state {
             Error(_) => {
@@ -391,8 +473,8 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if let Loaded(LoadedState {
-            focus_mode: mode, ..
-        }) = &mut self.state
+                          focus_mode: mode, ..
+                      }) = &mut self.state
         {
             if let FocusMode::FocusOnDetails((selected, _)) = mode {
                 if action == Action::Escape {
@@ -422,10 +504,50 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             }
             Action::Escape => {
                 if let Loaded(LoadedState {
-                    focus_mode: mode, ..
-                }) = &mut self.state
+                                  focus_mode: mode, ..
+                              }) = &mut self.state
                 {
                     *mode = FocusMode::FocusOnList(ListState::default());
+                }
+            }
+            Action::Delete => {
+                if let Some((id, _)) = self.get_selected() {
+                    if self.delete_fn.is_some() {
+                        let item_type = self.details_title.clone();
+                        let item_id = id.clone();
+                        return Ok(Some(CreateConfirmPopup {
+                            title: "Delete Item?".to_string(),
+                            message: "Do you really want to delete the item?".to_string(),
+                            confirm_action: Box::new(Action::ItemDelete { item_type, item_id }),
+                        }));
+                    }
+                }
+            }
+            Action::ItemDelete { item_type, item_id } => {
+                if let (Some(delete_fn), true) = (&self.delete_fn, item_type.eq(&self.details_title)) {
+                    let tx = self.tx.clone().unwrap();
+                    let host = self.hivemq_address.clone();
+                    let delete_fn = delete_fn.clone();
+                    tokio::spawn(async move {
+                        let result = delete_fn.delete(host, item_id).await;
+                        tx.send(Action::ItemDeleted { item_type, result }).unwrap();
+                    });
+                }
+            }
+            Action::ItemDeleted { item_type, result } => {
+                if item_type.eq(&self.details_title) {
+                    return match result {
+                        Ok(id) => {
+                            self.remove(id);
+                            Ok(None)
+                        }
+                        Err(message) => {
+                            Ok(Some(Action::CreateErrorPopup {
+                                title: "Deletion failed".to_string(),
+                                message: format!("Failed deletion of item:\n{}", message),
+                            }))
+                        }
+                    };
                 }
             }
             Action::Enter => self.focus_on_details(),

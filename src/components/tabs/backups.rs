@@ -22,9 +22,9 @@ pub struct BackupsTab<'a> {
 impl BackupsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
         BackupsTab {
-            hivemq_address,
+            hivemq_address: hivemq_address.clone(),
             tx: None,
-            list_with_details: ListWithDetails::new("Backups".to_owned(), "Backup".to_owned()),
+            list_with_details: ListWithDetails::new("Backups".to_owned(), "Backup".to_owned(), hivemq_address),
         }
     }
 }

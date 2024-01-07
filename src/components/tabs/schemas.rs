@@ -5,7 +5,7 @@ use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_schema, fetch_schemas};
+use crate::hivemq_rest_client::{create_schema, create_script, delete_schema, fetch_schemas};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
@@ -20,7 +20,10 @@ use ratatui::text::Text;
 use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{format, Display, Formatter};
+use std::future::Future;
+use std::sync::Arc;
+use async_trait::async_trait;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct SchemasTab<'a> {
@@ -32,10 +35,12 @@ pub struct SchemasTab<'a> {
 
 impl SchemasTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let mut list_with_details = ListWithDetails::new("Schemas".to_owned(), "Schema".to_owned(), hivemq_address.clone());
+        list_with_details.register_delete_fn(delete_schema);
         SchemasTab {
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             tx: None,
-            list_with_details: ListWithDetails::new("Schemas".to_owned(), "Schema".to_owned()),
+            list_with_details,
             new_item_editor: None,
         }
     }
@@ -43,7 +48,8 @@ impl SchemasTab<'_> {
 
 impl Component for SchemasTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
+        self.tx = Some(tx.clone());
+        self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
 
@@ -60,11 +66,8 @@ impl Component for SchemasTab<'_> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
-            }
-            _ => {}
+        if let Ok(Some(action)) = list_action {
+            return Ok(Some(action));
         }
 
         match action {
@@ -76,23 +79,29 @@ impl Component for SchemasTab<'_> {
                     tx.send(Action::SchemasLoadingFinished(result))
                         .expect("Failed to send schemas loading finished action")
                 });
+                Ok(None)
             }
-            Action::SchemasLoadingFinished(result) => match result {
-                Ok(schemas) => self.list_with_details.update_items(schemas),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
+            Action::SchemasLoadingFinished(result) => {
+                match result {
+                    Ok(schemas) => self.list_with_details.update_items(schemas),
+                    Err(msg) => {
+                        self.list_with_details.error(&msg)
+                    }
                 }
+                Ok(None)
             },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
-                    return Ok(Some(Action::SwitchMode(Mode::Main)));
+                    Ok(Some(Action::SwitchMode(Mode::Main)))
+                } else {
+                    Ok(None)
                 }
             }
             Action::NewItem => {
                 self.list_with_details.unfocus();
                 self.new_item_editor = Some(Editor::writeable("Create New Schema".to_owned()));
-                return Ok(Some(Action::SwitchMode(Mode::Editing)));
+                Ok(Some(Action::SwitchMode(Mode::Editing)))
             }
             Action::Submit => {
                 if let Some(editor) = &mut self.new_item_editor {
@@ -104,6 +113,7 @@ impl Component for SchemasTab<'_> {
                         tx.send(Action::SchemaCreated(result)).unwrap();
                     });
                 }
+                Ok(None)
             }
             Action::SchemaCreated(result) => {
                 self.new_item_editor = None;
@@ -118,12 +128,10 @@ impl Component for SchemasTab<'_> {
                             .details_error("Schema creation failed".to_owned(), error);
                     }
                 }
-                return Ok(Some(Action::SwitchMode(Main)));
+                Ok(Some(Action::SwitchMode(Main)))
             }
-            _ => {}
+            _ => Ok(None)
         }
-
-        Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
@@ -145,6 +153,7 @@ impl TabComponent for SchemasTab<'_> {
         vec![
             ("R", "Load"),
             ("N", "New Schema"),
+            ("D", "Delete Schema"),
             ("C", "Copy JSON"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),

@@ -3,7 +3,7 @@ use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{fetch_backups, fetch_trace_recordings};
+use crate::hivemq_rest_client::{delete_trace_recording, fetch_backups, fetch_trace_recordings};
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
@@ -22,20 +22,24 @@ pub struct TraceRecordingsTab<'a> {
 
 impl TraceRecordingsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let mut list_with_details = ListWithDetails::new(
+            "Trace Recordings".to_owned(),
+            "Trace Recording".to_owned(),
+            hivemq_address.clone()
+        );
+        list_with_details.register_delete_fn(delete_trace_recording);
         TraceRecordingsTab {
             hivemq_address,
             tx: None,
-            list_with_details: ListWithDetails::new(
-                "Trace Recordings".to_owned(),
-                "Trace Recording".to_owned(),
-            ),
+            list_with_details,
         }
     }
 }
 
 impl Component for TraceRecordingsTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
+        self.tx = Some(tx.clone());
+        self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
 
@@ -44,11 +48,8 @@ impl Component for TraceRecordingsTab<'_> {
     }
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
-            }
-            _ => {}
+        if let Ok(Some(action)) = list_action {
+            return Ok(Some(action));
         }
 
         match action {
@@ -85,6 +86,6 @@ impl TabComponent for TraceRecordingsTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy JSON"), ("ESC", "Escape")]
+        vec![("R", "Load"), ("D", "Delete Trace Recording"), ("C", "Copy JSON"), ("ESC", "Escape")]
     }
 }

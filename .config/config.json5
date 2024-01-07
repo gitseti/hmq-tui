@@ -10,6 +10,7 @@
       "<up>": "PrevItem",
       "<down>": "NextItem",
       "<n>": "NewItem",
+      "<d>": "DeleteItem",
       "<right>": "FocusDetails",
       "<tab>": "NextTab",
       "<backtab>": "PrevTab",
@@ -27,6 +28,21 @@
       "<Ctrl-c>": "Quit",
       "<Ctrl-z>": "Suspend",
       "<esc>": "Escape",
+    },
+    "ErrorPopup": {
+      "<q>": "Quit",
+      "<Ctrl-d>": "Quit",
+      "<Ctrl-c>": "Quit",
+      "<Ctrl-z>": "Suspend",
+      "<esc>": "Escape"
+    },
+    "ConfirmPopup": {
+      "<q>": "Quit",
+      "<Ctrl-d>": "Quit",
+      "<Ctrl-c>": "Quit",
+      "<Ctrl-z>": "Suspend",
+      "<esc>": "Escape",
+      "<enter>": "Enter"
     }
   }
 }

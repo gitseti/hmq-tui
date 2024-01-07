@@ -34,10 +34,11 @@ impl Clients<'_> {
     pub fn new(hivemq_address: String) -> Self {
         Clients {
             tx: None,
-            hivemq_address,
+            hivemq_address: hivemq_address.clone(),
             list_with_details: ListWithDetails::new(
                 "Clients".to_owned(),
                 "Client Details".to_owned(),
+                hivemq_address
             ),
         }
     }

@@ -5,7 +5,7 @@ use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_script, fetch_scripts};
+use crate::hivemq_rest_client::{create_script, delete_script, fetch_scripts};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
@@ -32,10 +32,12 @@ pub struct ScriptsTab<'a> {
 
 impl ScriptsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let mut list_with_details = ListWithDetails::new("Scripts".to_owned(), "Script".to_owned(), hivemq_address.clone());
+        list_with_details.register_delete_fn(delete_script);
         ScriptsTab {
-            hivemq_address: hivemq_address.clone(),
+            hivemq_address,
             tx: None,
-            list_with_details: ListWithDetails::new("Scripts".to_owned(), "Script".to_owned()),
+            list_with_details,
             new_item_editor: None,
         }
     }
@@ -43,7 +45,8 @@ impl ScriptsTab<'_> {
 
 impl Component for ScriptsTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
+        self.tx = Some(tx.clone());
+        self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
 
@@ -60,11 +63,8 @@ impl Component for ScriptsTab<'_> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
-            }
-            _ => {}
+        if let Ok(Some(action)) = list_action {
+            return Ok(Some(action));
         }
 
         match action {
@@ -145,6 +145,7 @@ impl TabComponent for ScriptsTab<'_> {
         vec![
             ("R", "Load"),
             ("N", "New Script"),
+            ("D", "Delete Script"),
             ("C", "Copy JSON"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
