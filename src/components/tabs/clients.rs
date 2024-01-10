@@ -1,17 +1,17 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::cli::Cli;
 use crate::components::editor::Editor;
 use crate::components::home::Home;
 use crate::components::list_with_details::ListWithDetails;
 use crate::components::tabs::TabComponent;
 use crate::components::Component;
-use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
+use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids, fetch_schemas};
 use crate::mode::Mode;
 use crate::{hivemq_rest_client, tui};
 use clap::builder::Str;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::ClientDetails;
+use hivemq_openapi::models::{Backup, ClientDetails};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
@@ -19,6 +19,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::sleep;
@@ -32,14 +33,21 @@ pub struct Clients<'a> {
 
 impl Clients<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
+            .list_title("Clients")
+            .details_title("Client Details")
+            .hivemq_address(hivemq_address.clone())
+            .item_selector(|item| {
+                match item {
+                    Item::ClientItem(client_details) => Some(Some(client_details)),
+                    _ => None
+                }
+            })
+            .build();
         Clients {
             tx: None,
             hivemq_address: hivemq_address.clone(),
-            list_with_details: ListWithDetails::new(
-                "Clients".to_owned(),
-                "Client Details".to_owned(),
-                hivemq_address
-            ),
+            list_with_details
         }
     }
 }
@@ -122,6 +130,8 @@ impl TabComponent for Clients<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy JSON"), ("ESC", "Escape")]
+        vec![("R", "Load"),
+             ("C", "Copy"),
+             ("ESC", "Escape"),]
     }
 }

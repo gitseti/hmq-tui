@@ -1,7 +1,7 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::action::Action::Submit;
 use crate::components::editor::Editor;
-use crate::components::list_with_details::{ListWithDetails, State};
+use crate::components::list_with_details::{ListWithDetails, ListWithDetailsBuilder, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
@@ -24,6 +24,7 @@ use std::fmt::{format, Display, Formatter};
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::components::item_features::ListFn;
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
@@ -34,8 +35,20 @@ pub struct SchemasTab<'a> {
 
 impl SchemasTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
-        let mut list_with_details = ListWithDetails::new("Schemas".to_owned(), "Schema".to_owned(), hivemq_address.clone());
-        list_with_details.register_delete_fn(delete_schema);
+        let list_with_details = ListWithDetails::<Schema>::builder()
+            .list_title("Schemas")
+            .details_title("Schema")
+            .hivemq_address(hivemq_address.clone())
+            .list_fn(Arc::new(fetch_schemas))
+            .delete_fn(Arc::new(delete_schema))
+            .item_selector(|item| {
+                match item {
+                    Item::SchemaItem(schema) => Some(schema),
+                    _ => None
+                }
+            })
+            .build();
+
         SchemasTab {
             hivemq_address,
             tx: None,
@@ -70,25 +83,6 @@ impl Component for SchemasTab<'_> {
         }
 
         match action {
-            Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
-                let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
-                    let result = fetch_schemas(hivemq_address).await;
-                    tx.send(Action::SchemasLoadingFinished(result))
-                        .expect("Failed to send schemas loading finished action")
-                });
-                Ok(None)
-            }
-            Action::SchemasLoadingFinished(result) => {
-                match result {
-                    Ok(schemas) => self.list_with_details.update_items(schemas),
-                    Err(msg) => {
-                        self.list_with_details.error(&msg)
-                    }
-                }
-                Ok(None)
-            },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
@@ -151,9 +145,9 @@ impl TabComponent for SchemasTab<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![
             ("R", "Load"),
-            ("N", "New Schema"),
-            ("D", "Delete Schema"),
-            ("C", "Copy JSON"),
+            ("N", "New"),
+            ("D", "Delete"),
+            ("C", "Copy"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]

@@ -1,18 +1,20 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::fetch_backups;
+use crate::hivemq_rest_client::{delete_schema, fetch_backups, fetch_schemas};
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::Backup;
+use hivemq_openapi::models::{Backup, Schema};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::components::item_features::ListFn;
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
@@ -21,17 +23,30 @@ pub struct BackupsTab<'a> {
 }
 impl BackupsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
+        let list_with_details = ListWithDetails::<Backup>::builder()
+            .list_title("Backups")
+            .details_title("Backup")
+            .hivemq_address(hivemq_address.clone())
+            .list_fn(Arc::new(fetch_backups))
+            .item_selector(|item| {
+                match item {
+                    Item::BackupItem(backup) => Some(backup),
+                    _ => None
+                }
+            })
+            .build();
         BackupsTab {
             hivemq_address: hivemq_address.clone(),
             tx: None,
-            list_with_details: ListWithDetails::new("Backups".to_owned(), "Backup".to_owned(), hivemq_address),
+            list_with_details,
         }
     }
 }
 
 impl Component for BackupsTab<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
+        self.tx = Some(tx.clone());
+        self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
 
@@ -45,25 +60,6 @@ impl Component for BackupsTab<'_> {
             Ok(Some(Action::SwitchMode(_))) => {
                 return list_action;
             }
-            _ => {}
-        }
-
-        match action {
-            Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
-                let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
-                    let result = fetch_backups(hivemq_address).await;
-                    tx.send(Action::BackupsLoadingFinished(result))
-                        .expect("Failed to send backups loading finished action")
-                });
-            }
-            Action::BackupsLoadingFinished(result) => match result {
-                Ok(backups) => self.list_with_details.update_items(backups),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
-                }
-            },
             _ => {}
         }
 

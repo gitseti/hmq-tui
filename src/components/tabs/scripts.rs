@@ -1,18 +1,18 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::action::Action::Submit;
 use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_script, delete_script, fetch_scripts};
+use crate::hivemq_rest_client::{create_script, delete_script, fetch_schemas, fetch_scripts};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::Script;
+use hivemq_openapi::models::{Backup, Script};
 use libc::printf;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
@@ -21,6 +21,7 @@ use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct ScriptsTab<'a> {
@@ -32,8 +33,19 @@ pub struct ScriptsTab<'a> {
 
 impl ScriptsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
-        let mut list_with_details = ListWithDetails::new("Scripts".to_owned(), "Script".to_owned(), hivemq_address.clone());
-        list_with_details.register_delete_fn(delete_script);
+        let list_with_details = ListWithDetails::<Script>::builder()
+            .list_title("Scripts")
+            .details_title("Script")
+            .hivemq_address(hivemq_address.clone())
+            .list_fn(Arc::new(fetch_scripts))
+            .delete_fn(Arc::new(delete_script))
+            .item_selector(|item| {
+                match item {
+                    Item::ScriptItem(script) => Some(script),
+                    _ => None
+                }
+            })
+            .build();
         ScriptsTab {
             hivemq_address,
             tx: None,
@@ -68,21 +80,6 @@ impl Component for ScriptsTab<'_> {
         }
 
         match action {
-            Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
-                let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
-                    let result = fetch_scripts(hivemq_address).await;
-                    tx.send(Action::ScriptsLoadingFinished(result))
-                        .expect("Failed to send scripts loading finished action")
-                });
-            }
-            Action::ScriptsLoadingFinished(result) => match result {
-                Ok(scripts) => self.list_with_details.update_items(scripts),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
-                }
-            },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
@@ -144,9 +141,9 @@ impl TabComponent for ScriptsTab<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![
             ("R", "Load"),
-            ("N", "New Script"),
-            ("D", "Delete Script"),
-            ("C", "Copy JSON"),
+            ("N", "New"),
+            ("D", "Delete"),
+            ("C", "Copy"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]

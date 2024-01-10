@@ -19,6 +19,8 @@ use hivemq_openapi::models::{
 };
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
+use crate::action::Item;
+use crate::action::Item::{BackupItem, BehaviorPolicyItem, DataPolicyItem, ScriptItem, TraceRecordingItem};
 
 pub async fn fetch_client_details(
     client_id: String,
@@ -77,7 +79,7 @@ pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
 }
 
 //TODO: Test
-pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy)>, String> {
+pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -97,7 +99,7 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, DataPolicy
             .or_else(|error| Err(transform_api_err(&error)))?;
 
         for policy in response.items.unwrap() {
-            policies.push((policy.id.clone(), policy));
+            policies.push((policy.id.clone(), DataPolicyItem(policy)));
         }
 
         let cursor = match response._links {
@@ -149,7 +151,7 @@ pub async fn delete_data_policy(host: String, policy_id: String) -> Result<Strin
 //TODO: Tests
 pub async fn fetch_behavior_policies(
     host: String,
-) -> Result<Vec<(String, BehaviorPolicy)>, String> {
+) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -168,7 +170,7 @@ pub async fn fetch_behavior_policies(
             .or_else(|error| Err(transform_api_err(&error)))?;
 
         for policy in response.items.unwrap() {
-            policies.push((policy.id.clone(), policy));
+            policies.push((policy.id.clone(), BehaviorPolicyItem(policy)));
         }
 
         let cursor = match response._links {
@@ -221,7 +223,7 @@ pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<S
 }
 
 //TODO: Test | Refactor?
-pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String> {
+pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -240,7 +242,7 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Schema)>, String
             .or_else(|error| Err(transform_api_err(&error)))?;
 
         for schema in response.items.unwrap() {
-            schemas.push((schema.id.clone(), schema));
+            schemas.push((schema.id.clone(), Item::SchemaItem(schema)));
         }
 
         let cursor = match response._links {
@@ -287,7 +289,7 @@ pub async fn delete_schema(host: String, schema_id: String) -> Result<String, St
     Ok(response)
 }
 
-pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Script)>, String> {
+pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -306,7 +308,7 @@ pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Script)>, String
             .or_else(|error| Err(transform_api_err(&error)))?;
 
         for script in response.items.unwrap() {
-            scripts.push((script.id.clone(), script));
+            scripts.push((script.id.clone(), ScriptItem(script)));
         }
 
         let cursor = match response._links {
@@ -353,7 +355,7 @@ pub async fn delete_script(host: String, script_id: String) -> Result<String, St
     Ok(response)
 }
 
-pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String> {
+pub async fn fetch_backups(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -363,13 +365,13 @@ pub async fn fetch_backups(host: String) -> Result<Vec<(String, Backup)>, String
         .or_else(|error| Err(transform_api_err(&error)))?;
 
     for backup in response.items.unwrap() {
-        backups.push((backup.id.clone().unwrap(), backup));
+        backups.push((backup.id.clone().unwrap(), BackupItem(backup)));
     }
 
     Ok(backups)
 }
 
-pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, TraceRecording)>, String> {
+pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -379,7 +381,7 @@ pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, TraceRe
         .or_else(|error| Err(transform_api_err(&error)))?;
 
     for trace_recording in response.items.unwrap() {
-        trace_recordings.push((trace_recording.name.clone().unwrap(), trace_recording));
+        trace_recordings.push((trace_recording.name.clone().unwrap(), TraceRecordingItem(trace_recording)));
     }
 
     Ok(trace_recordings)

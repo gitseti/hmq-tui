@@ -1,21 +1,22 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::action::Action::Submit;
 use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_data_policy, delete_data_policy, fetch_data_policies};
+use crate::hivemq_rest_client::{create_data_policy, delete_data_policy, fetch_data_policies, fetch_schemas};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::DataPolicy;
+use hivemq_openapi::models::{Backup, DataPolicy};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct DataPoliciesTab<'a> {
@@ -27,8 +28,19 @@ pub struct DataPoliciesTab<'a> {
 
 impl DataPoliciesTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
-        let mut list_with_details = ListWithDetails::new("Policies".to_owned(), "Policy".to_owned(), hivemq_address.clone());
-        list_with_details.register_delete_fn(delete_data_policy);
+        let list_with_details = ListWithDetails::<DataPolicy>::builder()
+            .list_title("D. Policies")
+            .details_title("D. Policy")
+            .hivemq_address(hivemq_address.clone())
+            .list_fn(Arc::new(fetch_data_policies))
+            .delete_fn(Arc::new(delete_data_policy))
+            .item_selector(|item| {
+                match item {
+                    Item::DataPolicyItem(policy) => Some(policy),
+                    _ => None
+                }
+            })
+            .build();
         DataPoliciesTab {
             hivemq_address,
             tx: None,
@@ -63,21 +75,6 @@ impl Component for DataPoliciesTab<'_> {
         }
 
         match action {
-            Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
-                let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
-                    let result = fetch_data_policies(hivemq_address).await;
-                    tx.send(Action::DataPoliciesLoadingFinished(result))
-                        .expect("Failed to send data policies loading finished action")
-                });
-            }
-            Action::DataPoliciesLoadingFinished(result) => match result {
-                Ok(policies) => self.list_with_details.update_items(policies),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
-                }
-            },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
@@ -139,9 +136,9 @@ impl TabComponent for DataPoliciesTab<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![
             ("R", "Load"),
-            ("N", "New Policy"),
-            ("D", "Delete Policy"),
-            ("C", "Copy JSON"),
+            ("N", "New"),
+            ("D", "Delete"),
+            ("C", "Copy"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]

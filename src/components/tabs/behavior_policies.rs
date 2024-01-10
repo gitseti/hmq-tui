@@ -1,21 +1,22 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::action::Action::Submit;
 use crate::components::editor::Editor;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_behavior_policy, delete_behavior_policy, fetch_behavior_policies};
+use crate::hivemq_rest_client::{create_behavior_policy, delete_behavior_policy, fetch_behavior_policies, fetch_schemas};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::BehaviorPolicy;
+use hivemq_openapi::models::{Backup, BehaviorPolicy};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct BehaviorPoliciesTab<'a> {
@@ -27,8 +28,19 @@ pub struct BehaviorPoliciesTab<'a> {
 
 impl BehaviorPoliciesTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
-        let mut list_with_details = ListWithDetails::new("Policies".to_owned(), "Policy".to_owned(), hivemq_address.clone());
-        list_with_details.register_delete_fn(delete_behavior_policy);
+        let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
+            .list_title("B. Policies")
+            .details_title("B. Policy")
+            .hivemq_address(hivemq_address.clone())
+            .list_fn(Arc::new(fetch_behavior_policies))
+            .delete_fn(Arc::new(delete_behavior_policy))
+            .item_selector(|item| {
+                match item {
+                    Item::BehaviorPolicyItem(policy) => Some(policy),
+                    _ => None
+                }
+            })
+            .build();
         BehaviorPoliciesTab {
             hivemq_address,
             tx: None,
@@ -63,21 +75,6 @@ impl Component for BehaviorPoliciesTab<'_> {
         }
 
         match action {
-            Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
-                let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
-                    let result = fetch_behavior_policies(hivemq_address).await;
-                    tx.send(Action::BehaviorPoliciesLoadingFinished(result))
-                        .expect("Failed to send behavior policies loading finished action")
-                });
-            }
-            Action::BehaviorPoliciesLoadingFinished(result) => match result {
-                Ok(policies) => self.list_with_details.update_items(policies),
-                Err(msg) => {
-                    self.list_with_details.error(&msg);
-                }
-            },
             Action::Escape => {
                 if let Some(editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
@@ -140,9 +137,9 @@ impl TabComponent for BehaviorPoliciesTab<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![
             ("R", "Load"),
-            ("N", "New Policy"),
-            ("D", "Delete Policy"),
-            ("C", "Copy JSON"),
+            ("N", "New"),
+            ("D", "Delete"),
+            ("C", "Copy"),
             ("CTRL + N", "Submit"),
             ("ESC", "Escape"),
         ]

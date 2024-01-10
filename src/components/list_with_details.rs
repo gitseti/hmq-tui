@@ -1,4 +1,4 @@
-use crate::action::Action;
+use crate::action::{Action, Item};
 use crate::action::Action::{CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
@@ -11,42 +11,53 @@ use ratatui::prelude::Stylize;
 use ratatui::style::{Color, Modifier, Style, Styled};
 use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use typed_builder::TypedBuilder;
 use tui::Frame;
 use State::Loaded;
 
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{Error, Loading};
 use crate::components::Component;
-use crate::hivemq_rest_client::create_data_policy;
+use crate::components::item_features::{DeleteFn, ListFn};
 use crate::mode::Mode;
 use crate::tui;
 
-pub trait DeleteFn: Send + Sync {
-    fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>>;
-}
 
-impl<T, F> DeleteFn for T
-    where
-        T: Fn(String, String) -> F + Sync + Send,
-        F: Future<Output=Result<String, String>> + 'static + Send,
-{
-    fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>> {
-        Box::pin(self(host, id))
-    }
-}
-
+#[derive(TypedBuilder)]
 pub struct ListWithDetails<'a, T> {
+    #[builder(setter(into))]
     list_title: String,
+
+    #[builder(setter(into))]
     details_title: String,
+
+    #[builder(setter(skip), default =
+    Loaded(LoadedState {
+    items: IndexMap::new(),
+    list: vec ! [],
+    focus_mode: FocusMode::FocusOnList(ListState::default()),
+    }))]
     state: State<'a, T>,
+
+    #[builder(setter(skip), default)]
     tx: Option<UnboundedSender<Action>>,
+
+    #[builder(setter(into))]
     hivemq_address: String,
+
+    #[builder(setter(strip_option), default)]
     delete_fn: Option<Arc<dyn DeleteFn>>,
+
+    #[builder(setter(strip_option), default)]
+    list_fn: Option<Arc<dyn ListFn>>,
+
+    #[builder(setter(strip_option))]
+    item_selector: Option<fn(Item) -> Option<T>>,
 }
 
 pub enum State<'a, T> {
@@ -69,26 +80,6 @@ pub enum FocusMode<'a> {
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
-    pub fn new(list_title: String, details_title: String, hivemq_address: String) -> Self {
-        let loaded_state = LoadedState {
-            items: IndexMap::new(),
-            list: vec![],
-            focus_mode: FocusMode::FocusOnList(ListState::default()),
-        };
-        ListWithDetails {
-            list_title,
-            details_title,
-            state: Loaded(loaded_state),
-            tx: None,
-            hivemq_address,
-            delete_fn: None,
-        }
-    }
-
-    pub fn register_delete_fn(&mut self, f: impl DeleteFn + 'static) {
-        self.delete_fn = Some(Arc::new(f));
-    }
-
     pub fn reset(&mut self) {
         self.state = Loaded(LoadedState {
             items: IndexMap::new(),
@@ -455,7 +446,6 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         Ok(())
     }
 
-
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         let state = match &mut self.state {
             Error(_) => {
@@ -488,6 +478,38 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         }
 
         match action {
+            Action::LoadAllItems => {
+                if let Some(list_fn) = &self.list_fn {
+                    let tx = self.tx.clone().unwrap();
+                    let hivemq_address = self.hivemq_address.clone();
+                    let list_fn = list_fn.clone();
+                    let handle = tokio::spawn(async move {
+                        let result = list_fn.list(hivemq_address).await;
+                        tx.send(Action::ItemsLoadingFinished { result }).unwrap();
+                    });
+                }
+                self.loading();
+            }
+            Action::ItemsLoadingFinished { result } =>
+                {
+                    match result {
+                        Ok(items) => {
+                            let selector = self.item_selector.unwrap();
+                            let mut unwrapped_items = Vec::with_capacity(items.len());
+                            for (id, item) in items {
+                                let Some(item) = selector(item) else {
+                                    break;
+                                };
+                                unwrapped_items.push((id, item));
+                            }
+                            self.update_items(unwrapped_items);
+                        }
+                        Err(msg) => {
+                            self.error(&msg)
+                        }
+                    }
+                    return Ok(None);
+                }
             Action::PrevItem => {
                 if let Some((key, value)) = self.prev_item() {
                     return Ok(Some(SelectedItem(key.to_owned())));
@@ -553,12 +575,11 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 }
             }
             Action::Enter => self.focus_on_details(),
-            Action::LoadAllItems => self.loading(),
             Action::Copy => {
                 if let Err(message) = self.copy_details_to_clipboard() {
-                    return Ok(Some(CreateErrorPopup { title: "Could not copy to clipboard".to_string(), message }))
+                    return Ok(Some(CreateErrorPopup { title: "Could not copy to clipboard".to_string(), message }));
                 }
-            },
+            }
             _ => {}
         }
 
