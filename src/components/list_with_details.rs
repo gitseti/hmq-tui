@@ -388,7 +388,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     )))
                     .highlight_style(
                         Style::default()
-                            .bg(Color::Green)
+                            .bg(Color::Blue)
                             .add_modifier(Modifier::BOLD),
                     )
                     .set_style(list_style);

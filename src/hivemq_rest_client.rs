@@ -432,7 +432,7 @@ pub fn transform_api_err<T: Serialize>(error: &Error<T>) -> String {
         error.to_string()
     };
 
-    format!("Fetching failed: {}", msg)
+    format!("API request failed: {}", msg)
 }
 
 #[cfg(test)]

@@ -169,10 +169,10 @@ impl Component for Home {
             .tabs
             .iter()
             .enumerate()
-            .map(|(index, tab)| format!(" [{}] {} ", index + 1, tab.get_name().to_string()))
+            .map(|(index, tab)| format!(" {} [{}] ", tab.get_name().to_string(), index + 1))
             .collect();
         let tabs = Tabs::new(titles.to_vec())
-            .highlight_style(Style::default().bg(Color::Green))
+            .highlight_style(Style::default().bg(Color::Blue).underlined())
             .select(self.active_tab)
             .padding("", "")
             .divider("");

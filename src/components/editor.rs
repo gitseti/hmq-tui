@@ -54,7 +54,7 @@ impl Editor<'_> {
                 .title(self.title.to_owned()),
         );
         self.textarea
-            .set_cursor_style(Style::default().bg(Color::Green));
+            .set_cursor_style(Style::default().bg(Color::Blue));
     }
 
     pub fn unfocus(&mut self) {
