@@ -172,7 +172,8 @@ impl Component for Home {
             .map(|(index, tab)| format!(" {} [{}] ", tab.get_name().to_string(), index + 1))
             .collect();
         let tabs = Tabs::new(titles.to_vec())
-            .highlight_style(Style::default().bg(Color::Blue).underlined())
+            .highlight_style(Style::default().bg(Color::Blue).not_dim().underlined())
+            .style(Style::default().dim())
             .select(self.active_tab)
             .padding("", "")
             .divider("");

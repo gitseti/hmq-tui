@@ -340,7 +340,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     );
                 f.render_widget(p, list_layout);
                 f.render_widget(
-                    Block::default().borders(Borders::ALL).title(detail_title),
+                    Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
                     detail_layout,
                 );
             }
@@ -351,7 +351,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     .title(format!("Loading {list_title}..."));
                 f.render_widget(b, area);
                 f.render_widget(
-                    Block::default().borders(Borders::ALL).title(detail_title),
+                    Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
                     detail_layout,
                 );
             }
@@ -404,7 +404,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnList(list_state) => match list_state.selected() {
                         None => {
                             f.render_widget(
-                                Block::default().borders(Borders::ALL).title(detail_title),
+                                Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
                                 detail_layout,
                             );
                         }
