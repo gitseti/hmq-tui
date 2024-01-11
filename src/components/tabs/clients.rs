@@ -97,7 +97,7 @@ impl Component for Clients<'_> {
                     self.list_with_details.put(client_id, Some(details));
                 }
                 Err(msg) => {
-                    self.list_with_details.error(&msg);
+                    self.list_with_details.list_error(&msg);
                 }
             },
             Action::ClientIdsLoadingFinished(result) => match result {
@@ -109,7 +109,7 @@ impl Component for Clients<'_> {
                     self.list_with_details.update_items(details);
                 }
                 Err(msg) => {
-                    self.list_with_details.error(&msg);
+                    self.list_with_details.list_error(&msg);
                 }
             },
             _ => (),

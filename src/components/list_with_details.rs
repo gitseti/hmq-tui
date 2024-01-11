@@ -12,7 +12,7 @@ use ratatui::style::{Color, Modifier, Style, Styled};
 use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::fmt::{Display, format};
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -21,9 +21,10 @@ use tui::Frame;
 use State::Loaded;
 
 use crate::components::editor::Editor;
-use crate::components::list_with_details::State::{Error, Loading};
+use crate::components::list_with_details::State::{LoadingError, Loading};
 use crate::components::Component;
 use crate::components::item_features::{DeleteFn, ListFn};
+use crate::components::list_with_details::FocusMode::FocusOnList;
 use crate::mode::Mode;
 use crate::tui;
 
@@ -61,7 +62,7 @@ pub struct ListWithDetails<'a, T> {
 }
 
 pub enum State<'a, T> {
-    Error(String),
+    LoadingError(String),
     Loading(),
     Loaded(LoadedState<'a, T>),
 }
@@ -75,8 +76,7 @@ pub struct LoadedState<'a, T> {
 pub enum FocusMode<'a> {
     FocusOnList(ListState),
     FocusOnDetails((ListState, Editor<'a>)),
-    NoFocus,
-    Error(String, String),
+    FocusOnDetailsError(String, String),
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
@@ -162,14 +162,14 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         Some((key, item))
     }
 
-    pub fn error(&mut self, msg: &str) {
+    pub fn list_error(&mut self, msg: &str) {
         self.reset();
-        self.state = Error(msg.to_owned());
+        self.state = LoadingError(msg.to_owned());
     }
 
     pub fn details_error(&mut self, title: String, message: String) {
         if let Loaded(loaded_state) = &mut self.state {
-            loaded_state.focus_mode = FocusMode::Error(title, message);
+            loaded_state.focus_mode = FocusMode::FocusOnDetailsError(title, message);
         }
     }
 
@@ -191,7 +191,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                           focus_mode: mode, ..
                       }) = &mut self.state
         {
-            *mode = FocusMode::NoFocus;
+            *mode = FocusOnList(ListState::default());
         }
     }
 
@@ -218,7 +218,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 list_state.select(Some(new_selected));
                 Some(state.items.get_index(new_selected).unwrap())
             }
-            FocusMode::Error(_, _) => {
+            FocusMode::FocusOnDetailsError(_, _) => {
                 state.focus_mode = FocusMode::FocusOnList(ListState::default());
                 None
             }
@@ -243,7 +243,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 list_state.select(Some(new_selected));
                 Some(state.items.get_index(new_selected).unwrap())
             }
-            FocusMode::Error(_, _) => {
+            FocusMode::FocusOnDetailsError(_, _) => {
                 state.focus_mode = FocusMode::FocusOnList(ListState::default());
                 None
             }
@@ -301,8 +301,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         (*state).focus_mode = FocusMode::FocusOnDetails((list_state.clone(), editor));
     }
 
-    fn is_focus_on_details(&mut self) -> bool {
-        let Loaded(state) = &mut self.state else {
+    fn is_focus_on_details(&self) -> bool {
+        let Loaded(state) = &self.state else {
             return false;
         };
 
@@ -329,7 +329,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         let list_title = self.list_title.clone();
 
         match &mut self.state {
-            Error(msg) => {
+            LoadingError(msg) => {
                 let p = Paragraph::new(msg.clone())
                     .wrap(Wrap { trim: true })
                     .style(Style::default().fg(Color::Red))
@@ -347,9 +347,9 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             Loading() => {
                 let b = Block::default()
                     .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::LightBlue))
+                    .style(Style::default().fg(Color::Blue))
                     .title(format!("Loading {list_title}..."));
-                f.render_widget(b, area);
+                f.render_widget(b, list_layout);
                 f.render_widget(
                     Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
                     detail_layout,
@@ -369,8 +369,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnDetails((list_state, _)) => {
                         (list_state.clone(), Style::default().dim())
                     }
-                    FocusMode::Error(_, _) => (ListState::default(), Style::default().dim()),
-                    FocusMode::NoFocus => (ListState::default(), Style::default().dim()),
+                    FocusMode::FocusOnDetailsError(_, _) => (ListState::default(), Style::default().dim()),
                 };
 
                 let list_style = if custom_component.is_some() {
@@ -421,7 +420,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnDetails((_, editor)) => {
                         editor.draw(f, detail_layout).unwrap();
                     }
-                    FocusMode::Error(title, message) => {
+                    FocusMode::FocusOnDetailsError(title, message) => {
                         let p = Paragraph::new(message.clone())
                             .wrap(Wrap { trim: true })
                             .style(Style::default().fg(Color::Red))
@@ -432,7 +431,6 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                             );
                         f.render_widget(p, detail_layout);
                     }
-                    _ => {}
                 }
             }
         }
@@ -448,7 +446,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         let state = match &mut self.state {
-            Error(_) => {
+            LoadingError(_) => {
                 self.reset();
                 return Ok(None);
             }
@@ -505,7 +503,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                             self.update_items(unwrapped_items);
                         }
                         Err(msg) => {
-                            self.error(&msg)
+                            self.list_error(&msg)
                         }
                     }
                     return Ok(None);
@@ -527,12 +525,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 }
             }
             Action::Escape => {
-                if let Loaded(LoadedState {
-                                  focus_mode: mode, ..
-                              }) = &mut self.state
-                {
-                    *mode = FocusMode::FocusOnList(ListState::default());
-                }
+                self.unfocus();
             }
             Action::Delete => {
                 if let Some((id, _)) = self.get_selected() {
@@ -540,8 +533,8 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         let item_type = self.details_title.clone();
                         let item_id = id.clone();
                         return Ok(Some(CreateConfirmPopup {
-                            title: "Delete Item?".to_string(),
-                            message: "Do you really want to delete the item?".to_string(),
+                            title: format!("Delete {item_type} Item?").to_string(),
+                            message: format!("Do you really want to delete the item '{item_id}'").to_string(),
                             confirm_action: Box::new(Action::ItemDelete { item_type, item_id }),
                         }));
                     }
