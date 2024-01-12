@@ -159,11 +159,12 @@ impl Component for Home {
             .direction(Direction::Vertical)
             .constraints(vec![
                 Constraint::Min(1),
+                Constraint::Min(1),
                 Constraint::Percentage(100),
                 Constraint::Min(1),
             ])
             .split(f.size());
-        let tab_area = layout[1];
+        let tab_area = layout[2];
 
         let titles: Vec<String> = self
             .tabs
@@ -178,6 +179,7 @@ impl Component for Home {
             .padding("", "")
             .divider("");
         f.render_widget(tabs, layout[0]);
+        f.render_widget(Block::default().borders(Borders::BOTTOM).dim(), layout[1]);
 
         let active_tab = &mut self.tabs[self.active_tab];
         active_tab.draw(f, tab_area)?;
@@ -188,7 +190,7 @@ impl Component for Home {
             .map(|(key, value)| format!(" [{key}] {value} "))
             .collect::<Vec<_>>();
         let mappings = mappings.join("");
-        f.render_widget(Paragraph::new(mappings), layout[2]);
+        f.render_widget(Paragraph::new(mappings), layout[3]);
 
         if let Some(popup) = &mut self.popup {
             popup.draw(f, area)?;
