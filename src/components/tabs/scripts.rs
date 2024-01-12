@@ -12,8 +12,8 @@ use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::{Backup, Script};
-use libc::printf;
+use hivemq_openapi::models::{Backup, Schema, Script};
+use libc::{creat, printf};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::Text;
@@ -23,12 +23,28 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::components::item_features::ItemSelector;
 
 pub struct ScriptsTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Script>,
     new_item_editor: Option<Editor<'a>>,
+}
+
+struct ScriptSelector;
+
+impl ItemSelector<Script> for ScriptSelector {
+    fn select(&self, item: Item) -> Option<Script> {
+        match item {
+            Item::ScriptItem(script) => Some(script),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, Script)> {
+        self.select(item).map(|item| (item.id.clone(), item))
+    }
 }
 
 impl ScriptsTab<'_> {
@@ -39,12 +55,8 @@ impl ScriptsTab<'_> {
             .hivemq_address(hivemq_address.clone())
             .list_fn(Arc::new(fetch_scripts))
             .delete_fn(Arc::new(delete_script))
-            .item_selector(|item| {
-                match item {
-                    Item::ScriptItem(script) => Some(script),
-                    _ => None
-                }
-            })
+            .create_fn(Arc::new(create_script))
+            .selector(Box::new(ScriptSelector))
             .build();
         ScriptsTab {
             hivemq_address,
@@ -63,14 +75,7 @@ impl Component for ScriptsTab<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
-                return Ok(Some(Submit));
-            }
-            editor.handle_key_events(key)
-        } else {
-            self.list_with_details.handle_key_events(key)
-        }
+        self.list_with_details.handle_key_events(key)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
@@ -79,57 +84,11 @@ impl Component for ScriptsTab<'_> {
             return Ok(Some(action));
         }
 
-        match action {
-            Action::Escape => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    self.new_item_editor = None;
-                    return Ok(Some(Action::SwitchMode(Mode::Main)));
-                }
-            }
-            Action::NewItem => {
-                self.list_with_details.unfocus();
-                self.new_item_editor = Some(Editor::writeable("Create New Script".to_owned()));
-                return Ok(Some(Action::SwitchMode(Mode::Editing)));
-            }
-            Action::Submit => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    let text = editor.get_text();
-                    let host = self.hivemq_address.clone();
-                    let tx = self.tx.clone().unwrap();
-                    tokio::spawn(async move {
-                        let result = create_script(host, text).await;
-                        tx.send(Action::ScriptCreated(result)).unwrap();
-                    });
-                }
-            }
-            Action::ScriptCreated(result) => {
-                self.new_item_editor = None;
-                match result {
-                    Ok(script) => {
-                        let script_id = script.id.clone();
-                        self.list_with_details.put(script_id.clone(), script);
-                        self.list_with_details.select_item(script_id)
-                    }
-                    Err(error) => {
-                        self.list_with_details
-                            .details_error("Script creation failed".to_owned(), error);
-                    }
-                }
-                return Ok(Some(Action::SwitchMode(Main)));
-            }
-            _ => {}
-        }
-
         Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let component = self
-            .new_item_editor
-            .as_mut()
-            .map(|x| x as &mut dyn Component);
-        self.list_with_details.draw_custom(f, area, component)?;
-        Ok(())
+        self.list_with_details.draw(f, area)
     }
 }
 

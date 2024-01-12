@@ -24,11 +24,39 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::sleep;
 use tui::Frame;
+use crate::components::item_features::ItemSelector;
 
 pub struct Clients<'a> {
     tx: Option<UnboundedSender<Action>>,
     hivemq_address: String,
     list_with_details: ListWithDetails<'a, Option<ClientDetails>>,
+}
+
+pub struct ClientSelector;
+
+impl ItemSelector<Option<ClientDetails>> for ClientSelector {
+    fn select(&self, item: Item) -> Option<Option<ClientDetails>> {
+        match item {
+            Item::ClientItem(client) => Some(Some(client)),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, Option<ClientDetails>)> {
+        let Some(item) = self.select(item) else {
+            return None;
+        };
+
+        let Some(details) = &item else {
+            return None;
+        };
+
+        let Some(id) = &details.id else {
+            return None;
+        };
+
+        Some((id.clone(), item))
+    }
 }
 
 impl Clients<'_> {
@@ -37,17 +65,12 @@ impl Clients<'_> {
             .list_title("Clients")
             .details_title("Client Details")
             .hivemq_address(hivemq_address.clone())
-            .item_selector(|item| {
-                match item {
-                    Item::ClientItem(client_details) => Some(Some(client_details)),
-                    _ => None
-                }
-            })
+            .selector(Box::new(ClientSelector))
             .build();
         Clients {
             tx: None,
             hivemq_address: hivemq_address.clone(),
-            list_with_details
+            list_with_details,
         }
     }
 }
@@ -132,6 +155,6 @@ impl TabComponent for Clients<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![("R", "Load"),
              ("C", "Copy"),
-             ("ESC", "Escape"),]
+             ("ESC", "Escape"), ]
     }
 }

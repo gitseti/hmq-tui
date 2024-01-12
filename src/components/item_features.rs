@@ -34,3 +34,23 @@ impl<T, F> ListFn for T
         Box::pin(self(host))
     }
 }
+
+pub trait CreateFn: Send + Sync {
+    fn create(&self, host: String, item: String) -> BoxFuture<'static, Result<Item, String>>;
+}
+
+impl<T, F> CreateFn for T
+    where
+        T: Fn(String, String) -> F + Sync + Send,
+        F: Future<Output=Result<Item, String>> + 'static + Send,
+{
+    fn create(&self, host: String, item: String) -> BoxFuture<'static, Result<Item, String>> {
+        Box::pin(self(host, item))
+    }
+}
+
+pub trait ItemSelector<T> {
+    fn select(&self, item: Item) -> Option<T>;
+
+    fn select_with_id(&self, item: Item) -> Option<(String, T)>;
+}

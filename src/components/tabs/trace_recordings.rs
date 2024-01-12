@@ -7,19 +7,44 @@ use crate::hivemq_rest_client::{delete_trace_recording, fetch_backups, fetch_sch
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::{Backup, TraceRecording};
+use hivemq_openapi::models::{Backup, Script, TraceRecording, TraceRecordingItem};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::components::item_features::ItemSelector;
 
 pub struct TraceRecordingsTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, TraceRecording>,
 }
+
+struct TraceRecordingSelector;
+
+impl ItemSelector<TraceRecording> for TraceRecordingSelector {
+    fn select(&self, item: Item) -> Option<TraceRecording> {
+        match item {
+            Item::TraceRecordingItem(trace_recording_item) => Some(trace_recording_item),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, TraceRecording)> {
+        let Some(item) = self.select(item) else {
+            return None;
+        };
+
+        let Some(id) = &item.start_at else {
+            return None;
+        };
+
+        Some((id.clone(), item))
+    }
+}
+
 
 impl TraceRecordingsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
@@ -29,17 +54,12 @@ impl TraceRecordingsTab<'_> {
             .hivemq_address(hivemq_address.clone())
             .list_fn(Arc::new(fetch_trace_recordings))
             .delete_fn(Arc::new(delete_trace_recording))
-            .item_selector(|item| {
-                match item {
-                    Item::TraceRecordingItem(trace_recording) => Some(trace_recording),
-                    _ => None
-                }
-            })
+            .selector(Box::new(TraceRecordingSelector))
             .build();
         TraceRecordingsTab {
             hivemq_address,
             tx: None,
-            list_with_details
+            list_with_details,
         }
     }
 }
@@ -77,6 +97,6 @@ impl TabComponent for TraceRecordingsTab<'_> {
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
         vec![("R", "Load"),
              ("C", "Copy"),
-             ("ESC", "Escape"),]
+             ("ESC", "Escape"), ]
     }
 }

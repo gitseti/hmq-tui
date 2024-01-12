@@ -20,7 +20,7 @@ use hivemq_openapi::models::{
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
 use crate::action::Item;
-use crate::action::Item::{BackupItem, BehaviorPolicyItem, DataPolicyItem, ScriptItem, TraceRecordingItem};
+use crate::action::Item::{BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem};
 
 pub async fn fetch_client_details(
     client_id: String,
@@ -114,7 +114,7 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, Item)>, St
     Ok(policies)
 }
 
-pub async fn create_data_policy(host: String, data_policy: String) -> Result<DataPolicy, String> {
+pub async fn create_data_policy(host: String, data_policy: String) -> Result<Item, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -127,10 +127,10 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Dat
         &configuration,
         params,
     )
-    .await
-    .or_else(|error| Err(transform_api_err(&error)))?;
+        .await
+        .or_else(|error| Err(transform_api_err(&error)))?;
 
-    Ok(response)
+    Ok(DataPolicyItem(response))
 }
 
 pub async fn delete_data_policy(host: String, policy_id: String) -> Result<String, String> {
@@ -188,7 +188,7 @@ pub async fn fetch_behavior_policies(
 pub async fn create_behavior_policy(
     host: String,
     behavior_policy: String,
-) -> Result<BehaviorPolicy, String> {
+) -> Result<Item, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -201,10 +201,11 @@ pub async fn create_behavior_policy(
         &configuration,
         params,
     )
-    .await
-    .or_else(|error| Err(transform_api_err(&error)))?;
+        .await
+        .or_else(|error| Err(transform_api_err(&error)))?;
 
-    Ok(response)
+
+    Ok(Item::BehaviorPolicyItem(response))
 }
 
 pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<String, String> {
@@ -257,7 +258,7 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Item)>, String> 
     Ok(schemas)
 }
 
-pub async fn create_schema(host: String, schema: String) -> Result<Schema, String> {
+pub async fn create_schema(host: String, schema: String) -> Result<Item, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -271,7 +272,7 @@ pub async fn create_schema(host: String, schema: String) -> Result<Schema, Strin
             .await
             .or_else(|error| Err(transform_api_err(&error)))?;
 
-    Ok(response)
+    Ok(SchemaItem(response))
 }
 
 pub async fn delete_schema(host: String, schema_id: String) -> Result<String, String> {
@@ -323,7 +324,7 @@ pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Item)>, String> 
     Ok(scripts)
 }
 
-pub async fn create_script(host: String, script: String) -> Result<Script, String> {
+pub async fn create_script(host: String, script: String) -> Result<Item, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -337,7 +338,7 @@ pub async fn create_script(host: String, script: String) -> Result<Script, Strin
             .await
             .or_else(|error| Err(transform_api_err(&error)))?;
 
-    Ok(response)
+    Ok(ScriptItem(response))
 }
 
 pub async fn delete_script(host: String, script_id: String) -> Result<String, String> {

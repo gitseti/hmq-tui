@@ -11,13 +11,14 @@ use crate::mode::Mode::Main;
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::{Backup, DataPolicy};
+use hivemq_openapi::models::{Backup, BehaviorPolicy, DataPolicy};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::components::item_features::ItemSelector;
 
 pub struct DataPoliciesTab<'a> {
     hivemq_address: String,
@@ -26,20 +27,31 @@ pub struct DataPoliciesTab<'a> {
     new_item_editor: Option<Editor<'a>>,
 }
 
+struct DataPolicySelector;
+
+impl ItemSelector<DataPolicy> for DataPolicySelector {
+    fn select(&self, item: Item) -> Option<DataPolicy> {
+        match item {
+            Item::DataPolicyItem(policy) => Some(policy),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, DataPolicy)> {
+        self.select(item).map(|item| (item.id.clone(), item))
+    }
+}
+
 impl DataPoliciesTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
         let list_with_details = ListWithDetails::<DataPolicy>::builder()
-            .list_title("D. Policies")
-            .details_title("D. Policy")
+            .list_title("Data Policies")
+            .details_title("Data Policy")
             .hivemq_address(hivemq_address.clone())
+            .selector(Box::new(DataPolicySelector))
             .list_fn(Arc::new(fetch_data_policies))
             .delete_fn(Arc::new(delete_data_policy))
-            .item_selector(|item| {
-                match item {
-                    Item::DataPolicyItem(policy) => Some(policy),
-                    _ => None
-                }
-            })
+            .create_fn(Arc::new(create_data_policy))
             .build();
         DataPoliciesTab {
             hivemq_address,
@@ -58,61 +70,13 @@ impl Component for DataPoliciesTab<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
-                return Ok(Some(Submit));
-            }
-            editor.handle_key_events(key)
-        } else {
-            self.list_with_details.handle_key_events(key)
-        }
+        self.list_with_details.handle_key_events(key)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
         if let Ok(Some(action)) = list_action {
             return Ok(Some(action));
-        }
-
-        match action {
-            Action::Escape => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    self.new_item_editor = None;
-                    return Ok(Some(Action::SwitchMode(Mode::Main)));
-                }
-            }
-            Action::NewItem => {
-                self.list_with_details.unfocus();
-                self.new_item_editor = Some(Editor::writeable("Create New Data Policy".to_owned()));
-                return Ok(Some(Action::SwitchMode(Mode::Editing)));
-            }
-            Action::Submit => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    let text = editor.get_text();
-                    let host = self.hivemq_address.clone();
-                    let tx = self.tx.clone().unwrap();
-                    tokio::spawn(async move {
-                        let result = create_data_policy(host, text).await;
-                        tx.send(Action::DataPolicyCreated(result)).unwrap();
-                    });
-                }
-            }
-            Action::DataPolicyCreated(result) => {
-                self.new_item_editor = None;
-                match result {
-                    Ok(data_policy) => {
-                        let id = data_policy.id.clone();
-                        self.list_with_details.put(id.clone(), data_policy);
-                        self.list_with_details.select_item(id)
-                    }
-                    Err(error) => {
-                        self.list_with_details
-                            .details_error("Data Policy creation failed".to_owned(), error);
-                    }
-                }
-                return Ok(Some(Action::SwitchMode(Main)));
-            }
-            _ => {}
         }
 
         Ok(None)
@@ -130,7 +94,7 @@ impl Component for DataPoliciesTab<'_> {
 
 impl TabComponent for DataPoliciesTab<'_> {
     fn get_name(&self) -> &str {
-        "D. Policies"
+        "Data Policies"
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {

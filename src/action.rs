@@ -61,34 +61,11 @@ pub enum Action {
     ItemDelete { item_type: String, item_id: String },
     ItemDeleted { item_type: String, result: Result<String, String> },
     ItemsLoadingFinished { result: Result<Vec<(String, Item)>, String> },
+    ItemCreated { result: Result<Item, String> },
 
     // Clients view
     ClientIdsLoadingFinished(Result<Vec<String>, String>),
     ClientDetailsLoadingFinished(Result<(String, ClientDetails), String>),
-
-    // Data Policies
-    DataPoliciesLoadingFinished(Result<Vec<(String, DataPolicy)>, String>),
-    DataPolicyCreated(Result<DataPolicy, String>),
-
-    // Behavior Policies
-    BehaviorPoliciesLoadingFinished(Result<Vec<(String, BehaviorPolicy)>, String>),
-    BehaviorPolicyCreated(Result<BehaviorPolicy, String>),
-
-    // Schemas
-    SchemasLoadingFinished(Result<Vec<(String, Schema)>, String>),
-    SchemaDelete(String),
-    SchemaDeleted(Result<String, String>),
-    SchemaCreated(Result<Schema, String>),
-
-    // Scripts
-    ScriptsLoadingFinished(Result<Vec<(String, Script)>, String>),
-    ScriptCreated(Result<Script, String>),
-
-    // Backups
-    BackupsLoadingFinished(Result<Vec<(String, Backup)>, String>),
-
-    // Trace Recordings
-    TraceRecordingsLoadingFinished(Result<Vec<(String, TraceRecording)>, String>),
 }
 
 impl<'de> Deserialize<'de> for Action {

@@ -12,7 +12,7 @@ use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::Schema;
+use hivemq_openapi::models::{DataPolicy, Schema};
 use libc::printf;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
@@ -24,13 +24,27 @@ use std::fmt::{format, Display, Formatter};
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::ListFn;
+use crate::components::item_features::{ItemSelector, ListFn};
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Schema>,
-    new_item_editor: Option<Editor<'a>>,
+}
+
+struct SchemaSelector;
+
+impl ItemSelector<Schema> for SchemaSelector {
+    fn select(&self, item: Item) -> Option<Schema> {
+        match item {
+            Item::SchemaItem(schema) => Some(schema),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, Schema)> {
+        self.select(item).map(|item| (item.id.clone(), item))
+    }
 }
 
 impl SchemasTab<'_> {
@@ -41,19 +55,14 @@ impl SchemasTab<'_> {
             .hivemq_address(hivemq_address.clone())
             .list_fn(Arc::new(fetch_schemas))
             .delete_fn(Arc::new(delete_schema))
-            .item_selector(|item| {
-                match item {
-                    Item::SchemaItem(schema) => Some(schema),
-                    _ => None
-                }
-            })
+            .create_fn(Arc::new(create_schema))
+            .selector(Box::new(SchemaSelector))
             .build();
 
         SchemasTab {
             hivemq_address,
             tx: None,
             list_with_details,
-            new_item_editor: None,
         }
     }
 }
@@ -66,14 +75,7 @@ impl Component for SchemasTab<'_> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
-                return Ok(Some(Submit));
-            }
-            editor.handle_key_events(key)
-        } else {
-            self.list_with_details.handle_key_events(key)
-        }
+        self.list_with_details.handle_key_events(key)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
@@ -82,58 +84,11 @@ impl Component for SchemasTab<'_> {
             return Ok(Some(action));
         }
 
-        match action {
-            Action::Escape => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    self.new_item_editor = None;
-                    Ok(Some(Action::SwitchMode(Mode::Main)))
-                } else {
-                    Ok(None)
-                }
-            }
-            Action::NewItem => {
-                self.list_with_details.unfocus();
-                self.new_item_editor = Some(Editor::writeable("Create New Schema".to_owned()));
-                Ok(Some(Action::SwitchMode(Mode::Editing)))
-            }
-            Action::Submit => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    let text = editor.get_text();
-                    let host = self.hivemq_address.clone();
-                    let tx = self.tx.clone().unwrap();
-                    tokio::spawn(async move {
-                        let result = create_schema(host, text).await;
-                        tx.send(Action::SchemaCreated(result)).unwrap();
-                    });
-                }
-                Ok(None)
-            }
-            Action::SchemaCreated(result) => {
-                self.new_item_editor = None;
-                match result {
-                    Ok(schema) => {
-                        let schema_id = schema.id.clone();
-                        self.list_with_details.put(schema_id.clone(), schema);
-                        self.list_with_details.select_item(schema_id)
-                    }
-                    Err(error) => {
-                        self.list_with_details
-                            .details_error("Schema creation failed".to_owned(), error);
-                    }
-                }
-                Ok(Some(Action::SwitchMode(Main)))
-            }
-            _ => Ok(None)
-        }
+        Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let component = self
-            .new_item_editor
-            .as_mut()
-            .map(|x| x as &mut dyn Component);
-        self.list_with_details.draw_custom(f, area, component)?;
-        Ok(())
+        self.list_with_details.draw(f, area)
     }
 }
 

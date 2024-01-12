@@ -1,9 +1,9 @@
 use crate::action::{Action, Item};
-use crate::action::Action::{CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, SwitchMode};
+use crate::action::Action::{CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::future::{BoxFuture, err};
 use indexmap::IndexMap;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -23,9 +23,11 @@ use State::Loaded;
 use crate::components::editor::Editor;
 use crate::components::list_with_details::State::{LoadingError, Loading};
 use crate::components::Component;
-use crate::components::item_features::{DeleteFn, ListFn};
+use crate::components::item_features::{CreateFn, DeleteFn, ListFn, ItemSelector};
 use crate::components::list_with_details::FocusMode::FocusOnList;
+use crate::hivemq_rest_client::create_behavior_policy;
 use crate::mode::Mode;
+use crate::mode::Mode::Main;
 use crate::tui;
 
 
@@ -36,6 +38,21 @@ pub struct ListWithDetails<'a, T> {
 
     #[builder(setter(into))]
     details_title: String,
+
+    #[builder(setter(into))]
+    hivemq_address: String,
+
+    #[builder]
+    selector: Box<dyn ItemSelector<T>>,
+
+    #[builder(setter(strip_option), default)]
+    delete_fn: Option<Arc<dyn DeleteFn>>,
+
+    #[builder(setter(strip_option), default)]
+    list_fn: Option<Arc<dyn ListFn>>,
+
+    #[builder(setter(strip_option), default)]
+    create_fn: Option<Arc<dyn CreateFn>>,
 
     #[builder(setter(skip), default =
     Loaded(LoadedState {
@@ -48,17 +65,8 @@ pub struct ListWithDetails<'a, T> {
     #[builder(setter(skip), default)]
     tx: Option<UnboundedSender<Action>>,
 
-    #[builder(setter(into))]
-    hivemq_address: String,
-
-    #[builder(setter(strip_option), default)]
-    delete_fn: Option<Arc<dyn DeleteFn>>,
-
-    #[builder(setter(strip_option), default)]
-    list_fn: Option<Arc<dyn ListFn>>,
-
-    #[builder(setter(strip_option))]
-    item_selector: Option<fn(Item) -> Option<T>>,
+    #[builder(setter(skip), default)]
+    new_item_editor: Option<Editor<'a>>,
 }
 
 pub enum State<'a, T> {
@@ -372,7 +380,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnDetailsError(_, _) => (ListState::default(), Style::default().dim()),
                 };
 
-                let list_style = if custom_component.is_some() {
+                let list_style = if custom_component.is_some() || self.new_item_editor.is_some() {
                     Style::default().dim()
                 } else {
                     list_style
@@ -398,6 +406,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     custom_component.draw(f, detail_layout).unwrap();
                     return Ok(());
                 }
+
+                if let Some(editor) = &mut self.new_item_editor {
+                    editor.draw(f, detail_layout).unwrap();
+                    return Ok(());
+                }
+
 
                 match mode {
                     FocusMode::FocusOnList(list_state) => match list_state.selected() {
@@ -445,6 +459,13 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
+        if let Some(editor) = &mut self.new_item_editor {
+            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
+                return Ok(Some(Submit));
+            }
+            return editor.handle_key_events(key);
+        }
+
         let state = match &mut self.state {
             LoadingError(_) => {
                 self.reset();
@@ -492,10 +513,9 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 {
                     match result {
                         Ok(items) => {
-                            let selector = self.item_selector.unwrap();
                             let mut unwrapped_items = Vec::with_capacity(items.len());
                             for (id, item) in items {
-                                let Some(item) = selector(item) else {
+                                let Some(item) = self.selector.select(item) else {
                                     break;
                                 };
                                 unwrapped_items.push((id, item));
@@ -526,6 +546,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             }
             Action::Escape => {
                 self.unfocus();
+                if let Some(editor) = &mut self.new_item_editor {
+                    self.new_item_editor = None;
+                    return Ok(Some(Action::SwitchMode(Mode::Main)));
+                }
             }
             Action::Delete => {
                 if let Some((id, _)) = self.get_selected() {
@@ -566,6 +590,41 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         }
                     };
                 }
+            }
+            Action::NewItem => {
+                if self.create_fn.is_some() {
+                    self.unfocus();
+                    self.new_item_editor =
+                        Some(Editor::writeable(format!("New {}", self.details_title).to_owned()));
+                    return Ok(Some(Action::SwitchMode(Mode::Editing)));
+                }
+            }
+            Action::Submit => {
+                if let Some(editor) = &mut self.new_item_editor {
+                    let text = editor.get_text();
+                    let host = self.hivemq_address.clone();
+                    let tx = self.tx.clone().unwrap();
+                    let create_fn = self.create_fn.clone().unwrap();
+                    tokio::spawn(async move {
+                        let result = create_fn.create(host, text).await;
+                        tx.send(Action::ItemCreated { result }).unwrap();
+                    });
+                }
+            }
+            Action::ItemCreated { result } => {
+                self.new_item_editor = None;
+                match result {
+                    Ok(item) => {
+                        if let Some((id, item)) = self.selector.select_with_id(item) {
+                            self.put(id.clone(), item);
+                            self.select_item(id)
+                        }
+                    }
+                    Err(error) => {
+                        self.details_error(format!("{} creation failed", self.details_title), error);
+                    }
+                }
+                return Ok(Some(Action::SwitchMode(Main)));
             }
             Action::Enter => self.focus_on_details(),
             Action::Copy => {

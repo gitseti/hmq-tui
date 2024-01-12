@@ -7,20 +7,44 @@ use crate::hivemq_rest_client::{delete_schema, fetch_backups, fetch_schemas};
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::{Backup, Schema};
+use hivemq_openapi::models::{Backup, BehaviorPolicy, Schema};
 use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, ListItem, ListState};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::ListFn;
+use crate::components::item_features::{ItemSelector, ListFn};
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Backup>,
 }
+
+struct BackupSelector;
+
+impl ItemSelector<Backup> for BackupSelector {
+    fn select(&self, item: Item) -> Option<Backup> {
+        match item {
+            Item::BackupItem(backup) => Some(backup),
+            _ => None
+        }
+    }
+
+    fn select_with_id(&self, item: Item) -> Option<(String, Backup)> {
+        let Some(item) = self.select(item) else {
+            return None;
+        };
+
+        let Some(id) = &item.id else {
+            return None;
+        };
+
+        Some((id.clone(), item))
+    }
+}
+
 impl BackupsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
         let list_with_details = ListWithDetails::<Backup>::builder()
@@ -28,12 +52,7 @@ impl BackupsTab<'_> {
             .details_title("Backup")
             .hivemq_address(hivemq_address.clone())
             .list_fn(Arc::new(fetch_backups))
-            .item_selector(|item| {
-                match item {
-                    Item::BackupItem(backup) => Some(backup),
-                    _ => None
-                }
-            })
+            .selector(Box::new(BackupSelector))
             .build();
         BackupsTab {
             hivemq_address: hivemq_address.clone(),
@@ -67,8 +86,7 @@ impl Component for BackupsTab<'_> {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.list_with_details.draw(f, area).expect("panic");
-        Ok(())
+        self.list_with_details.draw(f, area)
     }
 }
 
