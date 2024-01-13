@@ -24,7 +24,6 @@ pub struct DataPoliciesTab<'a> {
     hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, DataPolicy>,
-    new_item_editor: Option<Editor<'a>>,
 }
 
 struct DataPolicySelector;
@@ -57,7 +56,6 @@ impl DataPoliciesTab<'_> {
             hivemq_address,
             tx: None,
             list_with_details,
-            new_item_editor: None,
         }
     }
 }
@@ -83,12 +81,7 @@ impl Component for DataPoliciesTab<'_> {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let component = self
-            .new_item_editor
-            .as_mut()
-            .map(|x| x as &mut dyn Component);
-        self.list_with_details.draw_custom(f, area, component)?;
-        Ok(())
+        self.list_with_details.draw(f, area)
     }
 }
 
