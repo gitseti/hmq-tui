@@ -61,7 +61,7 @@ impl Config {
             }
         }
         if !found_config {
-            log::error!("No configuration file found. Application may not behave as expected");
+            log::debug!("No configuration file found. Using default config.");
         }
 
         let mut cfg: Self = builder.build()?.try_deserialize()?;
