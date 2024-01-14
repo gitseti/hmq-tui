@@ -2,6 +2,7 @@ use crate::action::{Action, Item};
 use crate::cli::Cli;
 use crate::components::editor::Editor;
 use crate::components::home::Home;
+use crate::components::item_features::ItemSelector;
 use crate::components::list_with_details::ListWithDetails;
 use crate::components::tabs::TabComponent;
 use crate::components::Component;
@@ -24,7 +25,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::sleep;
 use tui::Frame;
-use crate::components::item_features::ItemSelector;
 
 pub struct Clients<'a> {
     tx: Option<UnboundedSender<Action>>,
@@ -38,7 +38,7 @@ impl ItemSelector<Option<ClientDetails>> for ClientSelector {
     fn select(&self, item: Item) -> Option<Option<ClientDetails>> {
         match item {
             Item::ClientItem(client) => Some(Some(client)),
-            _ => None
+            _ => None,
         }
     }
 
@@ -153,8 +153,6 @@ impl TabComponent for Clients<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"),
-             ("C", "Copy"),
-             ("ESC", "Escape"), ]
+        vec![("R", "Load"), ("C", "Copy"), ("ESC", "Escape")]
     }
 }

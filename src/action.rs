@@ -1,15 +1,17 @@
+use hivemq_openapi::models::{
+    Backup, BehaviorPolicy, Client, ClientDetails, DataPolicy, Schema, Script, TraceRecording,
+};
 use std::any::{Any, TypeId};
-use hivemq_openapi::models::{Backup, BehaviorPolicy, Client, ClientDetails, DataPolicy, Schema, Script, TraceRecording};
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{mode::Mode};
+use crate::action::Item::SchemaItem;
+use crate::mode::Mode;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-use crate::action::Item::SchemaItem;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Item {
@@ -19,7 +21,7 @@ pub enum Item {
     DataPolicyItem(DataPolicy),
     BehaviorPolicyItem(BehaviorPolicy),
     BackupItem(Backup),
-    TraceRecordingItem(TraceRecording)
+    TraceRecordingItem(TraceRecording),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -34,8 +36,15 @@ pub enum Action {
     Error(String),
     Help,
 
-    CreateErrorPopup { title: String, message: String },
-    CreateConfirmPopup { title: String, message: String, confirm_action: Box<Action> },
+    CreateErrorPopup {
+        title: String,
+        message: String,
+    },
+    CreateConfirmPopup {
+        title: String,
+        message: String,
+        confirm_action: Box<Action>,
+    },
     ClosePopup,
     SwitchMode(Mode),
 
@@ -58,10 +67,20 @@ pub enum Action {
     SelectedItem(String),
 
     // ListWithDetails
-    ItemDelete { item_type: String, item_id: String },
-    ItemDeleted { item_type: String, result: Result<String, String> },
-    ItemsLoadingFinished { result: Result<Vec<(String, Item)>, String> },
-    ItemCreated { result: Result<Item, String> },
+    ItemDelete {
+        item_type: String,
+        item_id: String,
+    },
+    ItemDeleted {
+        item_type: String,
+        result: Result<String, String>,
+    },
+    ItemsLoadingFinished {
+        result: Result<Vec<(String, Item)>, String>,
+    },
+    ItemCreated {
+        result: Result<Item, String>,
+    },
 
     // Clients view
     ClientIdsLoadingFinished(Result<Vec<String>, String>),
@@ -70,8 +89,8 @@ pub enum Action {
 
 impl<'de> Deserialize<'de> for Action {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct ActionVisitor;
 
@@ -83,8 +102,8 @@ impl<'de> Deserialize<'de> for Action {
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Action, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
                 match value {
                     "Tick" => Ok(Action::Tick),

@@ -6,5 +6,5 @@ pub enum Mode {
     Main,
     Editing,
     ErrorPopup,
-    ConfirmPopup
+    ConfirmPopup,
 }

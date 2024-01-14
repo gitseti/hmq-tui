@@ -1,6 +1,7 @@
-use crate::action::{Action, Item};
 use crate::action::Action::Submit;
+use crate::action::{Action, Item};
 use crate::components::editor::Editor;
+use crate::components::item_features::{ItemSelector, ListFn};
 use crate::components::list_with_details::{ListWithDetails, ListWithDetailsBuilder, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
@@ -24,7 +25,6 @@ use std::fmt::{format, Display, Formatter};
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::{ItemSelector, ListFn};
 
 pub struct SchemasTab<'a> {
     hivemq_address: String,
@@ -38,7 +38,7 @@ impl ItemSelector<Schema> for SchemaSelector {
     fn select(&self, item: Item) -> Option<Schema> {
         match item {
             Item::SchemaItem(schema) => Some(schema),
-            _ => None
+            _ => None,
         }
     }
 

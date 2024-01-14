@@ -1,10 +1,12 @@
+use crate::action::Action::{
+    CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode,
+};
 use crate::action::{Action, Item};
-use crate::action::Action::{CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode};
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use futures::future::{BoxFuture, err};
+use futures::future::{err, BoxFuture};
 use indexmap::IndexMap;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Stylize;
@@ -12,24 +14,23 @@ use ratatui::style::{Color, Modifier, Style, Styled};
 use ratatui::widgets::block::Block;
 use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, format};
+use std::fmt::{format, Display};
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use typed_builder::TypedBuilder;
 use tui::Frame;
+use typed_builder::TypedBuilder;
 use State::Loaded;
 
 use crate::components::editor::Editor;
-use crate::components::list_with_details::State::{LoadingError, Loading};
-use crate::components::Component;
-use crate::components::item_features::{CreateFn, DeleteFn, ListFn, ItemSelector};
+use crate::components::item_features::{CreateFn, DeleteFn, ItemSelector, ListFn};
 use crate::components::list_with_details::FocusMode::FocusOnList;
+use crate::components::list_with_details::State::{Loading, LoadingError};
+use crate::components::Component;
 use crate::hivemq_rest_client::create_behavior_policy;
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui;
-
 
 #[derive(TypedBuilder)]
 pub struct ListWithDetails<'a, T> {
@@ -129,7 +130,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         let list_state = match &mut loaded.focus_mode {
             FocusMode::FocusOnList(list_state) => list_state,
             FocusMode::FocusOnDetails((list_state, _)) => list_state,
-            _ => return Some(item)
+            _ => return Some(item),
         };
 
         if index > loaded.list.len().saturating_sub(1) {
@@ -183,11 +184,11 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn select_item(&mut self, item_key: String) {
         if let Loaded(LoadedState {
-                          items,
-                          list,
-                          focus_mode: mode,
-                          ..
-                      }) = &mut self.state
+            items,
+            list,
+            focus_mode: mode,
+            ..
+        }) = &mut self.state
         {
             let index = items.get_index_of(&item_key);
             *mode = FocusMode::FocusOnList(ListState::default().with_selected(index));
@@ -196,8 +197,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn unfocus(&mut self) {
         if let Loaded(LoadedState {
-                          focus_mode: mode, ..
-                      }) = &mut self.state
+            focus_mode: mode, ..
+        }) = &mut self.state
         {
             *mode = FocusOnList(ListState::default());
         }
@@ -348,7 +349,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     );
                 f.render_widget(p, list_layout);
                 f.render_widget(
-                    Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
+                    Block::default()
+                        .style(Style::default().dim())
+                        .borders(Borders::ALL)
+                        .title(detail_title),
                     detail_layout,
                 );
             }
@@ -359,7 +363,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     .title(format!("Loading {list_title}..."));
                 f.render_widget(b, list_layout);
                 f.render_widget(
-                    Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
+                    Block::default()
+                        .style(Style::default().dim())
+                        .borders(Borders::ALL)
+                        .title(detail_title),
                     detail_layout,
                 );
             }
@@ -377,7 +384,9 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     FocusMode::FocusOnDetails((list_state, _)) => {
                         (list_state.clone(), Style::default().dim())
                     }
-                    FocusMode::FocusOnDetailsError(_, _) => (ListState::default(), Style::default().dim()),
+                    FocusMode::FocusOnDetailsError(_, _) => {
+                        (ListState::default(), Style::default().dim())
+                    }
                 };
 
                 let list_style = if custom_component.is_some() || self.new_item_editor.is_some() {
@@ -412,12 +421,14 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     return Ok(());
                 }
 
-
                 match mode {
                     FocusMode::FocusOnList(list_state) => match list_state.selected() {
                         None => {
                             f.render_widget(
-                                Block::default().style(Style::default().dim()).borders(Borders::ALL).title(detail_title),
+                                Block::default()
+                                    .style(Style::default().dim())
+                                    .borders(Borders::ALL)
+                                    .title(detail_title),
                                 detail_layout,
                             );
                         }
@@ -484,8 +495,8 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if let Loaded(LoadedState {
-                          focus_mode: mode, ..
-                      }) = &mut self.state
+            focus_mode: mode, ..
+        }) = &mut self.state
         {
             if let FocusMode::FocusOnDetails((selected, _)) = mode {
                 if action == Action::Escape {
@@ -509,25 +520,22 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 }
                 self.loading();
             }
-            Action::ItemsLoadingFinished { result } =>
-                {
-                    match result {
-                        Ok(items) => {
-                            let mut unwrapped_items = Vec::with_capacity(items.len());
-                            for (id, item) in items {
-                                let Some(item) = self.selector.select(item) else {
-                                    break;
-                                };
-                                unwrapped_items.push((id, item));
-                            }
-                            self.update_items(unwrapped_items);
+            Action::ItemsLoadingFinished { result } => {
+                match result {
+                    Ok(items) => {
+                        let mut unwrapped_items = Vec::with_capacity(items.len());
+                        for (id, item) in items {
+                            let Some(item) = self.selector.select(item) else {
+                                break;
+                            };
+                            unwrapped_items.push((id, item));
                         }
-                        Err(msg) => {
-                            self.list_error(&msg)
-                        }
+                        self.update_items(unwrapped_items);
                     }
-                    return Ok(None);
+                    Err(msg) => self.list_error(&msg),
                 }
+                return Ok(None);
+            }
             Action::PrevItem => {
                 if let Some((key, value)) = self.prev_item() {
                     return Ok(Some(SelectedItem(key.to_owned())));
@@ -558,14 +566,17 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         let item_id = id.clone();
                         return Ok(Some(CreateConfirmPopup {
                             title: format!("Delete {item_type} Item?").to_string(),
-                            message: format!("Do you really want to delete the item '{item_id}'").to_string(),
+                            message: format!("Do you really want to delete the item '{item_id}'")
+                                .to_string(),
                             confirm_action: Box::new(Action::ItemDelete { item_type, item_id }),
                         }));
                     }
                 }
             }
             Action::ItemDelete { item_type, item_id } => {
-                if let (Some(delete_fn), true) = (&self.delete_fn, item_type.eq(&self.details_title)) {
+                if let (Some(delete_fn), true) =
+                    (&self.delete_fn, item_type.eq(&self.details_title))
+                {
                     let tx = self.tx.clone().unwrap();
                     let host = self.hivemq_address.clone();
                     let delete_fn = delete_fn.clone();
@@ -582,20 +593,19 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                             self.remove(id);
                             Ok(None)
                         }
-                        Err(message) => {
-                            Ok(Some(Action::CreateErrorPopup {
-                                title: "Deletion failed".to_string(),
-                                message: format!("Failed deletion of item:\n{}", message),
-                            }))
-                        }
+                        Err(message) => Ok(Some(Action::CreateErrorPopup {
+                            title: "Deletion failed".to_string(),
+                            message: format!("Failed deletion of item:\n{}", message),
+                        })),
                     };
                 }
             }
             Action::NewItem => {
                 if self.create_fn.is_some() {
                     self.unfocus();
-                    self.new_item_editor =
-                        Some(Editor::writeable(format!("New {}", self.details_title).to_owned()));
+                    self.new_item_editor = Some(Editor::writeable(
+                        format!("New {}", self.details_title).to_owned(),
+                    ));
                     return Ok(Some(Action::SwitchMode(Mode::Editing)));
                 }
             }
@@ -621,7 +631,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         }
                     }
                     Err(error) => {
-                        self.details_error(format!("{} creation failed", self.details_title), error);
+                        self.details_error(
+                            format!("{} creation failed", self.details_title),
+                            error,
+                        );
                     }
                 }
                 return Ok(Some(Action::SwitchMode(Main)));
@@ -629,7 +642,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             Action::Enter => self.focus_on_details(),
             Action::Copy => {
                 if let Err(message) = self.copy_details_to_clipboard() {
-                    return Ok(Some(CreateErrorPopup { title: "Could not copy to clipboard".to_string(), message }));
+                    return Ok(Some(CreateErrorPopup {
+                        title: "Could not copy to clipboard".to_string(),
+                        message,
+                    }));
                 }
             }
             _ => {}

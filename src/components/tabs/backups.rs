@@ -1,4 +1,5 @@
 use crate::action::{Action, Item};
+use crate::components::item_features::{ItemSelector, ListFn};
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
@@ -14,7 +15,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::{ItemSelector, ListFn};
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
@@ -28,7 +28,7 @@ impl ItemSelector<Backup> for BackupSelector {
     fn select(&self, item: Item) -> Option<Backup> {
         match item {
             Item::BackupItem(backup) => Some(backup),
-            _ => None
+            _ => None,
         }
     }
 

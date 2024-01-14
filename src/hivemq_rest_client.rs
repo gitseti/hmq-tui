@@ -1,17 +1,31 @@
+use crate::action::Item;
+use crate::action::Item::{
+    BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem,
+};
 use futures::future::err;
 use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_behavior_policies_api::{get_all_behavior_policies, CreateBehaviorPolicyParams, GetAllBehaviorPoliciesParams, DeleteBehaviorPolicyParams};
-use hivemq_openapi::apis::data_hub_data_policies_api::{get_all_data_policies, CreateDataPolicyParams, GetAllDataPoliciesError, GetAllDataPoliciesParams, DeleteDataPolicyParams};
-use hivemq_openapi::apis::data_hub_schemas_api::{
-    get_all_schemas, CreateSchemaParams, GetAllSchemasParams, DeleteSchemaParams,
+use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+    get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
+    GetAllBehaviorPoliciesParams,
 };
-use hivemq_openapi::apis::data_hub_scripts_api::{get_all_scripts, CreateScriptParams, GetAllScriptsParams, DeleteScriptParams};
+use hivemq_openapi::apis::data_hub_data_policies_api::{
+    get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams, GetAllDataPoliciesError,
+    GetAllDataPoliciesParams,
+};
+use hivemq_openapi::apis::data_hub_schemas_api::{
+    get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
+};
+use hivemq_openapi::apis::data_hub_scripts_api::{
+    get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
+};
 use hivemq_openapi::apis::mqtt_clients_api::{
     get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
     GetMqttClientDetailsParams,
 };
-use hivemq_openapi::apis::trace_recordings_api::{DeleteTraceRecordingParams, get_all_trace_recordings};
+use hivemq_openapi::apis::trace_recordings_api::{
+    get_all_trace_recordings, DeleteTraceRecordingParams,
+};
 use hivemq_openapi::apis::{mqtt_clients_api, Error};
 use hivemq_openapi::models::{
     Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
@@ -19,8 +33,6 @@ use hivemq_openapi::models::{
 };
 use mqtt_clients_api::get_mqtt_client_details;
 use serde::Serialize;
-use crate::action::Item;
-use crate::action::Item::{BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem};
 
 pub async fn fetch_client_details(
     client_id: String,
@@ -127,8 +139,8 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Ite
         &configuration,
         params,
     )
-        .await
-        .or_else(|error| Err(transform_api_err(&error)))?;
+    .await
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(DataPolicyItem(response))
 }
@@ -137,21 +149,23 @@ pub async fn delete_data_policy(host: String, policy_id: String) -> Result<Strin
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
-    let params = DeleteDataPolicyParams { policy_id: policy_id.clone() };
+    let params = DeleteDataPolicyParams {
+        policy_id: policy_id.clone(),
+    };
 
-    let response =
-        hivemq_openapi::apis::data_hub_data_policies_api::delete_data_policy(&configuration, params)
-            .await
-            .map(|_| policy_id)
-            .or_else(|error| Err(transform_api_err(&error)))?;
+    let response = hivemq_openapi::apis::data_hub_data_policies_api::delete_data_policy(
+        &configuration,
+        params,
+    )
+    .await
+    .map(|_| policy_id)
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(response)
 }
 
 //TODO: Tests
-pub async fn fetch_behavior_policies(
-    host: String,
-) -> Result<Vec<(String, Item)>, String> {
+pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, Item)>, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -185,10 +199,7 @@ pub async fn fetch_behavior_policies(
     Ok(policies)
 }
 
-pub async fn create_behavior_policy(
-    host: String,
-    behavior_policy: String,
-) -> Result<Item, String> {
+pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Result<Item, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
@@ -201,9 +212,8 @@ pub async fn create_behavior_policy(
         &configuration,
         params,
     )
-        .await
-        .or_else(|error| Err(transform_api_err(&error)))?;
-
+    .await
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(Item::BehaviorPolicyItem(response))
 }
@@ -212,13 +222,17 @@ pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<S
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
-    let params = DeleteBehaviorPolicyParams { policy_id: policy_id.clone() };
+    let params = DeleteBehaviorPolicyParams {
+        policy_id: policy_id.clone(),
+    };
 
-    let response =
-        hivemq_openapi::apis::data_hub_behavior_policies_api::delete_behavior_policy(&configuration, params)
-            .await
-            .map(|_| policy_id)
-            .or_else(|error| Err(transform_api_err(&error)))?;
+    let response = hivemq_openapi::apis::data_hub_behavior_policies_api::delete_behavior_policy(
+        &configuration,
+        params,
+    )
+    .await
+    .map(|_| policy_id)
+    .or_else(|error| Err(transform_api_err(&error)))?;
 
     Ok(response)
 }
@@ -279,7 +293,9 @@ pub async fn delete_schema(host: String, schema_id: String) -> Result<String, St
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
-    let params = DeleteSchemaParams { schema_id: schema_id.clone() };
+    let params = DeleteSchemaParams {
+        schema_id: schema_id.clone(),
+    };
 
     let response =
         hivemq_openapi::apis::data_hub_schemas_api::delete_schema(&configuration, params)
@@ -345,7 +361,9 @@ pub async fn delete_script(host: String, script_id: String) -> Result<String, St
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
-    let params = DeleteScriptParams { script_id: script_id.clone() };
+    let params = DeleteScriptParams {
+        script_id: script_id.clone(),
+    };
 
     let response =
         hivemq_openapi::apis::data_hub_scripts_api::delete_script(&configuration, params)
@@ -382,17 +400,25 @@ pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>,
         .or_else(|error| Err(transform_api_err(&error)))?;
 
     for trace_recording in response.items.unwrap() {
-        trace_recordings.push((trace_recording.name.clone().unwrap(), TraceRecordingItem(trace_recording)));
+        trace_recordings.push((
+            trace_recording.name.clone().unwrap(),
+            TraceRecordingItem(trace_recording),
+        ));
     }
 
     Ok(trace_recordings)
 }
 
-pub async fn delete_trace_recording(host: String, trace_recording_id: String) -> Result<String, String> {
+pub async fn delete_trace_recording(
+    host: String,
+    trace_recording_id: String,
+) -> Result<String, String> {
     let mut configuration = Configuration::default();
     configuration.base_path = host;
 
-    let params = DeleteTraceRecordingParams { trace_recording_id: trace_recording_id.clone() };
+    let params = DeleteTraceRecordingParams {
+        trace_recording_id: trace_recording_id.clone(),
+    };
 
     let response =
         hivemq_openapi::apis::trace_recordings_api::delete_trace_recording(&configuration, params)

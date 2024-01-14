@@ -1,6 +1,7 @@
 use color_eyre::eyre::{Ok, Result};
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::layout::Alignment::Center;
+use ratatui::layout::Margin;
 use ratatui::style::{Color, Stylize};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::{
@@ -10,7 +11,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Widget},
     Frame,
 };
-use ratatui::layout::Margin;
 use serde::Serialize;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
@@ -30,19 +30,24 @@ pub struct ConfirmPopup {
 impl Popup for ConfirmPopup {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::Escape => {
-                Ok(Some(Action::ClosePopup))
-            }
+            Action::Escape => Ok(Some(Action::ClosePopup)),
             Action::Enter => {
                 self.tx.send(self.action.clone()).unwrap();
                 Ok(Some(Action::ClosePopup))
             }
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()> {
-        draw_default_popup(f, popup_area, self.title.clone(), self.message.clone(), Color::Blue, "[ESC] Escape  [ENTER] Confirm".to_string());
+        draw_default_popup(
+            f,
+            popup_area,
+            self.title.clone(),
+            self.message.clone(),
+            Color::Blue,
+            "[ESC] Escape  [ENTER] Confirm".to_string(),
+        );
         Ok(())
     }
 }
@@ -53,23 +58,34 @@ pub struct ErrorPopup {
 }
 
 impl Popup for ErrorPopup {
-
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::Escape => {
-                Ok(Some(Action::ClosePopup))
-            }
-            _ => Ok(None)
+            Action::Escape => Ok(Some(Action::ClosePopup)),
+            _ => Ok(None),
         }
     }
 
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()> {
-        draw_default_popup(f, popup_area, self.title.clone(), self.message.clone(), Color::Red, "[ESC] Escape".to_string());
+        draw_default_popup(
+            f,
+            popup_area,
+            self.title.clone(),
+            self.message.clone(),
+            Color::Red,
+            "[ESC] Escape".to_string(),
+        );
         Ok(())
     }
 }
 
-fn draw_default_popup(f: &mut crate::tui::Frame<'_>, popup_area: Rect, title: String, message: String, color: Color, footer: String) {
+fn draw_default_popup(
+    f: &mut crate::tui::Frame<'_>,
+    popup_area: Rect,
+    title: String,
+    message: String,
+    color: Color,
+    footer: String,
+) {
     let block = Block::default()
         .title(title)
         .title_alignment(Center)
@@ -98,7 +114,9 @@ fn draw_default_popup(f: &mut crate::tui::Frame<'_>, popup_area: Rect, title: St
 }
 
 pub trait Popup {
-    fn update(&mut self, action: Action) -> Result<Option<Action>> { Ok(None) }
+    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        Ok(None)
+    }
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()>;
 
     fn draw(&mut self, f: &mut crate::tui::Frame<'_>, area: Rect) -> Result<()> {
@@ -118,7 +136,7 @@ fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
                 Constraint::Percentage(percent_y),
                 Constraint::Percentage((100 - percent_y) / 2),
             ]
-                .as_ref(),
+            .as_ref(),
         )
         .split(r);
 
@@ -130,7 +148,7 @@ fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
                 Constraint::Percentage(percent_x),
                 Constraint::Percentage((100 - percent_x) / 2),
             ]
-                .as_ref(),
+            .as_ref(),
         )
         .split(popup_layout[1])[1]
 }

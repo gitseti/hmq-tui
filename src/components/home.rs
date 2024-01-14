@@ -1,17 +1,18 @@
 use std::{collections::HashMap, time::Duration};
 
-use color_eyre::eyre::{Result, Ok};
+use color_eyre::eyre::{Ok, Result};
 use color_eyre::owo_colors::OwoColorize;
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use futures::SinkExt;
-use ratatui::{prelude::*, widgets::*};
 use ratatui::layout::Direction::Horizontal;
+use ratatui::{prelude::*, widgets::*};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{event, instrument, Level, span};
+use tracing::{event, instrument, span, Level};
 use tracing_subscriber::fmt::format;
 
 use super::{Component, Frame};
+use crate::components::popup::{ConfirmPopup, ErrorPopup, Popup};
 use crate::components::tabs::backups::BackupsTab;
 use crate::components::tabs::behavior_policies::BehaviorPoliciesTab;
 use crate::components::tabs::clients::Clients;
@@ -20,13 +21,12 @@ use crate::components::tabs::schemas::SchemasTab;
 use crate::components::tabs::scripts::ScriptsTab;
 use crate::components::tabs::trace_recordings::TraceRecordingsTab;
 use crate::components::tabs::TabComponent;
+use crate::mode::Mode;
 use crate::tui::Event;
 use crate::{
     action::Action,
     config::{Config, KeyBindings},
 };
-use crate::components::popup::{ConfirmPopup, ErrorPopup, Popup};
-use crate::mode::Mode;
 
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
@@ -140,8 +140,17 @@ impl Component for Home {
             Action::SelectTab(tab) => self.select_tab(tab),
             Action::NextTab => self.next_tab(),
             Action::PrevTab => self.prev_tab(),
-            Action::CreateConfirmPopup { title, message, confirm_action } => {
-                let popup = ConfirmPopup { title, message, tx: self.command_tx.clone().unwrap(), action: *confirm_action };
+            Action::CreateConfirmPopup {
+                title,
+                message,
+                confirm_action,
+            } => {
+                let popup = ConfirmPopup {
+                    title,
+                    message,
+                    tx: self.command_tx.clone().unwrap(),
+                    action: *confirm_action,
+                };
                 self.popup = Some(Box::new(popup));
                 return Ok(Some(Action::SwitchMode(Mode::ConfirmPopup)));
             }
@@ -150,7 +159,7 @@ impl Component for Home {
                 self.popup = Some(Box::new(popup));
                 return Ok(Some(Action::SwitchMode(Mode::ErrorPopup)));
             }
-            _ => return self.tabs[self.active_tab].update(action)
+            _ => return self.tabs[self.active_tab].update(action),
         }
 
         Ok(None)
@@ -161,7 +170,11 @@ impl Component for Home {
         let active_tab = &tabs[self.active_tab];
         let max_width = f.size().width;
 
-        let key_bindings: Vec<String> = active_tab.get_key_hints().iter().map(|(key, action)| format!(" {key} [{action}]")).collect();
+        let key_bindings: Vec<String> = active_tab
+            .get_key_hints()
+            .iter()
+            .map(|(key, action)| format!(" {key} [{action}]"))
+            .collect();
         let key_bindings = split_at_width(key_bindings, max_width);
 
         let layout = Layout::default()
@@ -192,7 +205,10 @@ impl Component for Home {
             .padding("", "")
             .divider("");
         f.render_widget(header, header_area);
-        f.render_widget(Block::default().borders(Borders::BOTTOM).dim(), header_ruler_area);
+        f.render_widget(
+            Block::default().borders(Borders::BOTTOM).dim(),
+            header_ruler_area,
+        );
 
         // Create Tab
         (&mut tabs[self.active_tab]).draw(f, tab_area)?;

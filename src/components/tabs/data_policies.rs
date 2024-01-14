@@ -1,11 +1,14 @@
-use crate::action::{Action, Item};
 use crate::action::Action::Submit;
+use crate::action::{Action, Item};
 use crate::components::editor::Editor;
+use crate::components::item_features::ItemSelector;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{create_data_policy, delete_data_policy, fetch_data_policies, fetch_schemas};
+use crate::hivemq_rest_client::{
+    create_data_policy, delete_data_policy, fetch_data_policies, fetch_schemas,
+};
 use crate::mode::Mode;
 use crate::mode::Mode::Main;
 use crate::tui::Frame;
@@ -18,7 +21,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::ItemSelector;
 
 pub struct DataPoliciesTab<'a> {
     hivemq_address: String,
@@ -32,7 +34,7 @@ impl ItemSelector<DataPolicy> for DataPolicySelector {
     fn select(&self, item: Item) -> Option<DataPolicy> {
         match item {
             Item::DataPolicyItem(policy) => Some(policy),
-            _ => None
+            _ => None,
         }
     }
 

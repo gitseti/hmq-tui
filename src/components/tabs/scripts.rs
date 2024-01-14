@@ -1,6 +1,7 @@
-use crate::action::{Action, Item};
 use crate::action::Action::Submit;
+use crate::action::{Action, Item};
 use crate::components::editor::Editor;
+use crate::components::item_features::ItemSelector;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
@@ -23,7 +24,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::ItemSelector;
 
 pub struct ScriptsTab<'a> {
     hivemq_address: String,
@@ -37,7 +37,7 @@ impl ItemSelector<Script> for ScriptSelector {
     fn select(&self, item: Item) -> Option<Script> {
         match item {
             Item::ScriptItem(script) => Some(script),
-            _ => None
+            _ => None,
         }
     }
 

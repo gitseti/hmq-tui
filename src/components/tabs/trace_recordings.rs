@@ -1,9 +1,12 @@
 use crate::action::{Action, Item};
+use crate::components::item_features::ItemSelector;
 use crate::components::list_with_details::{ListWithDetails, State};
 use crate::components::tabs::TabComponent;
 use crate::components::{list_with_details, Component};
 use crate::config::Config;
-use crate::hivemq_rest_client::{delete_trace_recording, fetch_backups, fetch_schemas, fetch_trace_recordings};
+use crate::hivemq_rest_client::{
+    delete_trace_recording, fetch_backups, fetch_schemas, fetch_trace_recordings,
+};
 use crate::tui::Frame;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
@@ -14,7 +17,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use crate::components::item_features::ItemSelector;
 
 pub struct TraceRecordingsTab<'a> {
     hivemq_address: String,
@@ -28,7 +30,7 @@ impl ItemSelector<TraceRecording> for TraceRecordingSelector {
     fn select(&self, item: Item) -> Option<TraceRecording> {
         match item {
             Item::TraceRecordingItem(trace_recording_item) => Some(trace_recording_item),
-            _ => None
+            _ => None,
         }
     }
 
@@ -44,7 +46,6 @@ impl ItemSelector<TraceRecording> for TraceRecordingSelector {
         Some((id.clone(), item))
     }
 }
-
 
 impl TraceRecordingsTab<'_> {
     pub fn new(hivemq_address: String) -> Self {
@@ -95,8 +96,6 @@ impl TabComponent for TraceRecordingsTab<'_> {
     }
 
     fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"),
-             ("C", "Copy"),
-             ("ESC", "Escape"), ]
+        vec![("R", "Load"), ("C", "Copy"), ("ESC", "Escape")]
     }
 }
