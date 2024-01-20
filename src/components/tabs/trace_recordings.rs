@@ -24,7 +24,7 @@ pub struct TraceRecordingsTab<'a> {
     list_with_details: ListWithDetails<'a, TraceRecording>,
 }
 
-struct TraceRecordingSelector;
+pub struct TraceRecordingSelector;
 
 impl ItemSelector<TraceRecording> for TraceRecordingSelector {
     fn select(&self, item: Item) -> Option<TraceRecording> {

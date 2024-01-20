@@ -28,7 +28,7 @@ pub struct DataPoliciesTab<'a> {
     list_with_details: ListWithDetails<'a, DataPolicy>,
 }
 
-struct DataPolicySelector;
+pub struct DataPolicySelector;
 
 impl ItemSelector<DataPolicy> for DataPolicySelector {
     fn select(&self, item: Item) -> Option<DataPolicy> {

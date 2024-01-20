@@ -29,7 +29,7 @@ pub struct BehaviorPoliciesTab<'a> {
     list_with_details: ListWithDetails<'a, BehaviorPolicy>,
 }
 
-struct BehaviorPolicySelector;
+pub struct BehaviorPolicySelector;
 
 impl ItemSelector<BehaviorPolicy> for BehaviorPolicySelector {
     fn select(&self, item: Item) -> Option<BehaviorPolicy> {

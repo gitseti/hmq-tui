@@ -12,7 +12,7 @@ use crate::{
 pub mod editor;
 pub mod fps;
 pub mod home;
-mod item_features;
+pub(crate) mod item_features;
 pub mod list_with_details;
 pub mod popup;
 pub mod tabs;

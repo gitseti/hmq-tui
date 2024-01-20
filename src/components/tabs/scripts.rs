@@ -31,7 +31,7 @@ pub struct ScriptsTab<'a> {
     list_with_details: ListWithDetails<'a, Script>,
 }
 
-struct ScriptSelector;
+pub struct ScriptSelector;
 
 impl ItemSelector<Script> for ScriptSelector {
     fn select(&self, item: Item) -> Option<Script> {

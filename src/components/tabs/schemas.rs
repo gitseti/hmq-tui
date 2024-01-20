@@ -32,7 +32,7 @@ pub struct SchemasTab<'a> {
     list_with_details: ListWithDetails<'a, Schema>,
 }
 
-struct SchemaSelector;
+pub struct SchemaSelector;
 
 impl ItemSelector<Schema> for SchemaSelector {
     fn select(&self, item: Item) -> Option<Schema> {

@@ -93,7 +93,7 @@ impl Component for Clients<'_> {
                     let tx = self.tx.clone().unwrap();
                     let hivemq_address = self.hivemq_address.clone();
                     let _ = tokio::spawn(async move {
-                        let result = fetch_client_details(key, hivemq_address).await;
+                        let result = fetch_client_details(&key, hivemq_address).await;
                         tx.send(Action::ClientDetailsLoadingFinished(result))
                             .expect("Failed to send client details loading finished action");
                     });

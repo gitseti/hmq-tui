@@ -2,6 +2,7 @@ use crate::action::Item;
 use crate::action::Item::{
     BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem,
 };
+use color_eyre::eyre::ContextCompat;
 use futures::future::err;
 use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
 use hivemq_openapi::apis::configuration::Configuration;
@@ -31,70 +32,98 @@ use hivemq_openapi::models::{
     Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
     TraceRecording,
 };
+use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
+use regex::Regex;
 use serde::Serialize;
+use serde::__private::de::IdentifierDeserializer;
+use std::fmt::format;
+
+fn get_cursor(links: Option<Option<Box<PaginationCursor>>>) -> Option<String> {
+    lazy_static! {
+        static ref CURSOR_REGEX: Regex = Regex::new(r"cursor=([^&]*)").unwrap();
+    }
+
+    let next = links.flatten().and_then(|cursor| cursor.next)?;
+
+    CURSOR_REGEX
+        .captures_iter(&next)
+        .next()
+        .and_then(|cap| cap.get(1))
+        .map(|mat| mat.as_str().to_string())
+}
+
+fn build_rest_api_config(host: String) -> Configuration {
+    let mut configuration = Configuration::default();
+    configuration.base_path = host.to_string();
+    configuration
+}
+
+fn transform_api_err<T: Serialize>(error: Error<T>) -> String {
+    let msg = if let Error::ResponseError(response) = error {
+        match &response.entity {
+            None => response.content.clone(),
+            Some(entity) => serde_json::to_string_pretty(entity).expect("Can not serialize entity"),
+        }
+    } else {
+        error.to_string()
+    };
+
+    format!("API request failed: {}", msg)
+}
 
 pub async fn fetch_client_details(
-    client_id: String,
+    client_id: &str,
     host: String,
 ) -> Result<(String, ClientDetails), String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
-
+    let configuration = build_rest_api_config(host);
     let params = GetMqttClientDetailsParams {
-        client_id: client_id.clone(),
+        client_id: client_id.to_string(),
     };
 
     let details = get_mqtt_client_details(&configuration, params)
         .await
-        .or_else(|error| {
-            Err(format!(
-                "Failed to fetch client details for client {client_id}: {error}"
-            ))
-        })?;
-
-    let details = details
+        .map_err(transform_api_err)?
         .client
-        .expect(format!("Client details for client {client_id} were empty").as_str());
-    Ok((client_id, *details))
+        .ok_or_else(|| format!("Client details for client {client_id} were empty"))?;
+
+    Ok((client_id.to_string(), *details))
 }
 
 pub async fn fetch_client_ids(host: String) -> Result<Vec<String>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
-    let mut client_ids = vec![];
-
+    let configuration = build_rest_api_config(host);
     let mut params = GetAllMqttClientsParams {
         limit: Some(2_500),
         cursor: None,
     };
 
+    let mut client_ids = vec![];
     loop {
         let response = get_all_mqtt_clients(&configuration, params.clone())
             .await
-            .or_else(|error| Err(format!("Failed to fetch clients: {error}")))?;
+            .map_err(transform_api_err)?;
 
-        for client in response.items.unwrap() {
-            client_ids.push(client.id.unwrap())
+        for client in response.items.into_iter().flatten() {
+            client_ids.push(
+                client
+                    .id
+                    .ok_or_else(|| String::from("Client id was empty"))?,
+            )
         }
 
-        let cursor = match response._links {
-            None => {
-                break;
-            }
-            Some(cursor) => cursor.unwrap().next,
-        };
-        params.cursor = cursor;
+        let cursor = get_cursor(response._links);
+        if cursor.is_none() {
+            break;
+        } else {
+            params.cursor = cursor;
+        }
     }
 
     Ok(client_ids)
 }
 
-//TODO: Test
 pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
-
+    let configuration = build_rest_api_config(host);
     let mut params = GetAllDataPoliciesParams {
         fields: None,
         policy_ids: None,
@@ -108,27 +137,25 @@ pub async fn fetch_data_policies(host: String) -> Result<Vec<(String, Item)>, St
     loop {
         let response = get_all_data_policies(&configuration, params.clone())
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
-        for policy in response.items.unwrap() {
-            policies.push((policy.id.clone(), DataPolicyItem(policy)));
+        for policy in response.items.into_iter().flatten() {
+            policies.push((policy.id.clone(), DataPolicyItem(policy)))
         }
 
-        let cursor = match response._links {
-            None => {
-                break;
-            }
-            Some(cursor) => cursor.unwrap().next,
-        };
-        params.cursor = cursor;
+        let cursor = get_cursor(response._links);
+        if cursor.is_none() {
+            break;
+        } else {
+            params.cursor = cursor;
+        }
     }
 
     Ok(policies)
 }
 
 pub async fn create_data_policy(host: String, data_policy: String) -> Result<Item, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let data_policy: DataPolicy =
         serde_json::from_str(data_policy.as_str()).or_else(|err| Err(err.to_string()))?;
@@ -140,14 +167,13 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Ite
         params,
     )
     .await
-    .or_else(|error| Err(transform_api_err(&error)))?;
+    .map_err(transform_api_err)?;
 
     Ok(DataPolicyItem(response))
 }
 
 pub async fn delete_data_policy(host: String, policy_id: String) -> Result<String, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let params = DeleteDataPolicyParams {
         policy_id: policy_id.clone(),
@@ -159,15 +185,13 @@ pub async fn delete_data_policy(host: String, policy_id: String) -> Result<Strin
     )
     .await
     .map(|_| policy_id)
-    .or_else(|error| Err(transform_api_err(&error)))?;
+    .map_err(transform_api_err)?;
 
     Ok(response)
 }
 
-//TODO: Tests
 pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let mut params = GetAllBehaviorPoliciesParams {
         fields: None,
@@ -181,27 +205,25 @@ pub async fn fetch_behavior_policies(host: String) -> Result<Vec<(String, Item)>
     loop {
         let response = get_all_behavior_policies(&configuration, params.clone())
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
-        for policy in response.items.unwrap() {
-            policies.push((policy.id.clone(), BehaviorPolicyItem(policy)));
+        for policy in response.items.into_iter().flatten() {
+            policies.push((policy.id.clone(), BehaviorPolicyItem(policy)))
         }
 
-        let cursor = match response._links {
-            None => {
-                break;
-            }
-            Some(cursor) => cursor.unwrap().next,
-        };
-        params.cursor = cursor;
+        let cursor = get_cursor(response._links);
+        if cursor.is_none() {
+            break;
+        } else {
+            params.cursor = cursor;
+        }
     }
 
     Ok(policies)
 }
 
 pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Result<Item, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let behavior_policy: BehaviorPolicy =
         serde_json::from_str(behavior_policy.as_str()).or_else(|err| Err(err.to_string()))?;
@@ -213,14 +235,13 @@ pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Re
         params,
     )
     .await
-    .or_else(|error| Err(transform_api_err(&error)))?;
+    .map_err(transform_api_err)?;
 
     Ok(Item::BehaviorPolicyItem(response))
 }
 
 pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<String, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let params = DeleteBehaviorPolicyParams {
         policy_id: policy_id.clone(),
@@ -232,16 +253,13 @@ pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<S
     )
     .await
     .map(|_| policy_id)
-    .or_else(|error| Err(transform_api_err(&error)))?;
+    .map_err(transform_api_err)?;
 
     Ok(response)
 }
 
-//TODO: Test | Refactor?
 pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
-
+    let configuration = build_rest_api_config(host);
     let mut params = GetAllSchemasParams {
         fields: None,
         types: None,
@@ -254,27 +272,25 @@ pub async fn fetch_schemas(host: String) -> Result<Vec<(String, Item)>, String> 
     loop {
         let response = get_all_schemas(&configuration, params.clone())
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
-        for schema in response.items.unwrap() {
-            schemas.push((schema.id.clone(), Item::SchemaItem(schema)));
+        for schema in response.items.into_iter().flatten() {
+            schemas.push((schema.id.clone(), SchemaItem(schema)))
         }
 
-        let cursor = match response._links {
-            None => {
-                break;
-            }
-            Some(cursor) => cursor.unwrap().next,
-        };
-        params.cursor = cursor;
+        let cursor = get_cursor(response._links);
+        if cursor.is_none() {
+            break;
+        } else {
+            params.cursor = cursor;
+        }
     }
 
     Ok(schemas)
 }
 
 pub async fn create_schema(host: String, schema: String) -> Result<Item, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let schema: Schema =
         serde_json::from_str(schema.as_str()).or_else(|err| Err(err.to_string()))?;
@@ -284,14 +300,13 @@ pub async fn create_schema(host: String, schema: String) -> Result<Item, String>
     let response =
         hivemq_openapi::apis::data_hub_schemas_api::create_schema(&configuration, params)
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
     Ok(SchemaItem(response))
 }
 
 pub async fn delete_schema(host: String, schema_id: String) -> Result<String, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let params = DeleteSchemaParams {
         schema_id: schema_id.clone(),
@@ -301,14 +316,13 @@ pub async fn delete_schema(host: String, schema_id: String) -> Result<String, St
         hivemq_openapi::apis::data_hub_schemas_api::delete_schema(&configuration, params)
             .await
             .map(|_| schema_id)
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
     Ok(response)
 }
 
 pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let mut params = GetAllScriptsParams {
         fields: None,
@@ -322,27 +336,25 @@ pub async fn fetch_scripts(host: String) -> Result<Vec<(String, Item)>, String> 
     loop {
         let response = get_all_scripts(&configuration, params.clone())
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
-        for script in response.items.unwrap() {
-            scripts.push((script.id.clone(), ScriptItem(script)));
+        for script in response.items.into_iter().flatten() {
+            scripts.push((script.id.clone(), ScriptItem(script)))
         }
 
-        let cursor = match response._links {
-            None => {
-                break;
-            }
-            Some(cursor) => cursor.unwrap().next,
-        };
-        params.cursor = cursor;
+        let cursor = get_cursor(response._links);
+        if cursor.is_none() {
+            break;
+        } else {
+            params.cursor = cursor;
+        }
     }
 
     Ok(scripts)
 }
 
 pub async fn create_script(host: String, script: String) -> Result<Item, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let script: Script =
         serde_json::from_str(script.as_str()).or_else(|err| Err(err.to_string()))?;
@@ -352,14 +364,13 @@ pub async fn create_script(host: String, script: String) -> Result<Item, String>
     let response =
         hivemq_openapi::apis::data_hub_scripts_api::create_script(&configuration, params)
             .await
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
     Ok(ScriptItem(response))
 }
 
 pub async fn delete_script(host: String, script_id: String) -> Result<String, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let params = DeleteScriptParams {
         script_id: script_id.clone(),
@@ -369,41 +380,40 @@ pub async fn delete_script(host: String, script_id: String) -> Result<String, St
         hivemq_openapi::apis::data_hub_scripts_api::delete_script(&configuration, params)
             .await
             .map(|_| script_id)
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
     Ok(response)
 }
 
 pub async fn fetch_backups(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let mut backups = vec![];
     let response = get_all_backups(&configuration)
         .await
-        .or_else(|error| Err(transform_api_err(&error)))?;
+        .map_err(transform_api_err)?;
 
-    for backup in response.items.unwrap() {
-        backups.push((backup.id.clone().unwrap(), BackupItem(backup)));
+    for backup in response.items.into_iter().flatten() {
+        if let Some (id) = &backup.id{
+            backups.push((id.clone(), BackupItem(backup)));
+        }
     }
 
     Ok(backups)
 }
 
 pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let mut trace_recordings = vec![];
     let response = get_all_trace_recordings(&configuration)
         .await
-        .or_else(|error| Err(transform_api_err(&error)))?;
+        .map_err(transform_api_err)?;
 
-    for trace_recording in response.items.unwrap() {
-        trace_recordings.push((
-            trace_recording.name.clone().unwrap(),
-            TraceRecordingItem(trace_recording),
-        ));
+    for trace_recording in response.items.into_iter().flatten() {
+        if let Some (name) = &trace_recording.name{
+            trace_recordings.push((name.clone(), TraceRecordingItem(trace_recording)));
+        }
     }
 
     Ok(trace_recordings)
@@ -413,8 +423,7 @@ pub async fn delete_trace_recording(
     host: String,
     trace_recording_id: String,
 ) -> Result<String, String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
+    let configuration = build_rest_api_config(host);
 
     let params = DeleteTraceRecordingParams {
         trace_recording_id: trace_recording_id.clone(),
@@ -424,269 +433,823 @@ pub async fn delete_trace_recording(
         hivemq_openapi::apis::trace_recordings_api::delete_trace_recording(&configuration, params)
             .await
             .map(|_| trace_recording_id)
-            .or_else(|error| Err(transform_api_err(&error)))?;
+            .map_err(transform_api_err)?;
 
     Ok(response)
 }
 
-pub async fn disconnect(client_id: String, host: String) -> Result<(), String> {
-    let mut configuration = Configuration::default();
-    configuration.base_path = host;
-
-    let params = DisconnectClientParams {
-        client_id: client_id.clone(),
-        prevent_will_message: Some(false),
-    };
-
-    mqtt_clients_api::disconnect_client(&configuration, params)
-        .await
-        .or_else(|error| {
-            Err(format!(
-                "Failed to disconnect client '{client_id}': {error}"
-            ))
-        })?;
-
-    Ok(())
-}
-
-pub fn transform_api_err<T: Serialize>(error: &Error<T>) -> String {
-    let msg = if let Error::ResponseError(response) = error {
-        match &response.entity {
-            None => response.content.clone(),
-            Some(entity) => serde_json::to_string_pretty(entity).expect("Can not serialize entity"),
-        }
-    } else {
-        error.to_string()
-    };
-
-    format!("API request failed: {}", msg)
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids};
-    use httpmock::Method::GET;
-    use httpmock::MockServer;
-    use tracing_subscriber::fmt::format;
+    use super::*;
+    use crate::action::Item::DataPolicyItem;
+    use crate::components::item_features::ItemSelector;
+    use crate::components::tabs::behavior_policies::BehaviorPolicySelector;
+    use crate::components::tabs::data_policies::DataPolicySelector;
+    use crate::components::tabs::schemas::SchemaSelector;
+    use crate::components::tabs::scripts::ScriptSelector;
+    use futures::future::err;
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+        CreateBehaviorPolicyError, DeleteBehaviorPolicyError, GetAllBehaviorPoliciesError,
+    };
+    use hivemq_openapi::apis::data_hub_data_policies_api::{
+        CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
+    };
+    use hivemq_openapi::apis::data_hub_schemas_api::{
+        CreateSchemaError, DeleteSchemaError, GetAllSchemasError,
+    };
+    use hivemq_openapi::apis::data_hub_scripts_api::{
+        CreateScriptError, DeleteScriptError, GetAllScriptsError,
+    };
+    use hivemq_openapi::apis::mqtt_clients_api::GetMqttClientDetailsError;
+    use hivemq_openapi::models::script::FunctionType;
+    use hivemq_openapi::models::{Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Client, ClientDetails, ClientItem, ClientList, ClientRestrictions, Connection, ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching, Error, Errors, PaginationCursor, Schema, SchemaList, Script, ScriptList, trace_recording, TraceRecordingList};
+    use httpmock::Method::{DELETE, GET, POST};
+    use httpmock::{Mock, MockServer};
+    use pretty_assertions::assert_eq;
+    use serde::Serialize;
+    use serde_json::{json, Value};
+    use std::fmt::format;
+    use std::ops::Div;
+    use hivemq_openapi::apis::backup_restore_api::GetAllBackupsError;
+    use hivemq_openapi::apis::trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError};
+    use crate::components::tabs::backups::BackupSelector;
+    use crate::components::tabs::trace_recordings::TraceRecordingSelector;
+
+    fn create_responses<T>(
+        url: &str,
+        build_list: fn(usize, usize, Option<Option<Box<PaginationCursor>>>) -> T,
+    ) -> Vec<T> {
+        let mut responses: Vec<T> = Vec::with_capacity(100);
+        for i in 0..10 {
+            let start = i * 10;
+            let end = start + 10;
+            let cursor = if i != 9 {
+                Some(Some(Box::new(PaginationCursor {
+                    next: Some(format!("{url}?cursor=foobar{}", i + 1)),
+                })))
+            } else {
+                None
+            };
+            responses.push(build_list(start, end, cursor));
+        }
+        responses
+    }
+
+    fn mock_cursor_responses<'a, T: Serialize>(
+        broker: &'a MockServer,
+        url: &str,
+        responses: &Vec<T>,
+        cursor_prefix: &str,
+    ) -> Vec<Mock<'a>> {
+        let mut mocks = Vec::with_capacity(responses.len());
+        for (i, response) in responses.iter().enumerate().rev() {
+            let mock = broker.mock(|when, then| {
+                if i == 0 {
+                    when.method(GET).path(url);
+                } else {
+                    when.method(GET)
+                        .path(url)
+                        .query_param("cursor", format!("{cursor_prefix}{i}"));
+                }
+                then.status(200)
+                    .header("content-type", "application/json")
+                    .body(serde_json::to_string(&response).unwrap());
+            });
+            mocks.push(mock);
+        }
+
+        mocks
+    }
+
+    fn build_client_details() -> ClientDetails {
+        ClientDetails {
+            connected: Some(true),
+            connected_at: Some(Some("2020-07-20T14:59:50.580Z".to_string())),
+            connection: Some(Some(Box::new(ConnectionDetails {
+                clean_start: Some(true),
+                connected_listener_id: Some("TCP Listener".to_string()),
+                connected_node_id: Some("node1".to_string()),
+                keep_alive: Some(Some(60)),
+                mqtt_version: Some("MQTTv5".to_string()),
+                password: None,
+                proxy_information: None,
+                source_ip: Some(Some("127.0.0.1".to_string())),
+                tls_information: None,
+                username: None,
+            }))),
+            id: Some("client".to_string()),
+            message_queue_size: Some(100),
+            restrictions: Some(Some(Box::new(ClientRestrictions {
+                max_message_size: Some(Some(268435460)),
+                max_queue_size: Some(Some(1000)),
+                queued_message_strategy: Some(Some("DISCARD".to_string())),
+            }))),
+            session_expiry_interval: Some(Some(60)),
+            will_present: Some(false),
+        }
+    }
+
+    fn build_client_items(offset: usize, amount: usize) -> Vec<Client> {
+        let client_items: Vec<Client> = (offset..offset + amount)
+            .into_iter()
+            .map(|i| Client {
+                id: Some(format!("client-{i}")),
+            })
+            .collect();
+        client_items
+    }
 
     #[tokio::test]
-    async fn test_fetch_client_details_online_client() {
-        let response = r#"
-            {
-              "client": {
-                "id": "my-client",
-                "connected": true,
-                "sessionExpiryInterval": 15000,
-                "connectedAt": "2020-07-20T14:59:50.580Z",
-                "messageQueueSize": 0,
-                "willPresent": false,
-                "restrictions": {
-                  "maxMessageSize": 268435460,
-                  "maxQueueSize": 1000,
-                  "queuedMessageStrategy": "DISCARD"
-                },
-                "connection": {
-                  "keepAlive": 60,
-                  "mqttVersion": "MQTTv5",
-                  "connectedListenerId": "TCP Listener",
-                  "connectedNodeId": "bRIG4",
-                  "cleanStart": true,
-                  "sourceIp": "127.0.0.1"
-                }
-              }
-            }
-        "#;
-
+    async fn test_fetch_client_details_client() {
+        let client_details = build_client_details();
+        let client_item = ClientItem {
+            client: Some(Box::new(client_details.clone())),
+        };
+        let client_json = serde_json::to_string(&client_item).unwrap();
         let broker = MockServer::start();
         let client_details_mock = broker.mock(|when, then| {
-            when.method(GET).path("/api/v1/mqtt/clients/my-client");
+            when.method(GET).path("/api/v1/mqtt/clients/client");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(response);
+                .body(client_json);
         });
 
-        let client_details = fetch_client_details("my-client".to_string(), broker.base_url()).await;
-        let client_details = client_details.unwrap();
-        let client_details = client_details.1;
+        let response = fetch_client_details("client", broker.base_url()).await;
+        let (client_id, details) = response.unwrap();
 
-        // assert top level client details
-        assert_eq!("my-client", client_details.id.unwrap().as_str());
-        assert_eq!(true, client_details.connected.unwrap());
-        assert_eq!(
-            15000,
-            client_details.session_expiry_interval.unwrap().unwrap()
-        );
-        assert_eq!(
-            "2020-07-20T14:59:50.580Z",
-            client_details.connected_at.unwrap().unwrap()
-        );
-        assert_eq!(0, client_details.message_queue_size.unwrap());
-        assert_eq!(false, client_details.will_present.unwrap());
-
-        // assert restrictions
-        let restrictions = client_details.restrictions.unwrap().unwrap();
-        assert_eq!(268435460, restrictions.max_message_size.unwrap().unwrap());
-        assert_eq!(1000, restrictions.max_queue_size.unwrap().unwrap());
-        assert_eq!(
-            "DISCARD",
-            restrictions.queued_message_strategy.unwrap().unwrap()
-        );
-
-        // assert connection
-        let connection = client_details.connection.unwrap().unwrap();
-        assert_eq!(60, connection.keep_alive.unwrap().unwrap());
-        assert_eq!("MQTTv5", connection.mqtt_version.unwrap());
-        assert_eq!("TCP Listener", connection.connected_listener_id.unwrap());
-        assert_eq!("bRIG4", connection.connected_node_id.unwrap());
-        assert_eq!(true, connection.clean_start.unwrap());
-        assert_eq!("127.0.0.1", connection.source_ip.unwrap().unwrap());
-
-        client_details_mock.assert_hits(1);
+        assert_eq!(client_details.id, Some(client_id));
+        assert_eq!(client_details, details);
     }
 
     #[tokio::test]
     async fn test_fetch_client_details_error() {
-        let response = r#"
-            {
-              "errors": [
-                {
-                  "title": "Required parameter missing",
-                  "detail": "Required URL parameter 'parameterName' is missing"
-                }
-              ]
-            }
-        "#;
-
+        let error = GetMqttClientDetailsError::Status404(Errors {
+            errors: Some(vec![Error {
+                detail: Some(String::from("Client with id client was not found")),
+                title: Some(String::from("Client not found")),
+            }]),
+        });
+        let error_json = serde_json::to_string(&error).unwrap();
         let broker = MockServer::start();
         let client_details_mock = broker.mock(|when, then| {
-            when.method(GET).path("/api/v1/mqtt/clients/my-client");
-            then.status(400)
+            when.method(GET).path("/api/v1/mqtt/clients/client");
+            then.status(404)
                 .header("content-type", "application/json")
-                .body(response);
+                .body(error_json.clone());
         });
 
-        let client_details = fetch_client_details("my-client".to_string(), broker.base_url()).await;
+        let response = fetch_client_details("client", broker.base_url()).await;
 
-        assert!(client_details.is_err());
-        client_details.expect_err("Failed to fetch client details for client my-client: error in response: status code 400 Bad Request");
+        assert!(response.is_err());
     }
 
     #[tokio::test]
     async fn test_fetch_client_ids() {
-        let response = r#"
-        {
-            "items": [
-            {
-              "id": "client-12"
-            },
-            {
-              "id": "client-5"
-            },
-            {
-              "id": "client-32"
-            },
-            {
-              "id": "my-client-id2"
-            },
-            {
-              "id": "my-client-id"
-            }
-            ]
-        }
-        "#;
-
+        let client_items = build_client_items(0, 100);
+        let client_list = ClientList {
+            _links: None,
+            items: Some(client_items.clone()),
+        };
         let broker = MockServer::start();
-        let clients_mock = broker.mock(|when, then| {
+        let _ = broker.mock(|when, then| {
             when.method(GET).path("/api/v1/mqtt/clients");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(response);
+                .body(serde_json::to_string(&client_list).unwrap());
         });
 
-        let client_ids = fetch_client_ids(broker.base_url()).await;
-        let client_ids = client_ids.unwrap();
+        let client_ids = fetch_client_ids(broker.base_url()).await.unwrap();
 
-        clients_mock.assert_hits(1);
-        assert!(client_ids.contains(&"client-12".to_string()));
-        assert!(client_ids.contains(&"client-5".to_string()));
-        assert!(client_ids.contains(&"client-32".to_string()));
-        assert!(client_ids.contains(&"my-client-id2".to_string()));
-        assert!(client_ids.contains(&"my-client-id".to_string()));
+        for client in client_items {
+            assert!(client_ids.contains(&client.id.unwrap()));
+        }
     }
 
     #[tokio::test]
-    async fn test_fetch_client_ids_with_cursor() {
-        let response1 = r#"
-        {
-          "items": [
-            {
-              "id": "client-1"
-            },
-            {
-              "id": "client-2"
-            },
-            {
-              "id": "client-3"
-            },
-            {
-              "id": "client-4"
-            },
-            {
-              "id": "client-5"
-            }
-          ],
-          "_links": {
-            "next": "/api/v1/mqtt/clients?cursor=a-MvelExpd5y0SrXBxDhBvnGmohbpzwGDQFdUyOYWBACqs1TgI4-cUo-A=&limit=2500"
-          }
+    async fn test_fetch_client_ids_cursor() {
+        let mut all_client_items: Vec<Client> = Vec::with_capacity(1000);
+        let mut responses: Vec<ClientList> = Vec::with_capacity(10);
+        for i in 0..10 {
+            let client_items: Vec<Client> = build_client_items(i * 100, 100);
+            all_client_items.append(&mut client_items.clone());
+            let next = if i == 9 {
+                None
+            } else {
+                Some(Some(Box::new(PaginationCursor {
+                    next: Some(format!(
+                        "/api/v1/mqtt/clients?cursor=foobar{}&limit=2500",
+                        i + 1
+                    )),
+                })))
+            };
+            let client_list = ClientList {
+                _links: next,
+                items: Some(client_items),
+            };
+            responses.push(client_list);
         }
-        "#;
-
-        let response2 = r#"
-        {
-            "items": [
-            {
-              "id": "client-6"
-            },
-            {
-              "id": "client-7"
-            },
-            {
-              "id": "client-8"
-            },
-            {
-              "id": "client-9"
-            },
-            {
-              "id": "client-10"
-            }
-          ]
-        }
-        "#;
 
         let broker = MockServer::start();
-        let clients_mock2 = broker.mock(|when, then| {
-            when.method(GET)
-                .query_param_exists("cursor")
-                .path("/api/v1/mqtt/clients");
-            then.status(200)
-                .header("content-type", "application/json")
-                .body(response2);
-        });
-        let clients_mock1 = broker.mock(|when, then| {
-            when.method(GET).path("/api/v1/mqtt/clients");
-            then.status(200)
-                .header("content-type", "application/json")
-                .body(response1);
-        });
+        let mocks = mock_cursor_responses(&broker, "/api/v1/mqtt/clients", &responses, "foobar");
 
-        let client_ids = fetch_client_ids(broker.base_url()).await;
-        let client_ids = client_ids.unwrap();
+        let client_ids = fetch_client_ids(broker.base_url()).await.unwrap();
 
-        clients_mock1.assert_hits(1);
-        clients_mock2.assert_hits(1);
-        for i in 1..=10 {
-            let client_id = format! {"client-{i}"}.to_string();
-            assert!(client_ids.contains(&client_id));
+        for mock in mocks {
+            mock.assert();
+        }
+        for client in all_client_items {
+            assert!(
+                client_ids.contains(&client.id.clone().unwrap()),
+                "Client {} was not contained in response",
+                &client.id.unwrap()
+            );
         }
     }
+
+    fn build_data_policy(policy_num: usize) -> DataPolicy {
+        DataPolicy::new(
+            format!("policy-{policy_num}"),
+            DataPolicyMatching::new(format!("topic{policy_num}")),
+        )
+    }
+
+    fn build_data_policy_list(
+        start: usize,
+        end: usize,
+        cursor: Option<Option<Box<PaginationCursor>>>,
+    ) -> DataPolicyList {
+        let policies: Vec<DataPolicy> = (start..end).map(|i| build_data_policy(i)).collect();
+        DataPolicyList {
+            _links: cursor,
+            items: Some(policies),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_data_policies() {
+        let broker = MockServer::start();
+        let responses = create_responses(
+            "/api/v1/data-hub/data-validation/policies",
+            build_data_policy_list,
+        );
+        let mocks = mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/data-validation/policies",
+            &responses,
+            "foobar",
+        );
+
+        let response = fetch_data_policies(broker.base_url()).await.unwrap();
+        let items: Vec<DataPolicy> = response
+            .into_iter()
+            .map(|(id, item)| DataPolicySelector.select(item).unwrap())
+            .collect();
+
+        for mock in mocks {
+            mock.assert();
+        }
+        for policy in responses.into_iter().flat_map(|list| list.items).flatten() {
+            assert!(items.contains(&policy));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_data_policies_error() {
+        let error = GetAllDataPoliciesError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(GET);
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_data_policies(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_data_policy() {
+        let policy = build_data_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(policy_json.clone());
+        });
+
+        let response = create_data_policy(broker.base_url(), policy_json).await;
+        assert_eq!(
+            policy,
+            DataPolicySelector.select(response.unwrap()).unwrap()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_create_data_policy_error() {
+        let error = CreateDataPolicyError::Status503(Errors::new());
+        let policy = build_data_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = create_data_policy(broker.base_url(), policy_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_data_policy() {
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(200);
+        });
+
+        let response = delete_data_policy(broker.base_url(), String::from("policy-1")).await;
+        assert_eq!(response.unwrap(), "policy-1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_data_policy_error() {
+        let error = DeleteDataPolicyError::Status404(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = delete_data_policy(broker.base_url(), String::from("policy-1")).await;
+        assert!(response.is_err())
+    }
+
+    fn build_behavior_policy(policy_num: usize) -> BehaviorPolicy {
+        BehaviorPolicy::new(
+            BehaviorPolicyBehavior::new(String::from("foobar")),
+            format!("policy-{policy_num}"),
+            BehaviorPolicyMatching::new(String::from("foobar")),
+        )
+    }
+
+    fn build_behavior_policy_list(
+        start: usize,
+        end: usize,
+        cursor: Option<Option<Box<PaginationCursor>>>,
+    ) -> BehaviorPolicyList {
+        let policies: Vec<BehaviorPolicy> =
+            (start..end).map(|i| build_behavior_policy(i)).collect();
+        BehaviorPolicyList {
+            _links: cursor,
+            items: Some(policies),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_behavior_policies() {
+        let broker = MockServer::start();
+        let responses = create_responses(
+            "/api/v1/data-hub/behavior-validation/policies",
+            build_behavior_policy_list,
+        );
+        let mocks = mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/behavior-validation/policies",
+            &responses,
+            "foobar",
+        );
+
+        let response = fetch_behavior_policies(broker.base_url()).await.unwrap();
+        let items: Vec<BehaviorPolicy> = response
+            .into_iter()
+            .map(|(id, item)| BehaviorPolicySelector.select(item).unwrap())
+            .collect();
+
+        for mock in mocks {
+            mock.assert();
+        }
+        for policy in responses.into_iter().flat_map(|list| list.items).flatten() {
+            assert!(items.contains(&policy));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_behavior_policies_error() {
+        let error = GetAllBehaviorPoliciesError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request();
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_behavior_policies(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_behavior_policy() {
+        let policy = build_behavior_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(policy_json.clone());
+        });
+
+        let response = create_behavior_policy(broker.base_url(), policy_json).await;
+        assert_eq!(
+            policy,
+            BehaviorPolicySelector.select(response.unwrap()).unwrap()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_create_behavior_policy_error() {
+        let error = CreateBehaviorPolicyError::Status503(Errors::new());
+        let policy = build_behavior_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = create_behavior_policy(broker.base_url(), policy_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_behavior_policy() {
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(200);
+        });
+
+        let response = delete_behavior_policy(broker.base_url(), String::from("policy-1")).await;
+        assert_eq!(response.unwrap(), "policy-1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_behavior_policy_error() {
+        let error = DeleteBehaviorPolicyError::Status404(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = delete_behavior_policy(broker.base_url(), String::from("policy-1")).await;
+        assert!(response.is_err())
+    }
+
+    fn build_schema(schema_num: usize) -> Schema {
+        Schema::new(
+            format!("schema-{schema_num}"),
+            String::from("{}"),
+            String::from("JSON"),
+        )
+    }
+
+    fn build_schema_list(
+        start: usize,
+        end: usize,
+        cursor: Option<Option<Box<PaginationCursor>>>,
+    ) -> SchemaList {
+        let schemas: Vec<Schema> = (start..end).map(|i| build_schema(i)).collect();
+        SchemaList {
+            _links: cursor,
+            items: Some(schemas),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_schemas() {
+        let broker = MockServer::start();
+        let responses = create_responses("/api/v1/data-hub/schemas", build_schema_list);
+        let mocks =
+            mock_cursor_responses(&broker, "/api/v1/data-hub/schemas", &responses, "foobar");
+
+        let response = fetch_schemas(broker.base_url()).await.unwrap();
+        let items: Vec<Schema> = response
+            .into_iter()
+            .map(|(id, item)| SchemaSelector.select(item).unwrap())
+            .collect();
+
+        for mock in mocks {
+            mock.assert();
+        }
+        for schema in responses.into_iter().flat_map(|list| list.items).flatten() {
+            assert!(items.contains(&schema));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_schemas_error() {
+        let error = GetAllSchemasError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request();
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_schemas(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_schema() {
+        let schema = build_schema(1);
+        let schema_json = serde_json::to_string(&schema).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(schema_json.clone());
+        });
+
+        let response = create_schema(broker.base_url(), schema_json).await;
+        assert_eq!(schema, SchemaSelector.select(response.unwrap()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_create_schema_error() {
+        let error = CreateSchemaError::Status503(Errors::new());
+        let schema = build_schema(1);
+        let schema_json = serde_json::to_string(&schema).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = create_schema(broker.base_url(), schema_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_schema() {
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(200);
+        });
+
+        let response = delete_schema(broker.base_url(), String::from("schema-1")).await;
+        assert_eq!(response.unwrap(), "schema-1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_schema_error() {
+        let error = DeleteSchemaError::Status404(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = delete_schema(broker.base_url(), String::from("schema-1")).await;
+        assert!(response.is_err())
+    }
+
+    fn build_script(script_num: usize) -> Script {
+        Script::new(
+            FunctionType::Transformation,
+            format!("script-{script_num}"),
+            String::from("function transform(publish, context) -> { return publish }"),
+        )
+    }
+
+    fn build_script_list(
+        start: usize,
+        end: usize,
+        cursor: Option<Option<Box<PaginationCursor>>>,
+    ) -> ScriptList {
+        let scripts: Vec<Script> = (start..end).map(|i| build_script(i)).collect();
+        ScriptList {
+            _links: cursor,
+            items: Some(scripts),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_scripts() {
+        let broker = MockServer::start();
+        let responses = create_responses("/api/v1/data-hub/scripts", build_script_list);
+        let mocks =
+            mock_cursor_responses(&broker, "/api/v1/data-hub/scripts", &responses, "foobar");
+
+        let response = fetch_scripts(broker.base_url()).await.unwrap();
+        let items: Vec<Script> = response
+            .into_iter()
+            .map(|(id, item)| ScriptSelector.select(item).unwrap())
+            .collect();
+
+        for mock in mocks {
+            mock.assert();
+        }
+        for script in responses.into_iter().flat_map(|list| list.items).flatten() {
+            assert!(items.contains(&script));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_scripts_error() {
+        let error = GetAllScriptsError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request();
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_scripts(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_script() {
+        let script = build_script(1);
+        let script_json = serde_json::to_string(&script).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(script_json.clone());
+        });
+
+        let response = create_script(broker.base_url(), script_json).await;
+        assert_eq!(script, ScriptSelector.select(response.unwrap()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_create_script_error() {
+        let error = CreateScriptError::Status503(Errors::new());
+        let script = build_script(1);
+        let script_json = serde_json::to_string(&script).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = create_script(broker.base_url(), script_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_script() {
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(200);
+        });
+
+        let response = delete_script(broker.base_url(), String::from("script-1")).await;
+        assert_eq!(response.unwrap(), "script-1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_script_error() {
+        let error = DeleteScriptError::Status404(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = delete_script(broker.base_url(), String::from("script-1")).await;
+        assert!(response.is_err())
+    }
+
+    fn build_backup(backup_num: usize) -> Backup {
+        let mut backup = Backup::new();
+        backup.id = Some(format!("backup-{backup_num}"));
+        backup
+    }
+
+    fn build_backup_list(
+        start: usize,
+        end: usize,
+    ) -> BackupList {
+        let backups: Vec<Backup> = (start..end).map(|i| build_backup(i)).collect();
+        BackupList {
+            items: Some(backups),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_backups() {
+        let broker = MockServer::start();
+        let backup_list = build_backup_list(0, 10);
+        broker.mock(|when, then| {
+            when.any_request().method(GET);
+            then.status(200)
+                .body(serde_json::to_string(&backup_list).unwrap());
+        });
+
+        let response = fetch_backups(broker.base_url()).await.unwrap();
+        let items: Vec<Backup> = response
+            .into_iter()
+            .map(|(id, item)| BackupSelector.select(item).unwrap())
+            .collect();
+
+        for backup in backup_list.items.into_iter().flatten() {
+            assert!(items.contains(&backup));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_backups_error() {
+        let error = GetAllBackupsError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request();
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_backups(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    fn build_trace_recording(trace_recording_num: usize) -> TraceRecording {
+        let mut trace_recording = TraceRecording::new();
+        trace_recording.name = Some(format!("trace-recording-{trace_recording_num}"));
+        trace_recording
+    }
+
+    fn build_trace_recording_list(
+        start: usize,
+        end: usize,
+    ) -> TraceRecordingList {
+        let trace_recordings: Vec<TraceRecording> = (start..end).map(|i| build_trace_recording(i)).collect();
+        TraceRecordingList {
+            items: Some(trace_recordings),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_trace_recordings() {
+        let broker = MockServer::start();
+        let trace_recording_list = build_trace_recording_list(0, 10);
+        broker.mock(|when, then| {
+            when.any_request().method(GET);
+            then.status(200)
+                .body(serde_json::to_string(&trace_recording_list).unwrap());
+        });
+
+        let response = fetch_trace_recordings(broker.base_url()).await.unwrap();
+        let items: Vec<TraceRecording> = response
+            .into_iter()
+            .map(|(id, item)| TraceRecordingSelector.select(item).unwrap())
+            .collect();
+
+        for trace_recording in trace_recording_list.items.into_iter().flatten() {
+            assert!(items.contains(&trace_recording));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_trace_recordings_error() {
+        let error = GetAllTraceRecordingsError::UnknownValue(Value::Null);
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request();
+            then.status(503).json_body(json!(error));
+        });
+
+        let response = fetch_trace_recordings(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_trace_recording() {
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(200);
+        });
+
+        let response = delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
+        assert_eq!(response.unwrap(), "trace-recording-1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_trace_recording_error() {
+        let error = DeleteTraceRecordingError::Status404(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(DELETE);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
+        assert!(response.is_err())
+    }
+
 }

@@ -22,7 +22,7 @@ pub struct BackupsTab<'a> {
     list_with_details: ListWithDetails<'a, Backup>,
 }
 
-struct BackupSelector;
+pub struct BackupSelector;
 
 impl ItemSelector<Backup> for BackupSelector {
     fn select(&self, item: Item) -> Option<Backup> {
