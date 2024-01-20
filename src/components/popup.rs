@@ -1,24 +1,21 @@
 use color_eyre::eyre::{Ok, Result};
 use crossterm::event::{KeyEvent, MouseEvent};
-use ratatui::layout::Alignment::Center;
-use ratatui::layout::Margin;
-use ratatui::style::{Color, Stylize};
-use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::Style,
-    widgets::{Block, Borders, Clear, Widget},
+    layout::{Alignment::Center, Constraint, Direction, Layout, Margin, Rect},
+    style::{Color, Style, Stylize},
+    widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
     Frame,
 };
 use serde::Serialize;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
-use crate::action::{self, Action};
-use crate::config::Config;
-use crate::tui::Event;
-
 use super::Component;
+use crate::{
+    action::{self, Action},
+    config::Config,
+    tui::Event,
+};
 
 pub struct ConfirmPopup {
     pub title: String,

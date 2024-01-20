@@ -1,9 +1,11 @@
-use crate::action::Item;
+use std::future::Future;
+
 use color_eyre::eyre::Result;
 use futures::future::BoxFuture;
 use hivemq_openapi::models::Schema;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
+
+use crate::action::Item;
 
 pub trait DeleteFn: Send + Sync {
     fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>>;

@@ -1,16 +1,16 @@
-use crate::action::Action;
-use crate::components::Component;
+use std::iter::FromIterator;
+
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Style, Stylize};
-use ratatui::widgets::block::Block;
-use ratatui::widgets::Borders;
-use std::iter::FromIterator;
+use ratatui::{
+    layout::Rect,
+    style::{Color, Style, Stylize},
+    widgets::{block::Block, Borders},
+};
 use tui::Frame;
 use tui_textarea::{CursorMove, TextArea};
 
-use crate::tui;
+use crate::{action::Action, components::Component, tui};
 
 pub struct Editor<'a> {
     textarea: TextArea<'a>,

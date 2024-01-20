@@ -1,43 +1,49 @@
-use crate::action::Item;
-use crate::action::Item::{
-    BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem,
-};
+use std::fmt::format;
+
 use color_eyre::eyre::ContextCompat;
 use futures::future::err;
-use hivemq_openapi::apis::backup_restore_api::{get_all_backups, GetBackupParams};
-use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_behavior_policies_api::{
-    get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
-    GetAllBehaviorPoliciesParams,
-};
-use hivemq_openapi::apis::data_hub_data_policies_api::{
-    get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams, GetAllDataPoliciesError,
-    GetAllDataPoliciesParams,
-};
-use hivemq_openapi::apis::data_hub_schemas_api::{
-    get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
-};
-use hivemq_openapi::apis::data_hub_scripts_api::{
-    get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
-};
-use hivemq_openapi::apis::mqtt_clients_api::{
-    get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
-    GetMqttClientDetailsParams,
-};
-use hivemq_openapi::apis::trace_recordings_api::{
-    get_all_trace_recordings, DeleteTraceRecordingParams,
-};
-use hivemq_openapi::apis::{mqtt_clients_api, Error};
-use hivemq_openapi::models::{
-    Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
-    TraceRecording,
+use hivemq_openapi::{
+    apis::{
+        backup_restore_api::{get_all_backups, GetBackupParams},
+        configuration::Configuration,
+        data_hub_behavior_policies_api::{
+            get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
+            GetAllBehaviorPoliciesParams,
+        },
+        data_hub_data_policies_api::{
+            get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams,
+            GetAllDataPoliciesError, GetAllDataPoliciesParams,
+        },
+        data_hub_schemas_api::{
+            get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
+        },
+        data_hub_scripts_api::{
+            get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
+        },
+        mqtt_clients_api,
+        mqtt_clients_api::{
+            get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
+            GetMqttClientDetailsParams,
+        },
+        trace_recordings_api::{get_all_trace_recordings, DeleteTraceRecordingParams},
+        Error,
+    },
+    models::{
+        Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
+        TraceRecording,
+    },
 };
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
-use serde::Serialize;
-use serde::__private::de::IdentifierDeserializer;
-use std::fmt::format;
+use serde::{Serialize, __private::de::IdentifierDeserializer};
+
+use crate::action::{
+    Item,
+    Item::{
+        BackupItem, BehaviorPolicyItem, DataPolicyItem, SchemaItem, ScriptItem, TraceRecordingItem,
+    },
+};
 
 fn get_cursor(links: Option<Option<Box<PaginationCursor>>>) -> Option<String> {
     lazy_static! {
@@ -394,7 +400,7 @@ pub async fn fetch_backups(host: String) -> Result<Vec<(String, Item)>, String> 
         .map_err(transform_api_err)?;
 
     for backup in response.items.into_iter().flatten() {
-        if let Some (id) = &backup.id{
+        if let Some(id) = &backup.id {
             backups.push((id.clone(), BackupItem(backup)));
         }
     }
@@ -411,7 +417,7 @@ pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>,
         .map_err(transform_api_err)?;
 
     for trace_recording in response.items.into_iter().flatten() {
-        if let Some (name) = &trace_recording.name{
+        if let Some(name) = &trace_recording.name {
             trace_recordings.push((name.clone(), TraceRecordingItem(trace_recording)));
         }
     }
@@ -440,40 +446,51 @@ pub async fn delete_trace_recording(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::action::Item::DataPolicyItem;
-    use crate::components::item_features::ItemSelector;
-    use crate::components::tabs::behavior_policies::BehaviorPolicySelector;
-    use crate::components::tabs::data_policies::DataPolicySelector;
-    use crate::components::tabs::schemas::SchemaSelector;
-    use crate::components::tabs::scripts::ScriptSelector;
+    use std::{fmt::format, ops::Div};
+
     use futures::future::err;
-    use hivemq_openapi::apis::data_hub_behavior_policies_api::{
-        CreateBehaviorPolicyError, DeleteBehaviorPolicyError, GetAllBehaviorPoliciesError,
+    use hivemq_openapi::{
+        apis::{
+            backup_restore_api::GetAllBackupsError,
+            data_hub_behavior_policies_api::{
+                CreateBehaviorPolicyError, DeleteBehaviorPolicyError, GetAllBehaviorPoliciesError,
+            },
+            data_hub_data_policies_api::{
+                CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
+            },
+            data_hub_schemas_api::{CreateSchemaError, DeleteSchemaError, GetAllSchemasError},
+            data_hub_scripts_api::{CreateScriptError, DeleteScriptError, GetAllScriptsError},
+            mqtt_clients_api::GetMqttClientDetailsError,
+            trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError},
+        },
+        models::{
+            script::FunctionType, trace_recording, Backup, BackupList, BehaviorPolicy,
+            BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Client,
+            ClientDetails, ClientItem, ClientList, ClientRestrictions, Connection,
+            ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching, Error, Errors,
+            PaginationCursor, Schema, SchemaList, Script, ScriptList, TraceRecordingList,
+        },
     };
-    use hivemq_openapi::apis::data_hub_data_policies_api::{
-        CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
+    use httpmock::{
+        Method::{DELETE, GET, POST},
+        Mock, MockServer,
     };
-    use hivemq_openapi::apis::data_hub_schemas_api::{
-        CreateSchemaError, DeleteSchemaError, GetAllSchemasError,
-    };
-    use hivemq_openapi::apis::data_hub_scripts_api::{
-        CreateScriptError, DeleteScriptError, GetAllScriptsError,
-    };
-    use hivemq_openapi::apis::mqtt_clients_api::GetMqttClientDetailsError;
-    use hivemq_openapi::models::script::FunctionType;
-    use hivemq_openapi::models::{Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Client, ClientDetails, ClientItem, ClientList, ClientRestrictions, Connection, ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching, Error, Errors, PaginationCursor, Schema, SchemaList, Script, ScriptList, trace_recording, TraceRecordingList};
-    use httpmock::Method::{DELETE, GET, POST};
-    use httpmock::{Mock, MockServer};
     use pretty_assertions::assert_eq;
     use serde::Serialize;
     use serde_json::{json, Value};
-    use std::fmt::format;
-    use std::ops::Div;
-    use hivemq_openapi::apis::backup_restore_api::GetAllBackupsError;
-    use hivemq_openapi::apis::trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError};
-    use crate::components::tabs::backups::BackupSelector;
-    use crate::components::tabs::trace_recordings::TraceRecordingSelector;
+
+    use super::*;
+    use crate::{
+        action::Item::DataPolicyItem,
+        components::{
+            item_features::ItemSelector,
+            tabs::{
+                backups::BackupSelector, behavior_policies::BehaviorPolicySelector,
+                data_policies::DataPolicySelector, schemas::SchemaSelector,
+                scripts::ScriptSelector, trace_recordings::TraceRecordingSelector,
+            },
+        },
+    };
 
     fn create_responses<T>(
         url: &str,
@@ -1132,10 +1149,7 @@ mod tests {
         backup
     }
 
-    fn build_backup_list(
-        start: usize,
-        end: usize,
-    ) -> BackupList {
+    fn build_backup_list(start: usize, end: usize) -> BackupList {
         let backups: Vec<Backup> = (start..end).map(|i| build_backup(i)).collect();
         BackupList {
             items: Some(backups),
@@ -1182,11 +1196,9 @@ mod tests {
         trace_recording
     }
 
-    fn build_trace_recording_list(
-        start: usize,
-        end: usize,
-    ) -> TraceRecordingList {
-        let trace_recordings: Vec<TraceRecording> = (start..end).map(|i| build_trace_recording(i)).collect();
+    fn build_trace_recording_list(start: usize, end: usize) -> TraceRecordingList {
+        let trace_recordings: Vec<TraceRecording> =
+            (start..end).map(|i| build_trace_recording(i)).collect();
         TraceRecordingList {
             items: Some(trace_recordings),
         }
@@ -1234,7 +1246,8 @@ mod tests {
             then.status(200);
         });
 
-        let response = delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
+        let response =
+            delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
         assert_eq!(response.unwrap(), "trace-recording-1");
     }
 
@@ -1248,8 +1261,8 @@ mod tests {
                 .body(serde_json::to_string(&error).unwrap());
         });
 
-        let response = delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
+        let response =
+            delete_trace_recording(broker.base_url(), String::from("trace-recording-1")).await;
         assert!(response.is_err())
     }
-
 }

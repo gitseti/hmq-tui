@@ -1,29 +1,37 @@
-use crate::action::Action::Submit;
-use crate::action::{Action, Item};
-use crate::components::editor::Editor;
-use crate::components::item_features::ItemSelector;
-use crate::components::list_with_details::{ListWithDetails, State};
-use crate::components::tabs::TabComponent;
-use crate::components::{list_with_details, Component};
-use crate::config::Config;
-use crate::hivemq_rest_client::{create_script, delete_script, fetch_schemas, fetch_scripts};
-use crate::mode::Mode;
-use crate::mode::Mode::Main;
-use crate::tui::Frame;
-use color_eyre::eyre::Result;
-use color_eyre::owo_colors::OwoColorize;
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
+
+use color_eyre::{eyre::Result, owo_colors::OwoColorize};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use hivemq_openapi::models::{Backup, Schema, Script};
 use libc::{creat, printf};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::Text;
-use ratatui::widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    text::Text,
+    widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap},
+};
 use serde::Serialize;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    action::{Action, Action::Submit, Item},
+    components::{
+        editor::Editor,
+        item_features::ItemSelector,
+        list_with_details,
+        list_with_details::{ListWithDetails, State},
+        tabs::TabComponent,
+        Component,
+    },
+    config::Config,
+    hivemq_rest_client::{create_script, delete_script, fetch_schemas, fetch_scripts},
+    mode::{Mode, Mode::Main},
+    tui::Frame,
+};
 
 pub struct ScriptsTab<'a> {
     hivemq_address: String,

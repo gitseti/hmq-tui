@@ -1,36 +1,47 @@
-use crate::action::Action::{
-    CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode,
+use std::{
+    fmt::{format, Display},
+    future::Future,
+    sync::Arc,
 };
-use crate::action::{Action, Item};
+
 use arboard::Clipboard;
-use color_eyre::eyre::Result;
-use color_eyre::owo_colors::OwoColorize;
+use color_eyre::{eyre::Result, owo_colors::OwoColorize};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::future::{err, BoxFuture};
 use indexmap::IndexMap;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::prelude::Stylize;
-use ratatui::style::{Color, Modifier, Style, Styled};
-use ratatui::widgets::block::Block;
-use ratatui::widgets::{Borders, List, ListItem, ListState, Paragraph, Widget, Wrap};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    prelude::Stylize,
+    style::{Color, Modifier, Style, Styled},
+    widgets::{block::Block, Borders, List, ListItem, ListState, Paragraph, Widget, Wrap},
+};
 use serde::{Deserialize, Serialize};
-use std::fmt::{format, Display};
-use std::future::Future;
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 use typed_builder::TypedBuilder;
 use State::Loaded;
 
-use crate::components::editor::Editor;
-use crate::components::item_features::{CreateFn, DeleteFn, ItemSelector, ListFn};
-use crate::components::list_with_details::FocusMode::FocusOnList;
-use crate::components::list_with_details::State::{Loading, LoadingError};
-use crate::components::Component;
-use crate::hivemq_rest_client::create_behavior_policy;
-use crate::mode::Mode;
-use crate::mode::Mode::Main;
-use crate::tui;
+use crate::{
+    action::{
+        Action,
+        Action::{
+            CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode,
+        },
+        Item,
+    },
+    components::{
+        editor::Editor,
+        item_features::{CreateFn, DeleteFn, ItemSelector, ListFn},
+        list_with_details::{
+            FocusMode::FocusOnList,
+            State::{Loading, LoadingError},
+        },
+        Component,
+    },
+    hivemq_rest_client::create_behavior_policy,
+    mode::{Mode, Mode::Main},
+    tui,
+};
 
 #[derive(TypedBuilder)]
 pub struct ListWithDetails<'a, T> {

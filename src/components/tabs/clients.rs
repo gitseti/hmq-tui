@@ -1,30 +1,30 @@
-use crate::action::{Action, Item};
-use crate::cli::Cli;
-use crate::components::editor::Editor;
-use crate::components::home::Home;
-use crate::components::item_features::ItemSelector;
-use crate::components::list_with_details::ListWithDetails;
-use crate::components::tabs::TabComponent;
-use crate::components::Component;
-use crate::hivemq_rest_client::{fetch_client_details, fetch_client_ids, fetch_schemas};
-use crate::mode::Mode;
-use crate::{hivemq_rest_client, tui};
+use std::{collections::HashMap, ops::Deref, rc::Rc, sync::Arc, time::Duration};
+
 use clap::builder::Str;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::{Backup, ClientDetails};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+};
 use serde_json::json;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::time::sleep;
+use tokio::{sync::mpsc::UnboundedSender, time::sleep};
 use tui::Frame;
+
+use crate::{
+    action::{Action, Item},
+    cli::Cli,
+    components::{
+        editor::Editor, home::Home, item_features::ItemSelector,
+        list_with_details::ListWithDetails, tabs::TabComponent, Component,
+    },
+    hivemq_rest_client,
+    hivemq_rest_client::{fetch_client_details, fetch_client_ids, fetch_schemas},
+    mode::Mode,
+    tui,
+};
 
 pub struct Clients<'a> {
     tx: Option<UnboundedSender<Action>>,

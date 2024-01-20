@@ -1,31 +1,31 @@
 use std::{collections::HashMap, time::Duration};
 
-use color_eyre::eyre::{Ok, Result};
-use color_eyre::owo_colors::OwoColorize;
+use color_eyre::{
+    eyre::{Ok, Result},
+    owo_colors::OwoColorize,
+};
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
 use futures::SinkExt;
-use ratatui::layout::Direction::Horizontal;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{layout::Direction::Horizontal, prelude::*, widgets::*};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{event, instrument, span, Level};
 use tracing_subscriber::fmt::format;
 
 use super::{Component, Frame};
-use crate::components::popup::{ConfirmPopup, ErrorPopup, Popup};
-use crate::components::tabs::backups::BackupsTab;
-use crate::components::tabs::behavior_policies::BehaviorPoliciesTab;
-use crate::components::tabs::clients::Clients;
-use crate::components::tabs::data_policies::DataPoliciesTab;
-use crate::components::tabs::schemas::SchemasTab;
-use crate::components::tabs::scripts::ScriptsTab;
-use crate::components::tabs::trace_recordings::TraceRecordingsTab;
-use crate::components::tabs::TabComponent;
-use crate::mode::Mode;
-use crate::tui::Event;
 use crate::{
     action::Action,
+    components::{
+        popup::{ConfirmPopup, ErrorPopup, Popup},
+        tabs::{
+            backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
+            data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
+            trace_recordings::TraceRecordingsTab, TabComponent,
+        },
+    },
     config::{Config, KeyBindings},
+    mode::Mode,
+    tui::Event,
 };
 
 pub struct Home {

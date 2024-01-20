@@ -1,17 +1,19 @@
+use std::{
+    any::{Any, TypeId},
+    fmt,
+    fmt::Debug,
+    sync::Arc,
+};
+
 use hivemq_openapi::models::{
     Backup, BehaviorPolicy, Client, ClientDetails, DataPolicy, Schema, Script, TraceRecording,
 };
-use std::any::{Any, TypeId};
-use std::fmt;
-use std::fmt::Debug;
-use std::sync::Arc;
-
-use crate::action::Item::SchemaItem;
-use crate::mode::Mode;
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
+
+use crate::{action::Item::SchemaItem, mode::Mode};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Item {

@@ -1,20 +1,31 @@
-use crate::action::{Action, Item};
-use crate::components::item_features::{ItemSelector, ListFn};
-use crate::components::list_with_details::{ListWithDetails, State};
-use crate::components::tabs::TabComponent;
-use crate::components::{list_with_details, Component};
-use crate::config::Config;
-use crate::hivemq_rest_client::{delete_schema, fetch_backups, fetch_schemas};
-use crate::tui::Frame;
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
+
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::{Backup, BehaviorPolicy, Schema};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use ratatui::{
+    layout::Rect,
+    widgets::{Block, Borders, ListItem, ListState},
+};
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    action::{Action, Item},
+    components::{
+        item_features::{ItemSelector, ListFn},
+        list_with_details,
+        list_with_details::{ListWithDetails, State},
+        tabs::TabComponent,
+        Component,
+    },
+    config::Config,
+    hivemq_rest_client::{delete_schema, fetch_backups, fetch_schemas},
+    tui::Frame,
+};
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,

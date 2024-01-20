@@ -1,26 +1,35 @@
-use crate::action::Action::Submit;
-use crate::action::{Action, Item};
-use crate::components::editor::Editor;
-use crate::components::item_features::ItemSelector;
-use crate::components::list_with_details::{ListWithDetails, State};
-use crate::components::tabs::TabComponent;
-use crate::components::{list_with_details, Component};
-use crate::config::Config;
-use crate::hivemq_rest_client::{
-    create_data_policy, delete_data_policy, fetch_data_policies, fetch_schemas,
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    sync::Arc,
 };
-use crate::mode::Mode;
-use crate::mode::Mode::Main;
-use crate::tui::Frame;
+
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use hivemq_openapi::models::{Backup, BehaviorPolicy, DataPolicy};
-use ratatui::layout::Rect;
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use ratatui::{
+    layout::Rect,
+    widgets::{Block, Borders, ListItem, ListState},
+};
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    action::{Action, Action::Submit, Item},
+    components::{
+        editor::Editor,
+        item_features::ItemSelector,
+        list_with_details,
+        list_with_details::{ListWithDetails, State},
+        tabs::TabComponent,
+        Component,
+    },
+    config::Config,
+    hivemq_rest_client::{
+        create_data_policy, delete_data_policy, fetch_data_policies, fetch_schemas,
+    },
+    mode::{Mode, Mode::Main},
+    tui::Frame,
+};
 
 pub struct DataPoliciesTab<'a> {
     hivemq_address: String,
