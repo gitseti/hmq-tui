@@ -438,9 +438,6 @@ pub async fn delete_trace_recording(
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::format, ops::Div};
-
-    use futures::future::err;
     use hivemq_openapi::{
         apis::{
             backup_restore_api::GetAllBackupsError,
@@ -456,12 +453,11 @@ mod tests {
             trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError},
         },
         models::{
-            script::FunctionType, trace_recording, Backup, BackupList, BehaviorPolicy,
-            BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Client,
-            ClientDetails, ClientItem, ClientList, ClientRestrictions, Connection,
-            ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching, Error, Errors,
-            PaginationCursor, Schema, SchemaList, Script, ScriptList, TraceRecording,
-            TraceRecordingList,
+            script::FunctionType, Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior,
+            BehaviorPolicyList, BehaviorPolicyMatching, Client, ClientDetails, ClientItem,
+            ClientList, ClientRestrictions, ConnectionDetails, DataPolicy, DataPolicyList,
+            DataPolicyMatching, Error, Errors, PaginationCursor, Schema, SchemaList, Script,
+            ScriptList, TraceRecording, TraceRecordingList,
         },
     };
     use httpmock::{
@@ -473,15 +469,12 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::{
-        action::Item::DataPolicyItem,
-        components::{
-            item_features::ItemSelector,
-            tabs::{
-                backups::BackupSelector, behavior_policies::BehaviorPolicySelector,
-                data_policies::DataPolicySelector, schemas::SchemaSelector,
-                scripts::ScriptSelector, trace_recordings::TraceRecordingSelector,
-            },
+    use crate::components::{
+        item_features::ItemSelector,
+        tabs::{
+            backups::BackupSelector, behavior_policies::BehaviorPolicySelector,
+            data_policies::DataPolicySelector, schemas::SchemaSelector, scripts::ScriptSelector,
+            trace_recordings::TraceRecordingSelector,
         },
     };
 
@@ -577,7 +570,7 @@ mod tests {
         };
         let client_json = serde_json::to_string(&client_item).unwrap();
         let broker = MockServer::start();
-        let client_details_mock = broker.mock(|when, then| {
+        let _client_details_mock = broker.mock(|when, then| {
             when.method(GET).path("/api/v1/mqtt/clients/client");
             then.status(200)
                 .header("content-type", "application/json")
@@ -601,7 +594,7 @@ mod tests {
         });
         let error_json = serde_json::to_string(&error).unwrap();
         let broker = MockServer::start();
-        let client_details_mock = broker.mock(|when, then| {
+        let _client_details_mock = broker.mock(|when, then| {
             when.method(GET).path("/api/v1/mqtt/clients/client");
             then.status(404)
                 .header("content-type", "application/json")
@@ -712,7 +705,7 @@ mod tests {
         let response = fetch_data_policies(broker.base_url()).await.unwrap();
         let items: Vec<DataPolicy> = response
             .into_iter()
-            .map(|(id, item)| DataPolicySelector.select(item).unwrap())
+            .map(|(_id, item)| DataPolicySelector.select(item).unwrap())
             .collect();
 
         for mock in mocks {
@@ -833,7 +826,7 @@ mod tests {
         let response = fetch_behavior_policies(broker.base_url()).await.unwrap();
         let items: Vec<BehaviorPolicy> = response
             .into_iter()
-            .map(|(id, item)| BehaviorPolicySelector.select(item).unwrap())
+            .map(|(_id, item)| BehaviorPolicySelector.select(item).unwrap())
             .collect();
 
         for mock in mocks {
@@ -946,7 +939,7 @@ mod tests {
         let response = fetch_schemas(broker.base_url()).await.unwrap();
         let items: Vec<Schema> = response
             .into_iter()
-            .map(|(id, item)| SchemaSelector.select(item).unwrap())
+            .map(|(_id, item)| SchemaSelector.select(item).unwrap())
             .collect();
 
         for mock in mocks {
@@ -1056,7 +1049,7 @@ mod tests {
         let response = fetch_scripts(broker.base_url()).await.unwrap();
         let items: Vec<Script> = response
             .into_iter()
-            .map(|(id, item)| ScriptSelector.select(item).unwrap())
+            .map(|(_id, item)| ScriptSelector.select(item).unwrap())
             .collect();
 
         for mock in mocks {
@@ -1162,7 +1155,7 @@ mod tests {
         let response = fetch_backups(broker.base_url()).await.unwrap();
         let items: Vec<Backup> = response
             .into_iter()
-            .map(|(id, item)| BackupSelector.select(item).unwrap())
+            .map(|(_id, item)| BackupSelector.select(item).unwrap())
             .collect();
 
         for backup in backup_list.items.into_iter().flatten() {
@@ -1210,7 +1203,7 @@ mod tests {
         let response = fetch_trace_recordings(broker.base_url()).await.unwrap();
         let items: Vec<TraceRecording> = response
             .into_iter()
-            .map(|(id, item)| TraceRecordingSelector.select(item).unwrap())
+            .map(|(_id, item)| TraceRecordingSelector.select(item).unwrap())
             .collect();
 
         for trace_recording in trace_recording_list.items.into_iter().flatten() {

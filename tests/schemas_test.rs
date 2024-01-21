@@ -4,17 +4,12 @@ use hmq_tui::{
     action::Action,
     components::{
         item_features::ItemSelector,
-        tabs::{
-            schemas::{SchemaSelector, SchemasTab},
-            TabComponent,
-        },
+        tabs::schemas::{SchemaSelector, SchemasTab},
         Component,
     },
     hivemq_rest_client::create_schema,
 };
 use indoc::indoc;
-use serde::Serialize;
-use testcontainers::*;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},

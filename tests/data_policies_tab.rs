@@ -1,4 +1,3 @@
-use base64::Engine;
 use hivemq_openapi::models::{DataPolicy, DataPolicyMatching};
 use hmq_tui::{
     action::Action,

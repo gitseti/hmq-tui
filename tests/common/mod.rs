@@ -7,7 +7,7 @@ use hmq_tui::{
 use lazy_static::lazy_static;
 use pretty_assertions::assert_str_eq;
 use ratatui::{backend::TestBackend, Terminal};
-use serde::{Serialize, __private::ser::constrain};
+use serde::Serialize;
 use testcontainers::{clients::Cli, core::WaitFor, Container, GenericImage};
 use tokio::sync::mpsc::UnboundedReceiver;
 
