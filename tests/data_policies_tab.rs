@@ -1,17 +1,23 @@
 use base64::Engine;
 use hivemq_openapi::models::{DataPolicy, DataPolicyMatching};
+use hmq_tui::{
+    action::Action,
+    components::{
+        item_features::ItemSelector,
+        tabs::data_policies::{DataPoliciesTab, DataPolicySelector},
+        Component,
+    },
+    hivemq_rest_client::create_data_policy,
+};
 use indoc::indoc;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use hmq_tui::action::Action;
-use hmq_tui::components::tabs::data_policies::{DataPolicySelector, DataPoliciesTab};
-use hmq_tui::hivemq_rest_client::create_data_policy;
+use tokio::sync::{
+    mpsc,
+    mpsc::{UnboundedReceiver, UnboundedSender},
+};
+
 use crate::common::{assert_draw, create_item, Hivemq};
-use hmq_tui::components::Component;
-use hmq_tui::components::item_features::ItemSelector;
 
 mod common;
-
 
 #[tokio::test]
 async fn test_data_policies_tab() {
@@ -21,11 +27,14 @@ async fn test_data_policies_tab() {
     for i in 0..100 {
         let data_policy = DataPolicy::new(
             format!("data-policy-{i}"),
-            DataPolicyMatching::new(format!("topic-{i}"))
+            DataPolicyMatching::new(format!("topic-{i}")),
         );
-        create_data_policy(hivemq.host.clone(), serde_json::to_string(&data_policy).unwrap())
-            .await
-            .unwrap();
+        create_data_policy(
+            hivemq.host.clone(),
+            serde_json::to_string(&data_policy).unwrap(),
+        )
+        .await
+        .unwrap();
     }
 
     let mut tab = DataPoliciesTab::new(hivemq.host);
@@ -39,7 +48,9 @@ async fn test_data_policies_tab() {
         panic!("'Received wrong action {:?}", action.clone());
     };
     let data_policies = result.clone().unwrap();
-    let data_policy0 = DataPolicySelector.select(data_policies[0].clone().1).unwrap();
+    let data_policy0 = DataPolicySelector
+        .select(data_policies[0].clone().1)
+        .unwrap();
 
     tab.update(action).unwrap();
     assert_draw(
@@ -92,7 +103,7 @@ async fn test_data_policies_tab() {
 
     let data_policy = DataPolicy::new(
         "new-data_policy".to_owned(),
-        DataPolicyMatching::new("new-topic-filter".to_owned())
+        DataPolicyMatching::new("new-topic-filter".to_owned()),
     );
     let data_policy = create_item(&mut tab, &mut rx, data_policy, &DataPolicySelector).await;
     assert_draw(&mut tab, &indoc! {r#"

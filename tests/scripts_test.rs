@@ -1,19 +1,23 @@
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
-use hivemq_openapi::models::Script;
-use hivemq_openapi::models::script::FunctionType;
+use base64::{prelude::BASE64_STANDARD, Engine};
+use hivemq_openapi::models::{script::FunctionType, Script};
+use hmq_tui::{
+    action::Action,
+    components::{
+        item_features::ItemSelector,
+        tabs::scripts::{ScriptSelector, ScriptsTab},
+        Component,
+    },
+    hivemq_rest_client::create_script,
+};
 use indoc::indoc;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use hmq_tui::action::Action;
-use hmq_tui::components::tabs::scripts::{ScriptSelector, ScriptsTab};
-use hmq_tui::hivemq_rest_client::create_script;
+use tokio::sync::{
+    mpsc,
+    mpsc::{UnboundedReceiver, UnboundedSender},
+};
+
 use crate::common::{assert_draw, create_item, Hivemq};
-use hmq_tui::components::Component;
-use hmq_tui::components::item_features::ItemSelector;
 
 mod common;
-
 
 #[tokio::test]
 async fn test_scripts_tab() {

@@ -1,20 +1,20 @@
-use base64::{Engine, prelude::BASE64_STANDARD};
+use base64::{prelude::BASE64_STANDARD, Engine};
 use hivemq_openapi::models::Schema;
 use hmq_tui::{
     action::Action,
     components::{
-        Component,
         item_features::ItemSelector,
         tabs::{
             schemas::{SchemaSelector, SchemasTab},
             TabComponent,
         },
+        Component,
     },
     hivemq_rest_client::create_schema,
 };
 use indoc::indoc;
 use serde::Serialize;
-use testcontainers::{*};
+use testcontainers::*;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},

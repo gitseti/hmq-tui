@@ -1,4 +1,5 @@
 use std::sync::Arc;
+
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::Script;
