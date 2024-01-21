@@ -1,20 +1,20 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use hivemq_openapi::models::Schema;
 use hmq_tui::{
     action::Action,
     components::{
+        Component,
         item_features::ItemSelector,
         tabs::{
             schemas::{SchemaSelector, SchemasTab},
             TabComponent,
         },
-        Component,
     },
     hivemq_rest_client::create_schema,
 };
 use indoc::indoc;
 use serde::Serialize;
-use testcontainers::{clients::Cli, *};
+use testcontainers::{*};
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -26,8 +26,7 @@ mod common;
 
 #[tokio::test]
 async fn test_schemas_tab() {
-    let docker = Cli::default();
-    let hivemq = Hivemq::start(&docker);
+    let hivemq = Hivemq::start();
 
     for i in 0..100 {
         let schema = Schema::new(

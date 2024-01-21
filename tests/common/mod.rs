@@ -1,4 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
+use lazy_static::lazy::Lazy;
+use lazy_static::lazy_static;
 use hmq_tui::{
     action::Action,
     components::{item_features::ItemSelector, tabs::TabComponent},
@@ -6,8 +8,12 @@ use hmq_tui::{
 use pretty_assertions::assert_str_eq;
 use ratatui::{backend::TestBackend, Terminal};
 use serde::Serialize;
-use testcontainers::{clients::Cli, core::WaitFor, Container, GenericImage};
+use testcontainers::{clients::Cli, Container, core::WaitFor, GenericImage};
 use tokio::sync::mpsc::UnboundedReceiver;
+
+lazy_static! {
+    static ref DOCKER: Cli = Cli::default();
+}
 
 pub struct Hivemq<'a> {
     container: Container<'a, GenericImage>,
@@ -15,7 +21,7 @@ pub struct Hivemq<'a> {
 }
 
 impl<'a> Hivemq<'a> {
-    pub fn start(docker: &'a Cli) -> Self {
+    pub fn start() -> Self {
         let hivemq_image = GenericImage::new("hivemq/hivemq4", "latest")
             .with_env_var("HIVEMQ_REST_API_ENABLED", "true")
             .with_wait_for(WaitFor::StdOutMessage {
@@ -26,7 +32,7 @@ impl<'a> Hivemq<'a> {
             })
             .with_exposed_port(1883)
             .with_exposed_port(8888);
-        let container = docker.run(hivemq_image);
+        let container = DOCKER.run(hivemq_image);
         let rest_api_port = container.get_host_port_ipv4(8888);
         let host = format!("http://localhost:{rest_api_port}");
         Hivemq { container, host }
