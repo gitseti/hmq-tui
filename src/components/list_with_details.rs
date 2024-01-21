@@ -1,21 +1,15 @@
-use std::{
-    fmt::{format, Display},
-    future::Future,
-    sync::Arc,
-};
-
+use std::sync::Arc;
 use arboard::Clipboard;
-use color_eyre::{eyre::Result, owo_colors::OwoColorize};
+use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use futures::future::{err, BoxFuture};
 use indexmap::IndexMap;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::Stylize,
     style::{Color, Modifier, Style, Styled},
-    widgets::{block::Block, Borders, List, ListItem, ListState, Paragraph, Widget, Wrap},
+    widgets::{block::Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 use typed_builder::TypedBuilder;
@@ -24,10 +18,7 @@ use State::Loaded;
 use crate::{
     action::{
         Action,
-        Action::{
-            CreateConfirmPopup, CreateErrorPopup, ItemDelete, SelectedItem, Submit, SwitchMode,
-        },
-        Item,
+        Action::{CreateConfirmPopup, CreateErrorPopup, SelectedItem, Submit, SwitchMode},
     },
     components::{
         editor::Editor,
@@ -38,7 +29,6 @@ use crate::{
         },
         Component,
     },
-    hivemq_rest_client::create_behavior_policy,
     mode::{Mode, Mode::Main},
     tui,
 };
@@ -196,7 +186,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     pub fn select_item(&mut self, item_key: String) {
         if let Loaded(LoadedState {
             items,
-            list,
+            list: _,
             focus_mode: mode,
             ..
         }) = &mut self.state
@@ -225,7 +215,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return None;
         };
 
-        let list = &mut state.list;
+        let _list = &mut state.list;
 
         match &mut state.focus_mode {
             FocusMode::FocusOnList(list_state) => {
@@ -251,7 +241,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return None;
         };
 
-        let list = &mut state.list;
+        let _list = &mut state.list;
 
         match &mut state.focus_mode {
             FocusMode::FocusOnList(list_state) => {
@@ -524,7 +514,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     let tx = self.tx.clone().unwrap();
                     let hivemq_address = self.hivemq_address.clone();
                     let list_fn = list_fn.clone();
-                    let handle = tokio::spawn(async move {
+                    let _handle = tokio::spawn(async move {
                         let result = list_fn.list(hivemq_address).await;
                         tx.send(Action::ItemsLoadingFinished { result }).unwrap();
                     });
@@ -548,12 +538,12 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 return Ok(None);
             }
             Action::PrevItem => {
-                if let Some((key, value)) = self.prev_item() {
+                if let Some((key, _value)) = self.prev_item() {
                     return Ok(Some(SelectedItem(key.to_owned())));
                 }
             }
             Action::NextItem => {
-                if let Some((key, value)) = self.next_item() {
+                if let Some((key, _value)) = self.next_item() {
                     return Ok(Some(SelectedItem(key.to_owned())));
                 }
             }
@@ -565,7 +555,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             }
             Action::Escape => {
                 self.unfocus();
-                if let Some(editor) = &mut self.new_item_editor {
+                if let Some(_editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
                     return Ok(Some(Action::SwitchMode(Mode::Main)));
                 }

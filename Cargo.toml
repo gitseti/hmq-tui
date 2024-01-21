@@ -34,7 +34,6 @@ json5 = "0.4.1"
 lazy_static = "1.4.0"
 libc = "0.2.148"
 log = "0.4.20"
-pretty_assertions = "1.4.0"
 ratatui = { version = "0.25.0", features = ["serde", "macros"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version = "1.0.107", features = [] }
@@ -51,6 +50,12 @@ tui-textarea = "0.3.1"
 openssl = { version = "0.10.60", features = ["vendored"] }
 typed-builder = "0.18.0"
 regex = "1.10.2"
+
+[dev-dependencies]
+testcontainers = "0.15.0"
+pretty_assertions = "1.4.0"
+base64 = "0.21.7"
+indoc = "2.0.4"
 
 # https://crates.io/crates/cargo-deb
 [package.metadata.deb]

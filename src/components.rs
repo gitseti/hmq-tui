@@ -12,7 +12,7 @@ use crate::{
 pub mod editor;
 pub mod fps;
 pub mod home;
-pub(crate) mod item_features;
+pub mod item_features;
 pub mod list_with_details;
 pub mod popup;
 pub mod tabs;
@@ -56,7 +56,7 @@ pub trait Component {
     /// # Returns
     ///
     /// * `Result<()>` - An Ok result or an error.
-    fn init(&mut self, area: Rect) -> Result<()> {
+    fn init(&mut self, _area: Rect) -> Result<()> {
         Ok(())
     }
     /// Handle incoming events and produce actions if necessary.

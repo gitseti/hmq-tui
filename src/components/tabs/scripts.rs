@@ -1,35 +1,17 @@
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
-
-use color_eyre::{eyre::Result, owo_colors::OwoColorize};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::{Backup, Schema, Script};
-use libc::{creat, printf};
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    text::Text,
-    widgets::{Block, Borders, ListItem, ListState, Paragraph, Wrap},
-};
-use serde::Serialize;
+use std::sync::Arc;
+use color_eyre::eyre::Result;
+use crossterm::event::KeyEvent;
+use hivemq_openapi::models::Script;
+use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    action::{Action, Action::Submit, Item},
+    action::{Action, Item},
     components::{
-        editor::Editor,
-        item_features::ItemSelector,
-        list_with_details,
-        list_with_details::{ListWithDetails, State},
-        tabs::TabComponent,
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
         Component,
     },
-    config::Config,
-    hivemq_rest_client::{create_script, delete_script, fetch_schemas, fetch_scripts},
-    mode::{Mode, Mode::Main},
+    hivemq_rest_client::{create_script, delete_script, fetch_scripts},
     tui::Frame,
 };
 

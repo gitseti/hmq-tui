@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::components::Component;
 
 pub mod backups;

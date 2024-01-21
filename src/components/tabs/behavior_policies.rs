@@ -1,34 +1,18 @@
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use hivemq_openapi::models::{Backup, BehaviorPolicy};
-use libc::select;
-use ratatui::{
-    layout::Rect,
-    widgets::{Block, Borders, ListItem, ListState},
-};
+use crossterm::event::KeyEvent;
+use hivemq_openapi::models::BehaviorPolicy;
+use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    action::{Action, Action::Submit, Item},
+    action::{Action, Item},
     components::{
-        editor::Editor,
-        item_features::ItemSelector,
-        list_with_details,
-        list_with_details::{ListWithDetails, State},
-        tabs::TabComponent,
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
         Component,
     },
-    config::Config,
-    hivemq_rest_client::{
-        create_behavior_policy, delete_behavior_policy, fetch_behavior_policies, fetch_schemas,
-    },
-    mode::{Mode, Mode::Main},
+    hivemq_rest_client::{create_behavior_policy, delete_behavior_policy, fetch_behavior_policies},
     tui::Frame,
 };
 

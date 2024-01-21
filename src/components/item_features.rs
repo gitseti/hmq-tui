@@ -2,8 +2,6 @@ use std::future::Future;
 
 use color_eyre::eyre::Result;
 use futures::future::BoxFuture;
-use hivemq_openapi::models::Schema;
-use serde::{Deserialize, Serialize};
 
 use crate::action::Item;
 

@@ -1,31 +1,18 @@
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::{Backup, Script, TraceRecording, TraceRecordingItem};
-use ratatui::{
-    layout::Rect,
-    widgets::{Block, Borders, ListItem, ListState},
-};
+use hivemq_openapi::models::TraceRecording;
+use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     action::{Action, Item},
     components::{
-        item_features::ItemSelector,
-        list_with_details,
-        list_with_details::{ListWithDetails, State},
-        tabs::TabComponent,
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
         Component,
     },
-    config::Config,
-    hivemq_rest_client::{
-        delete_trace_recording, fetch_backups, fetch_schemas, fetch_trace_recordings,
-    },
+    hivemq_rest_client::{delete_trace_recording, fetch_trace_recordings},
     tui::Frame,
 };
 

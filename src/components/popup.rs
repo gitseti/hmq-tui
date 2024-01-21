@@ -1,21 +1,13 @@
 use color_eyre::eyre::{Ok, Result};
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment::Center, Constraint, Direction, Layout, Margin, Rect},
+    layout::{Alignment::Center, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
-    Frame,
 };
-use serde::Serialize;
-use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
-use super::Component;
-use crate::{
-    action::{self, Action},
-    config::Config,
-    tui::Event,
-};
+use crate::action::Action;
 
 pub struct ConfirmPopup {
     pub title: String,
@@ -111,12 +103,12 @@ fn draw_default_popup(
 }
 
 pub trait Popup {
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, _action: Action) -> Result<Option<Action>> {
         Ok(None)
     }
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()>;
 
-    fn draw(&mut self, f: &mut crate::tui::Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut crate::tui::Frame<'_>, _area: Rect) -> Result<()> {
         let popup_area = popup_rect(60, 60, f.size());
         f.render_widget(Dim, f.size()); // Dim the whole tui area
         f.render_widget(Clear, popup_area); // Reset the area for the popup

@@ -1,28 +1,17 @@
-use std::{collections::HashMap, ops::Deref, rc::Rc, sync::Arc, time::Duration};
-
-use clap::builder::Str;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use hivemq_openapi::models::{Backup, ClientDetails};
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-};
-use serde_json::json;
-use tokio::{sync::mpsc::UnboundedSender, time::sleep};
+use hivemq_openapi::models::ClientDetails;
+use ratatui::layout::Rect;
+use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 
 use crate::{
     action::{Action, Item},
-    cli::Cli,
     components::{
-        editor::Editor, home::Home, item_features::ItemSelector,
-        list_with_details::ListWithDetails, tabs::TabComponent, Component,
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
+        Component,
     },
-    hivemq_rest_client,
-    hivemq_rest_client::{fetch_client_details, fetch_client_ids, fetch_schemas},
-    mode::Mode,
+    hivemq_rest_client::{fetch_client_details, fetch_client_ids},
     tui,
 };
 
@@ -109,7 +98,7 @@ impl Component for Clients<'_> {
             Action::LoadAllItems => {
                 let tx = self.tx.clone().unwrap();
                 let hivemq_address = self.hivemq_address.clone();
-                let handle = tokio::spawn(async move {
+                let _handle = tokio::spawn(async move {
                     let result = fetch_client_ids(hivemq_address).await;
                     tx.send(Action::ClientIdsLoadingFinished(result))
                         .expect("Failed to send client ids loading finished action");

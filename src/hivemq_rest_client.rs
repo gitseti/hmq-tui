@@ -1,10 +1,6 @@
-use std::fmt::format;
-
-use color_eyre::eyre::ContextCompat;
-use futures::future::err;
 use hivemq_openapi::{
     apis::{
-        backup_restore_api::{get_all_backups, GetBackupParams},
+        backup_restore_api::get_all_backups,
         configuration::Configuration,
         data_hub_behavior_policies_api::{
             get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
@@ -12,7 +8,7 @@ use hivemq_openapi::{
         },
         data_hub_data_policies_api::{
             get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams,
-            GetAllDataPoliciesError, GetAllDataPoliciesParams,
+            GetAllDataPoliciesParams,
         },
         data_hub_schemas_api::{
             get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
@@ -22,21 +18,17 @@ use hivemq_openapi::{
         },
         mqtt_clients_api,
         mqtt_clients_api::{
-            get_all_mqtt_clients, DisconnectClientParams, GetAllMqttClientsParams,
-            GetMqttClientDetailsParams,
+            get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams,
         },
         trace_recordings_api::{get_all_trace_recordings, DeleteTraceRecordingParams},
         Error,
     },
-    models::{
-        Backup, BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script,
-        TraceRecording,
-    },
+    models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
-use serde::{Serialize, __private::de::IdentifierDeserializer};
+use serde::Serialize;
 
 use crate::action::{
     Item,
@@ -468,7 +460,8 @@ mod tests {
             BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Client,
             ClientDetails, ClientItem, ClientList, ClientRestrictions, Connection,
             ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching, Error, Errors,
-            PaginationCursor, Schema, SchemaList, Script, ScriptList, TraceRecordingList,
+            PaginationCursor, Schema, SchemaList, Script, ScriptList, TraceRecording,
+            TraceRecordingList,
         },
     };
     use httpmock::{

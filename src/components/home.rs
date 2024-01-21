@@ -1,16 +1,7 @@
-use std::{collections::HashMap, time::Duration};
-
-use color_eyre::{
-    eyre::{Ok, Result},
-    owo_colors::OwoColorize,
-};
-use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
-use futures::SinkExt;
-use ratatui::{layout::Direction::Horizontal, prelude::*, widgets::*};
-use serde::{Deserialize, Serialize};
+use color_eyre::eyre::{Ok, Result};
+use crossterm::event::{KeyEvent, MouseEvent};
+use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{event, instrument, span, Level};
-use tracing_subscriber::fmt::format;
 
 use super::{Component, Frame};
 use crate::{
@@ -23,7 +14,7 @@ use crate::{
             trace_recordings::TraceRecordingsTab, TabComponent,
         },
     },
-    config::{Config, KeyBindings},
+    config::Config,
     mode::Mode,
     tui::Event,
 };
