@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
+use hivemq_openapi::apis::configuration::Configuration;
 use lazy_static::lazy::Lazy;
 use lazy_static::lazy_static;
 use hmq_tui::{
@@ -7,6 +8,7 @@ use hmq_tui::{
 };
 use pretty_assertions::assert_str_eq;
 use ratatui::{backend::TestBackend, Terminal};
+use serde::__private::ser::constrain;
 use serde::Serialize;
 use testcontainers::{clients::Cli, Container, core::WaitFor, GenericImage};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -36,6 +38,12 @@ impl<'a> Hivemq<'a> {
         let rest_api_port = container.get_host_port_ipv4(8888);
         let host = format!("http://localhost:{rest_api_port}");
         Hivemq { container, host }
+    }
+
+    pub async fn enable_data_hub_trial(&self) {
+        let mut config = Configuration::default();
+        config.base_path = self.host.clone();
+        hivemq_openapi::apis::data_hub_management_api::start_trial_mode(&config).await.unwrap();
     }
 }
 

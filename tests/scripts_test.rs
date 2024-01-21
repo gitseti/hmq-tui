@@ -88,7 +88,7 @@ async fn test_scripts_tab() {
 
     let script = Script::new(
         FunctionType::Transformation,
-        format!("new-script"),
+        "new-script".to_owned(),
         BASE64_STANDARD.encode("function transform(publish, context) { return publish; }"),
     );
     let script = create_item(&mut tab, &mut rx, script, &ScriptSelector).await;
