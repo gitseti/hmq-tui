@@ -1,3 +1,4 @@
+use crate::action::Action;
 use color_eyre::eyre::{Ok, Result};
 use ratatui::{
     buffer::Buffer,
@@ -7,27 +8,14 @@ use ratatui::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::action::Action;
+use crate::components::Component;
 
 pub struct ConfirmPopup {
     pub title: String,
     pub message: String,
-    pub tx: UnboundedSender<Action>,
-    pub action: Action,
 }
 
 impl Popup for ConfirmPopup {
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Escape => Ok(Some(Action::ClosePopup)),
-            Action::Enter => {
-                self.tx.send(self.action.clone()).unwrap();
-                Ok(Some(Action::ClosePopup))
-            }
-            _ => Ok(None),
-        }
-    }
-
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()> {
         draw_default_popup(
             f,
@@ -35,7 +23,7 @@ impl Popup for ConfirmPopup {
             self.title.clone(),
             self.message.clone(),
             Color::Blue,
-            "[ESC] Escape  [ENTER] Confirm".to_string(),
+            "[Esc] Close  [Enter] Confirm".to_string(),
         );
         Ok(())
     }
@@ -47,13 +35,6 @@ pub struct ErrorPopup {
 }
 
 impl Popup for ErrorPopup {
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Escape => Ok(Some(Action::ClosePopup)),
-            _ => Ok(None),
-        }
-    }
-
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()> {
         draw_default_popup(
             f,
@@ -61,7 +42,7 @@ impl Popup for ErrorPopup {
             self.title.clone(),
             self.message.clone(),
             Color::Red,
-            "[ESC] Escape".to_string(),
+            "[Esc] Close".to_string(),
         );
         Ok(())
     }
@@ -103,13 +84,9 @@ fn draw_default_popup(
 }
 
 pub trait Popup {
-    fn update(&mut self, _action: Action) -> Result<Option<Action>> {
-        Ok(None)
-    }
     fn draw_popup(&mut self, f: &mut crate::tui::Frame<'_>, popup_area: Rect) -> Result<()>;
-
     fn draw(&mut self, f: &mut crate::tui::Frame<'_>, _area: Rect) -> Result<()> {
-        let popup_area = popup_rect(60, 60, f.size());
+        let popup_area = popup_rect(60, 40, f.size());
         f.render_widget(Dim, f.size()); // Dim the whole tui area
         f.render_widget(Clear, popup_area); // Reset the area for the popup
         Ok(self.draw_popup(f, popup_area)?)

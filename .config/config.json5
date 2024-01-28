@@ -1,49 +1,173 @@
 {
   "keybindings": {
-    "Main": {
-      "<q>": "Quit",
-      "<Ctrl-d>": "Quit",
-      "<Ctrl-c>": "Quit",
-      "<Ctrl-z>": "Suspend",
-      "<r>": "LoadAllItems",
-      "<c>": "Copy",
-      "<up>": "PrevItem",
-      "<down>": "NextItem",
-      "<n>": "NewItem",
-      "<d>": "DeleteItem",
-      "<right>": "FocusDetails",
-      "<tab>": "NextTab",
-      "<backtab>": "PrevTab",
-      "<enter>": "Enter",
-      "<esc>": "Escape",
-      "<1>": "Tab1",
-      "<2>": "Tab2",
-      "<3>": "Tab3",
-      "<4>": "Tab4",
-      "<5>": "Tab5",
-      "<6>": "Tab6",
-      "<7>": "Tab7"
+    "Home": {
+      "<q>": {
+       "action": "Quit",
+        "displayName": "Quit"
+      },
+      "<Ctrl-d>": {
+       "action": "Quit"
+      },
+      "<Ctrl-c>": {
+       "action": "Quit"
+      },
+      "<Ctrl-z>": {
+       "action": "Suspend"
+      },
     },
-    "Editing": {
-      "<Ctrl-d>": "Quit",
-      "<Ctrl-c>": "Quit",
-      "<Ctrl-z>": "Suspend",
-      "<esc>": "Escape",
+    "Tab": {
+      "displayGroups": {
+        "scroll": {
+          "displayName": "Scroll"
+        },
+        "tabs": {
+          "displayName": "Select Tab"
+        }
+      },
+      "extends": [
+        "Home"
+      ],
+      "<c>": {
+        "action": "Copy",
+        "displayName": "Copy"
+      },
+      "<up>": {
+        "action": "PrevItem",
+        "displayGroup": "scroll"
+      },
+      "<down>": {
+        "action": "NextItem",
+        "displayGroup": "scroll"
+      },
+      "<right>": {
+       "action": "FocusDetails",
+        "displayName": "Focus"
+      },
+      "<tab>": {
+       "action": "NextTab",
+        "displayName": "Tab"
+      },
+      "<backtab>": {
+       "action": "PrevTab"
+      },
+      "<enter>": {
+       "action": "Enter",
+      },
+      "<esc>": {
+       "action": "Escape",
+      },
+      "<1>": {
+       "action": "Tab1",
+        "displayGroup": "tabs"
+      },
+      "<2>": {
+       "action": "Tab2",
+        "displayGroup": "tabs"
+      },
+      "<3>": {
+       "action": "Tab3",
+        "displayGroup": "tabs"
+      },
+      "<4>": {
+       "action": "Tab4",
+        "displayGroup": "tabs"
+      },
+      "<5>": {
+       "action": "Tab5",
+        "displayGroup": "tabs"
+      },
+      "<6>": {
+       "action": "Tab6",
+        "displayGroup": "tabs"
+      },
+      "<7>": {
+       "action": "Tab7",
+        "displayGroup": "tabs"
+      }
+    },
+    "FullTab": {
+      "extends": [
+        "Tab"
+      ],
+      "<n>": {
+       "action": "NewItem",
+        "displayName": "New"
+      },
+      "<d>": {
+       "action": "DeleteItem",
+        "displayName": "Delete"
+      },
+      "<r>": {
+        "action": "LoadAllItems",
+        "displayName": "Load"
+      }
+    },
+    "ReadDeleteTab": {
+      "extends": [
+        "Tab"
+      ],
+      "<d>": {
+       "action": "DeleteItem",
+        "displayName": "Delete"
+      },
+      "<r>": {
+        "action": "LoadAllItems",
+        "displayName": "Load"
+      }
+    },
+    "ReadTab": {
+      "extends": [
+        "Tab"
+      ],
+      "<r>": {
+        "action": "LoadAllItems",
+        "displayName": "Load"
+      }
+    },
+    "EditorReadOnly": {
+      "<Ctrl-d>": {
+       "action": "Quit",
+      },
+      "<Ctrl-c>": {
+       "action": "Quit",
+       "displayName": "Quit"
+      },
+      "<Ctrl-z>": {
+       "action": "Suspend",
+      },
+      "<esc>": {
+       "action": "Escape",
+       "displayName": "Cancel"
+      }
+    },
+    "Editor": {
+      "extends": ["EditorReadOnly"],
+      "<Ctrl-n>": {
+       "action": "Submit",
+       "displayName": "Submit"
+      }
     },
     "ErrorPopup": {
-      "<q>": "Quit",
-      "<Ctrl-d>": "Quit",
-      "<Ctrl-c>": "Quit",
-      "<Ctrl-z>": "Suspend",
-      "<esc>": "Escape"
+      "extends": [
+        "Home"
+      ],
+      "<esc>": {
+       "action": "ClosePopup",
+       "displayName": "Close"
+      }
     },
     "ConfirmPopup": {
-      "<q>": "Quit",
-      "<Ctrl-d>": "Quit",
-      "<Ctrl-c>": "Quit",
-      "<Ctrl-z>": "Suspend",
-      "<esc>": "Escape",
-      "<enter>": "Enter"
+      "extends": [
+        "Home"
+      ],
+      "<esc>": {
+       "action": "ClosePopup",
+       "displayName": "Cancel"
+      },
+      "<enter>": {
+       "action": "ConfirmPopup",
+       "displayName": "Confirm"
+      },
     }
   }
 }

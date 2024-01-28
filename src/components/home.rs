@@ -1,7 +1,11 @@
 use color_eyre::eyre::{Ok, Result};
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
+use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing_subscriber::fmt::format;
 
 use super::{Component, Frame};
 use crate::{
@@ -22,45 +26,57 @@ use crate::{
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
+    mode: Rc<RefCell<Mode>>,
     tabs: [Box<dyn TabComponent>; 7],
     active_tab: usize,
-    popup: Option<Box<dyn Popup>>,
 }
 
 impl Home {
-    pub fn new(hivemq_address: String) -> Self {
+    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         return Home {
             command_tx: None,
             config: Config::default(),
+            mode: mode.clone(),
             tabs: [
-                Box::new(Clients::new(hivemq_address.to_owned())),
-                Box::new(SchemasTab::new(hivemq_address.to_owned())),
-                Box::new(ScriptsTab::new(hivemq_address.to_owned())),
-                Box::new(DataPoliciesTab::new(hivemq_address.to_owned())),
-                Box::new(BehaviorPoliciesTab::new(hivemq_address.to_owned())),
-                Box::new(TraceRecordingsTab::new(hivemq_address.to_owned())),
-                Box::new(BackupsTab::new(hivemq_address.to_owned())),
+                Box::new(Clients::new(hivemq_address.to_owned(), mode.clone())),
+                Box::new(SchemasTab::new(hivemq_address.to_owned(), mode.clone())),
+                Box::new(ScriptsTab::new(hivemq_address.to_owned(), mode.clone())),
+                Box::new(DataPoliciesTab::new(
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
+                Box::new(BehaviorPoliciesTab::new(
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
+                Box::new(TraceRecordingsTab::new(
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
+                Box::new(BackupsTab::new(hivemq_address.to_owned(), mode.clone())),
             ],
             active_tab: 0,
-            popup: None,
         };
     }
 
     pub fn select_tab(&mut self, index: usize) {
         if index != self.active_tab && index < self.tabs.len() {
             self.active_tab = index;
+            self.tabs[self.active_tab].activate().unwrap();
         }
     }
 
     pub fn next_tab(&mut self) {
         if self.active_tab < self.tabs.len() - 1 {
             self.active_tab = self.active_tab + 1;
+            self.tabs[self.active_tab].activate().unwrap();
         }
     }
 
     pub fn prev_tab(&mut self) {
         if self.active_tab > 0 {
             self.active_tab = self.active_tab - 1;
+            self.tabs[self.active_tab].activate().unwrap();
         }
     }
 }
@@ -78,6 +94,7 @@ impl Component for Home {
         for tab in self.tabs.iter_mut() {
             tab.register_config_handler(config.clone())?;
         }
+        self.config = config;
         Ok(())
     }
 
@@ -85,6 +102,7 @@ impl Component for Home {
         for tab in self.tabs.iter_mut() {
             tab.init(area)?;
         }
+        let mode = self.tabs[self.active_tab].activate();
         Ok(())
     }
 
@@ -116,41 +134,13 @@ impl Component for Home {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if let Some(popup) = &mut self.popup {
-            let action = popup.update(action)?;
-            if let Some(action) = action {
-                if action == Action::ClosePopup {
-                    self.popup = None;
-                    return Ok(Some(Action::SwitchMode(Mode::Main)));
-                }
-            }
-            return Ok(None);
-        }
-
         match action {
             Action::SelectTab(tab) => self.select_tab(tab),
             Action::NextTab => self.next_tab(),
             Action::PrevTab => self.prev_tab(),
-            Action::CreateConfirmPopup {
-                title,
-                message,
-                confirm_action,
-            } => {
-                let popup = ConfirmPopup {
-                    title,
-                    message,
-                    tx: self.command_tx.clone().unwrap(),
-                    action: *confirm_action,
-                };
-                self.popup = Some(Box::new(popup));
-                return Ok(Some(Action::SwitchMode(Mode::ConfirmPopup)));
+            _ => {
+                self.tabs[self.active_tab].update(action).unwrap();
             }
-            Action::CreateErrorPopup { title, message } => {
-                let popup = ErrorPopup { title, message };
-                self.popup = Some(Box::new(popup));
-                return Ok(Some(Action::SwitchMode(Mode::ErrorPopup)));
-            }
-            _ => return self.tabs[self.active_tab].update(action),
         }
 
         Ok(None)
@@ -161,12 +151,9 @@ impl Component for Home {
         let active_tab = &tabs[self.active_tab];
         let max_width = f.size().width;
 
-        let key_bindings: Vec<String> = active_tab
-            .get_key_hints()
-            .iter()
-            .map(|(key, action)| format!(" {key} [{action}]"))
-            .collect();
-        let key_bindings = split_at_width(key_bindings, max_width);
+        let mode = self.mode.borrow();
+        let key_hints = self.config.keybindings.hints.get(&*mode).unwrap();
+        let key_bindings = split_at_width(key_hints, max_width);
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -207,26 +194,28 @@ impl Component for Home {
         // Create Footer
         f.render_widget(Paragraph::new(key_bindings), footer_area);
 
-        if let Some(popup) = &mut self.popup {
-            popup.draw(f, area)?;
-        }
-
         Ok(())
     }
 }
 
-fn split_at_width(items: Vec<String>, max_width: u16) -> Vec<Line<'static>> {
+fn split_at_width(items: &Vec<String>, max_width: u16) -> Vec<Line> {
     let mut current_width: u16 = 0;
     let mut lines: Vec<Line> = Vec::new();
     let mut current_line: Vec<Span> = Vec::new();
     for item in items {
-        if (current_width + item.len() as u16 > max_width) && current_width != 0 {
+        let span1 = Span::default()
+            .style(Style::default().bg(Color::Blue))
+            .content(item);
+        let span2 = Span::default().content(" ");
+        let item_len = item.chars().count() + 1;
+        if (current_width + item_len as u16 > max_width) && current_width != 0 {
             lines.push(Line::from(current_line.clone()));
             current_width = 0;
             current_line.clear();
         }
-        current_width += item.len() as u16;
-        current_line.push(Span::default().content(item));
+        current_width += item_len as u16;
+        current_line.push(span1);
+        current_line.push(span2);
     }
     lines.push(Line::from(current_line));
     lines

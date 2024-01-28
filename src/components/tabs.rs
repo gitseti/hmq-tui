@@ -1,4 +1,5 @@
 use crate::components::Component;
+use crate::mode::Mode;
 
 pub mod backups;
 pub mod behavior_policies;
@@ -10,6 +11,4 @@ pub mod trace_recordings;
 
 pub trait TabComponent: Component {
     fn get_name(&self) -> &str;
-
-    fn get_key_hints(&self) -> Vec<(&str, &str)>;
 }

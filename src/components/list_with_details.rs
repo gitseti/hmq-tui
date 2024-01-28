@@ -1,9 +1,13 @@
+use std::cell::RefCell;
+use std::fmt::format;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use indexmap::IndexMap;
+use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::Stylize,
@@ -16,10 +20,14 @@ use tui::Frame;
 use typed_builder::TypedBuilder;
 use State::Loaded;
 
+use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
+use crate::components::popup;
+use crate::components::popup::Popup;
+use crate::mode::Mode::ConfirmPopup;
 use crate::{
     action::{
         Action,
-        Action::{CreateConfirmPopup, CreateErrorPopup, SelectedItem, Submit, SwitchMode},
+        Action::{SelectedItem, Submit},
     },
     components::{
         editor::Editor,
@@ -30,7 +38,7 @@ use crate::{
         },
         Component,
     },
-    mode::{Mode, Mode::Main},
+    mode::{Mode, Mode::Home},
     tui,
 };
 
@@ -44,6 +52,9 @@ pub struct ListWithDetails<'a, T> {
 
     #[builder(setter(into))]
     hivemq_address: String,
+
+    #[builder]
+    mode: Rc<RefCell<Mode>>,
 
     #[builder]
     selector: Box<dyn ItemSelector<T>>,
@@ -70,6 +81,9 @@ pub struct ListWithDetails<'a, T> {
 
     #[builder(setter(skip), default)]
     new_item_editor: Option<Editor<'a>>,
+
+    #[builder(setter(skip), default)]
+    popup: Option<ListPopup>,
 }
 
 pub enum State<'a, T> {
@@ -91,6 +105,16 @@ pub enum FocusMode<'a> {
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
+    pub fn get_standard_mode(&self) -> Mode {
+        if self.create_fn.is_some() && self.delete_fn.is_some() {
+            Mode::FullTab
+        } else if self.delete_fn.is_some() {
+            Mode::ReadDeleteTab
+        } else {
+            Mode::ReadTab
+        }
+    }
+
     pub fn reset(&mut self) {
         self.state = Loaded(LoadedState {
             items: IndexMap::new(),
@@ -202,7 +226,16 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             focus_mode: mode, ..
         }) = &mut self.state
         {
-            *mode = FocusOnList(ListState::default());
+            match mode {
+                FocusOnList(_) => {
+                    *mode = FocusOnList(ListState::default());
+                }
+                FocusMode::FocusOnDetails((state, editor)) => {
+                    *mode = FocusOnList(state.clone());
+                }
+                _ => (),
+            }
+            *self.mode.borrow_mut() = self.get_standard_mode();
         }
     }
 
@@ -282,6 +315,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     fn focus_on_list(&mut self, list_state: ListState) {
         if let Loaded(state) = &mut self.state {
             (*state).focus_mode = FocusMode::FocusOnList(list_state);
+            *self.mode.borrow_mut() = self.get_standard_mode();
         };
     }
 
@@ -310,6 +344,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         editor.focus();
 
         (*state).focus_mode = FocusMode::FocusOnDetails((list_state.clone(), editor));
+        *self.mode.borrow_mut() = Mode::EditorReadOnly;
     }
 
     fn is_focus_on_details(&self) -> bool {
@@ -320,6 +355,21 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         match state.focus_mode {
             FocusMode::FocusOnDetails(_) => true,
             _ => false,
+        }
+    }
+
+    fn enter_popup(&mut self, popup: ListPopup) {
+        *self.mode.borrow_mut() = match popup {
+            DeletePopup { .. } => Mode::ConfirmPopup,
+            ErrorPopup { .. } => Mode::ErrorPopup,
+        };
+        self.popup = Some(popup);
+    }
+
+    fn exit_popup(&mut self) {
+        if self.popup.is_some() {
+            self.popup = None;
+            *self.mode.borrow_mut() = self.get_standard_mode();
         }
     }
 
@@ -461,6 +511,15 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 }
             }
         }
+
+        if let Some(popup) = &mut self.popup {
+            let popup: &mut dyn Popup = match popup {
+                DeletePopup { popup, .. } => popup,
+                ErrorPopup { popup, .. } => popup,
+            };
+            popup.draw(f, f.size()).unwrap();
+        }
+
         Ok(())
     }
 }
@@ -471,11 +530,13 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         Ok(())
     }
 
+    fn activate(&mut self) -> Result<()> {
+        *self.mode.borrow_mut() = self.get_standard_mode();
+        Ok(())
+    }
+
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         if let Some(editor) = &mut self.new_item_editor {
-            if KeyCode::Char('n') == key.code && key.modifiers == KeyModifiers::CONTROL {
-                return Ok(Some(Submit));
-            }
             return editor.handle_key_events(key);
         }
 
@@ -496,19 +557,6 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        if let Loaded(LoadedState {
-            focus_mode: mode, ..
-        }) = &mut self.state
-        {
-            if let FocusMode::FocusOnDetails((selected, _)) = mode {
-                if action == Action::Escape {
-                    *mode = FocusMode::FocusOnList(selected.clone());
-                    return Ok(Some(SwitchMode(Mode::Main)));
-                }
-                return Ok(None);
-            }
-        }
-
         match action {
             Action::LoadAllItems => {
                 if let Some(list_fn) = &self.list_fn {
@@ -550,15 +598,11 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             }
             Action::FocusDetails => {
                 self.focus_on_details();
-                if self.is_focus_on_details() {
-                    return Ok(Some(SwitchMode(Mode::Editing)));
-                }
             }
             Action::Escape => {
                 self.unfocus();
                 if let Some(_editor) = &mut self.new_item_editor {
                     self.new_item_editor = None;
-                    return Ok(Some(Action::SwitchMode(Mode::Main)));
                 }
             }
             Action::Delete => {
@@ -566,39 +610,32 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     if self.delete_fn.is_some() {
                         let item_type = self.details_title.clone();
                         let item_id = id.clone();
-                        return Ok(Some(CreateConfirmPopup {
-                            title: format!("Delete {item_type} Item?").to_string(),
-                            message: format!("Do you really want to delete the item '{item_id}'")
-                                .to_string(),
-                            confirm_action: Box::new(Action::ItemDelete { item_type, item_id }),
-                        }));
+                        let popup = popup::ConfirmPopup {
+                            title: format!("Delete {} '{}'?", item_type, item_id).to_string(),
+                            message: format!(
+                                "Are you sure you want to delete the {} with id '{}'",
+                                item_type, item_id
+                            )
+                            .to_string(),
+                        };
+                        self.enter_popup(DeletePopup { popup, item_id })
                     }
-                }
-            }
-            Action::ItemDelete { item_type, item_id } => {
-                if let (Some(delete_fn), true) =
-                    (&self.delete_fn, item_type.eq(&self.details_title))
-                {
-                    let tx = self.tx.clone().unwrap();
-                    let host = self.hivemq_address.clone();
-                    let delete_fn = delete_fn.clone();
-                    tokio::spawn(async move {
-                        let result = delete_fn.delete(host, item_id).await;
-                        tx.send(Action::ItemDeleted { item_type, result }).unwrap();
-                    });
                 }
             }
             Action::ItemDeleted { item_type, result } => {
                 if item_type.eq(&self.details_title) {
-                    return match result {
+                    match result {
                         Ok(id) => {
                             self.remove(id);
-                            Ok(None)
+                            self.exit_popup();
                         }
-                        Err(message) => Ok(Some(Action::CreateErrorPopup {
-                            title: "Deletion failed".to_string(),
-                            message: format!("Failed deletion of item:\n{}", message),
-                        })),
+                        Err(message) => {
+                            let popup = popup::ErrorPopup {
+                                title: "Deletion failed".to_string(),
+                                message: format!("Failed deletion of item:\n{}", message),
+                            };
+                            self.enter_popup(ErrorPopup { popup })
+                        }
                     };
                 }
             }
@@ -608,7 +645,8 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     self.new_item_editor = Some(Editor::writeable(
                         format!("New {}", self.details_title).to_owned(),
                     ));
-                    return Ok(Some(Action::SwitchMode(Mode::Editing)));
+                    *self.mode.borrow_mut() = Mode::Editor;
+                    return Ok(None);
                 }
             }
             Action::Submit => {
@@ -639,15 +677,35 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         );
                     }
                 }
-                return Ok(Some(Action::SwitchMode(Main)));
+                *self.mode.borrow_mut() = self.get_standard_mode();
+                return Ok(None);
             }
             Action::Enter => self.focus_on_details(),
             Action::Copy => {
                 if let Err(message) = self.copy_details_to_clipboard() {
-                    return Ok(Some(CreateErrorPopup {
+                    let popup = popup::ErrorPopup {
                         title: "Could not copy to clipboard".to_string(),
                         message,
-                    }));
+                    };
+                    self.enter_popup(ErrorPopup { popup })
+                }
+            }
+            Action::ClosePopup => {
+                self.exit_popup();
+            }
+            Action::ConfirmPopup => {
+                if let Some(DeletePopup { item_id, .. }) = &self.popup {
+                    if let Some(delete_fn) = &self.delete_fn {
+                        let tx = self.tx.clone().unwrap();
+                        let host = self.hivemq_address.clone();
+                        let delete_fn = delete_fn.clone();
+                        let item_type = self.details_title.clone();
+                        let item_id = item_id.clone();
+                        tokio::spawn(async move {
+                            let result = delete_fn.delete(host, item_id).await;
+                            tx.send(Action::ItemDeleted { item_type, result }).unwrap();
+                        });
+                    }
                 }
             }
             _ => {}
@@ -659,4 +717,14 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         self.draw_custom(f, area, None)
     }
+}
+
+enum ListPopup {
+    DeletePopup {
+        popup: popup::ConfirmPopup,
+        item_id: String,
+    },
+    ErrorPopup {
+        popup: popup::ErrorPopup,
+    },
 }

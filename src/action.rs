@@ -33,17 +33,8 @@ pub enum Action {
     Error(String),
     Help,
 
-    CreateErrorPopup {
-        title: String,
-        message: String,
-    },
-    CreateConfirmPopup {
-        title: String,
-        message: String,
-        confirm_action: Box<Action>,
-    },
     ClosePopup,
-    SwitchMode(Mode),
+    ConfirmPopup,
 
     // Key Events
     PrevItem,
@@ -122,6 +113,8 @@ impl<'de> Deserialize<'de> for Action {
                     "Escape" => Ok(Action::Escape),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),
+                    "ClosePopup" => Ok(Action::ClosePopup),
+                    "ConfirmPopup" => Ok(Action::ConfirmPopup),
                     "Tab1" => Ok(Action::SelectTab(0)),
                     "Tab2" => Ok(Action::SelectTab(1)),
                     "Tab3" => Ok(Action::SelectTab(2)),

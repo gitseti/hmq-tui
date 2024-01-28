@@ -2,9 +2,12 @@ use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::ClientDetails;
 use ratatui::layout::Rect;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 
+use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
     components::{
@@ -49,11 +52,12 @@ impl ItemSelector<Option<ClientDetails>> for ClientSelector {
 }
 
 impl Clients<'_> {
-    pub fn new(hivemq_address: String) -> Self {
+    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
             .list_title("Clients")
             .details_title("Client Details")
             .hivemq_address(hivemq_address.clone())
+            .mode(mode)
             .selector(Box::new(ClientSelector))
             .build();
         Clients {
@@ -68,6 +72,10 @@ impl Component for Clients<'_> {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.tx = Some(tx);
         Ok(())
+    }
+
+    fn activate(&mut self) -> Result<()> {
+        self.list_with_details.activate()
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
@@ -87,9 +95,6 @@ impl Component for Clients<'_> {
                             .expect("Failed to send client details loading finished action");
                     });
                 }
-            }
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
             }
             _ => {}
         }
@@ -139,9 +144,5 @@ impl Component for Clients<'_> {
 impl TabComponent for Clients<'_> {
     fn get_name(&self) -> &str {
         "Clients"
-    }
-
-    fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy"), ("ESC", "Escape")]
     }
 }

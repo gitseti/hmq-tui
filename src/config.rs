@@ -1,10 +1,15 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use color_eyre::eyre::Result;
+use config::Map;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use derive_deref::{Deref, DerefMut};
+use indexmap::IndexMap;
+use itertools::Itertools;
 use ratatui::style::{Color, Modifier, Style};
 use serde::{de::Deserializer, Deserialize};
+use tracing::Value;
+use tracing_subscriber::fmt::format;
 
 use crate::{action::Action, mode::Mode};
 
@@ -59,52 +64,185 @@ impl Config {
             log::debug!("No configuration file found. Using default config.");
         }
 
-        let mut cfg: Self = builder.build()?.try_deserialize()?;
-
-        for (mode, default_bindings) in default_config.keybindings.iter() {
-            let user_bindings = cfg.keybindings.entry(*mode).or_default();
-            for (key, cmd) in default_bindings.iter() {
-                user_bindings
-                    .entry(key.clone())
-                    .or_insert_with(|| cmd.clone());
-            }
-        }
-        for (mode, default_styles) in default_config.styles.iter() {
-            let user_styles = cfg.styles.entry(*mode).or_default();
-            for (style_key, style) in default_styles.iter() {
-                user_styles
-                    .entry(style_key.clone())
-                    .or_insert_with(|| style.clone());
-            }
-        }
-
-        Ok(cfg)
+        Ok(default_config)
     }
 }
 
-#[derive(Clone, Debug, Default, Deref, DerefMut)]
-pub struct KeyBindings(pub HashMap<Mode, HashMap<Vec<KeyEvent>, Action>>);
+#[derive(Clone, Debug, Default)]
+pub struct KeyBindings {
+    pub bindings: HashMap<Mode, HashMap<Vec<KeyEvent>, Action>>,
+    pub hints: HashMap<Mode, Vec<String>>,
+}
 
 impl<'de> Deserialize<'de> for KeyBindings {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let parsed_map = HashMap::<Mode, HashMap<String, Action>>::deserialize(deserializer)?;
-
-        let keybindings = parsed_map
-            .into_iter()
-            .map(|(mode, inner_map)| {
-                let converted_inner_map = inner_map
-                    .into_iter()
-                    .map(|(key_str, cmd)| (parse_key_sequence(&key_str).unwrap(), cmd))
-                    .collect();
-                (mode, converted_inner_map)
-            })
+        let parsed_map = IndexMap::<Mode, ModeValue>::deserialize(deserializer)?;
+        let modes: IndexMap<Mode, Vec<ModeValue>> = parsed_map
+            .keys()
+            .map(|mode| (mode.clone(), collect_modes(&parsed_map, mode)))
             .collect();
+        let mut bindings: HashMap<Mode, HashMap<Vec<KeyEvent>, Action>> = HashMap::new();
+        let mut hints: HashMap<Mode, IndexMap<Vec<KeyEvent>, String>> = HashMap::new();
+        for (mode, mode_values) in modes {
+            let mut events_to_action: HashMap<Vec<KeyEvent>, Action> = HashMap::new();
+            let mut events_to_display_name: IndexMap<Vec<KeyEvent>, String> = IndexMap::new();
 
-        Ok(KeyBindings(keybindings))
+            let groups: IndexMap<String, GroupValue> = mode_values
+                .iter()
+                .flat_map(|mode_value| mode_value.clone().display_groups)
+                .flatten()
+                .collect();
+            let mut display_groups: IndexMap<String, Vec<KeyEvent>> = groups
+                .keys()
+                .into_iter()
+                .map(|key| (key.clone(), Vec::new()))
+                .collect();
+
+            for mode_value in mode_values {
+                for (key, key_binding) in mode_value.key_bindings {
+                    let events = parse_key_sequence(&key).unwrap();
+                    if let Some(group) = key_binding.display_group {
+                        display_groups
+                            .get_mut(&group)
+                            .unwrap()
+                            .append(&mut events.clone());
+                    } else if let Some(display_name) = key_binding.display_name {
+                        events_to_display_name.insert(events.clone(), display_name);
+                    }
+
+                    events_to_action.insert(events, key_binding.action.clone());
+                }
+            }
+
+            for (group_name, key_events) in display_groups {
+                events_to_display_name.insert(
+                    key_events,
+                    groups.get(&group_name).unwrap().display_name.clone(),
+                );
+            }
+
+            bindings.insert(mode, events_to_action);
+            hints.insert(mode, events_to_display_name);
+        }
+
+        Ok(KeyBindings {
+            bindings,
+            hints: to_display_names(hints),
+        })
     }
+}
+
+fn to_display_names(
+    map: HashMap<Mode, IndexMap<Vec<KeyEvent>, String>>,
+) -> HashMap<Mode, Vec<String>> {
+    let mut display_names_map: HashMap<Mode, Vec<String>> = HashMap::new();
+    for (mode, map) in map {
+        let mut key_hints: Vec<String> = Vec::new();
+        for (key_events, display_name) in map {
+            let keys = key_events
+                .iter()
+                .map(|event| {
+                    let prefix = if event.modifiers == KeyModifiers::SHIFT {
+                        Some("⇧")
+                    } else if event.modifiers == KeyModifiers::CONTROL {
+                        if cfg!(target_os = "macos") {
+                            Some("⌃")
+                        } else {
+                            Some("Ctrl-")
+                        }
+                    } else if event.modifiers == KeyModifiers::ALT {
+                        if cfg!(target_os = "macos") {
+                            Some("⌥")
+                        } else {
+                            Some("Alt-")
+                        }
+                    } else {
+                        None
+                    };
+
+                    let symbol = match event.code {
+                        KeyCode::Backspace => "⌫".to_string(),
+                        KeyCode::Enter => "⏎".to_string(),
+                        KeyCode::Left => "←".to_string(),
+                        KeyCode::Right => "→".to_string(),
+                        KeyCode::Up => "↑".to_string(),
+                        KeyCode::Down => "↓".to_string(),
+                        KeyCode::Home => "⌂".to_string(),
+                        KeyCode::End => "⇲".to_string(),
+                        KeyCode::PageUp => "PgUp".to_string(),
+                        KeyCode::PageDown => "PgDown".to_string(),
+                        KeyCode::Tab => "↹".to_string(),
+                        KeyCode::BackTab => "⇧↹".to_string(),
+                        KeyCode::Delete => "⌫".to_string(),
+                        KeyCode::Insert => "Insert".to_string(),
+                        KeyCode::F(num) => format!("F{num}").to_string(),
+                        KeyCode::Char(c) => c.to_string(),
+                        KeyCode::Null => "Null".to_string(),
+                        KeyCode::Esc => "Esc".to_string(),
+                        KeyCode::CapsLock => "⇪".to_string(),
+                        KeyCode::ScrollLock => "⤓".to_string(),
+                        KeyCode::NumLock => "NumLock".to_string(),
+                        KeyCode::PrintScreen => "PrtSc".to_string(),
+                        KeyCode::Pause => "Pause".to_string(),
+                        KeyCode::Menu => "Menu".to_string(),
+                        KeyCode::KeypadBegin => "￣".to_string(),
+                        KeyCode::Media(_) => "?".to_string(),
+                        KeyCode::Modifier(_) => "?".to_string(),
+                    };
+
+                    match prefix {
+                        None => symbol,
+                        Some(prefix) => format!("{prefix}{symbol}"),
+                    }
+                })
+                .join("");
+            key_hints.push(format!("{} [{}]", display_name, keys))
+        }
+        display_names_map.insert(mode, key_hints);
+    }
+
+    display_names_map
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ModeValue {
+    #[serde(rename = "displayGroups")]
+    display_groups: Option<IndexMap<String, GroupValue>>,
+    extends: Option<Vec<Mode>>,
+    #[serde(flatten)]
+    key_bindings: IndexMap<String, KeyBinding>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct KeyBinding {
+    action: Action,
+    #[serde(rename = "displayName")]
+    display_name: Option<String>,
+    #[serde(rename = "displayGroup")]
+    display_group: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct GroupValue {
+    #[serde(rename = "displayName")]
+    display_name: String,
+}
+
+fn collect_modes(modes: &IndexMap<Mode, ModeValue>, mode: &Mode) -> Vec<ModeValue> {
+    let mode_value = modes
+        .get(mode)
+        .expect(&*format!("Mode {:?} not found", mode));
+    let mut mode_values = Vec::new();
+    if let Some(extended_modes) = &mode_value.extends {
+        for extended_mode in extended_modes {
+            mode_values.append(collect_modes(modes, extended_mode).as_mut());
+        }
+    }
+    mode_values.push(mode_value.clone());
+    mode_values
 }
 
 fn parse_key_event(raw: &str) -> Result<KeyEvent, String> {
@@ -465,7 +603,8 @@ mod tests {
         let c = Config::new()?;
         assert_eq!(
             c.keybindings
-                .get(&Mode::Main)
+                .bindings
+                .get(&Mode::Home)
                 .unwrap()
                 .get(&parse_key_sequence("<q>").unwrap_or_default())
                 .unwrap(),
@@ -516,7 +655,7 @@ mod tests {
             parse_key_event("ctrl-alt-a").unwrap(),
             KeyEvent::new(
                 KeyCode::Char('a'),
-                KeyModifiers::CONTROL | KeyModifiers::ALT
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
             )
         );
 
@@ -531,7 +670,7 @@ mod tests {
         assert_eq!(
             key_event_to_string(&KeyEvent::new(
                 KeyCode::Char('a'),
-                KeyModifiers::CONTROL | KeyModifiers::ALT
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
             )),
             "ctrl-alt-a".to_string()
         );

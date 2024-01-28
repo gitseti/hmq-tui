@@ -1,4 +1,5 @@
 use hivemq_openapi::models::{BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyMatching};
+use hmq_tui::mode::Mode;
 use hmq_tui::{
     action::Action,
     components::{
@@ -9,6 +10,8 @@ use hmq_tui::{
     hivemq_rest_client::create_behavior_policy,
 };
 use indoc::indoc;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -33,14 +36,16 @@ async fn test_behavior_policies_tab() {
             hivemq.host.clone(),
             serde_json::to_string(&behavior_policy).unwrap(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
     }
 
-    let mut tab = BehaviorPoliciesTab::new(hivemq.host);
+    let mode = Rc::new(RefCell::new(Mode::Home));
+    let mut tab = BehaviorPoliciesTab::new(hivemq.host, mode.clone());
     let (tx, mut rx): (UnboundedSender<Action>, UnboundedReceiver<Action>) =
         mpsc::unbounded_channel();
     tab.register_action_handler(tx.clone()).unwrap();
+    tab.activate().unwrap();
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();
@@ -101,7 +106,8 @@ async fn test_behavior_policies_tab() {
         "new-behavior-policy".to_owned(),
         BehaviorPolicyMatching::new(".*".to_owned()),
     );
-    let behavior_policy = create_item(&mut tab, &mut rx, behavior_policy, &BehaviorPolicySelector).await;
+    let behavior_policy =
+        create_item(&mut tab, &mut rx, behavior_policy, &BehaviorPolicySelector).await;
     assert_draw(&mut tab, &indoc! {r#"
             ┌Behavior Policies (101/101)────┐┌Behavior Policy──────────────────────────────────────────────────┐
             │behavior-policy-88             ││  1 {                                                            │

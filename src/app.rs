@@ -1,6 +1,8 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -19,7 +21,7 @@ pub struct App {
     pub components: Vec<Box<dyn Component>>,
     pub should_quit: bool,
     pub should_suspend: bool,
-    pub mode: Mode,
+    pub mode: Rc<RefCell<Mode>>,
     pub last_tick_key_events: Vec<KeyEvent>,
 }
 
@@ -30,10 +32,10 @@ impl App {
         hivemq_address: String,
         is_debug: bool,
     ) -> Result<Self> {
-        let home = Home::new(hivemq_address.clone());
-        let fps = FpsCounter::default();
         let config = Config::new()?;
-        let mode = Mode::Main;
+        let mode = Rc::new(RefCell::new(Mode::Home));
+        let home = Home::new(hivemq_address.clone(), mode.clone());
+        let fps = FpsCounter::default();
         let mut components: Vec<Box<dyn Component>> = vec![Box::new(home)];
         if is_debug {
             components.push(Box::new(fps))
@@ -81,7 +83,9 @@ impl App {
                     tui::Event::Render => action_tx.send(Action::Render)?,
                     tui::Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
                     tui::Event::Key(key) => {
-                        if let Some(keymap) = self.config.keybindings.get(&self.mode) {
+                        if let Some(keymap) =
+                            self.config.keybindings.bindings.get(&self.mode.borrow())
+                        {
                             if let Some(action) = keymap.get(&vec![key]) {
                                 log::info!("Got action: {action:?}");
                                 action_tx.send(action.clone())?;
@@ -142,9 +146,6 @@ impl App {
                                 }
                             }
                         })?;
-                    }
-                    Action::SwitchMode(mode) => {
-                        self.mode = mode;
                     }
                     _ => {}
                 }

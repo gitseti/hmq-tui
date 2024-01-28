@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
@@ -6,6 +8,7 @@ use hivemq_openapi::models::Schema;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
     components::{
@@ -38,11 +41,13 @@ impl ItemSelector<Schema> for SchemaSelector {
 }
 
 impl SchemasTab<'_> {
-    pub fn new(hivemq_address: String) -> Self {
+    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+        let default_mode = Mode::FullTab;
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
             .details_title("Schema")
             .hivemq_address(hivemq_address.clone())
+            .mode(mode)
             .list_fn(Arc::new(fetch_schemas))
             .delete_fn(Arc::new(delete_schema))
             .create_fn(Arc::new(create_schema))
@@ -62,6 +67,10 @@ impl Component for SchemasTab<'_> {
         self.tx = Some(tx.clone());
         self.list_with_details.register_action_handler(tx)?;
         Ok(())
+    }
+
+    fn activate(&mut self) -> Result<()> {
+        self.list_with_details.activate()
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
@@ -85,16 +94,5 @@ impl Component for SchemasTab<'_> {
 impl TabComponent for SchemasTab<'_> {
     fn get_name(&self) -> &str {
         "Schemas"
-    }
-
-    fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![
-            ("R", "Load"),
-            ("N", "New"),
-            ("D", "Delete"),
-            ("C", "Copy"),
-            ("CTRL + N", "Submit"),
-            ("ESC", "Escape"),
-        ]
     }
 }

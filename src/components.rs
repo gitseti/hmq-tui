@@ -59,6 +59,14 @@ pub trait Component {
     fn init(&mut self, _area: Rect) -> Result<()> {
         Ok(())
     }
+    /// Activates the component.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<()>` - An Ok result or an error.
+    fn activate(&mut self) -> Result<()> {
+        Ok(())
+    }
     /// Handle incoming events and produce actions if necessary.
     ///
     /// # Arguments

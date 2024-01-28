@@ -1,5 +1,6 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use hivemq_openapi::models::Schema;
+use hmq_tui::mode::Mode;
 use hmq_tui::{
     action::Action,
     components::{
@@ -10,6 +11,8 @@ use hmq_tui::{
     hivemq_rest_client::create_schema,
 };
 use indoc::indoc;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -34,10 +37,12 @@ async fn test_schemas_tab() {
             .unwrap();
     }
 
-    let mut tab = SchemasTab::new(hivemq.host);
+    let mode = Rc::new(RefCell::new(Mode::Home));
+    let mut tab = SchemasTab::new(hivemq.host, mode.clone());
     let (tx, mut rx): (UnboundedSender<Action>, UnboundedReceiver<Action>) =
         mpsc::unbounded_channel();
     tab.register_action_handler(tx.clone()).unwrap();
+    tab.activate().unwrap();
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();

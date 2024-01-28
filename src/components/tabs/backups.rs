@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
@@ -6,6 +8,7 @@ use hivemq_openapi::models::Backup;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
     components::{
@@ -46,11 +49,12 @@ impl ItemSelector<Backup> for BackupSelector {
 }
 
 impl BackupsTab<'_> {
-    pub fn new(hivemq_address: String) -> Self {
+    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
             .details_title("Backup")
             .hivemq_address(hivemq_address.clone())
+            .mode(mode)
             .list_fn(Arc::new(fetch_backups))
             .selector(Box::new(BackupSelector))
             .build();
@@ -68,6 +72,9 @@ impl Component for BackupsTab<'_> {
         self.list_with_details.register_action_handler(tx)?;
         Ok(())
     }
+    fn activate(&mut self) -> Result<()> {
+        self.list_with_details.activate()
+    }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         self.list_with_details.handle_key_events(key)
@@ -75,13 +82,6 @@ impl Component for BackupsTab<'_> {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SwitchMode(_))) => {
-                return list_action;
-            }
-            _ => {}
-        }
-
         Ok(None)
     }
 
@@ -93,9 +93,5 @@ impl Component for BackupsTab<'_> {
 impl TabComponent for BackupsTab<'_> {
     fn get_name(&self) -> &str {
         "Backups"
-    }
-
-    fn get_key_hints(&self) -> Vec<(&str, &str)> {
-        vec![("R", "Load"), ("C", "Copy JSON"), ("ESC", "Escape")]
     }
 }
