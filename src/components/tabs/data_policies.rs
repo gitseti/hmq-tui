@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct DataPoliciesTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, DataPolicy>,
 }
@@ -53,7 +52,6 @@ impl DataPoliciesTab<'_> {
             .create_fn(Arc::new(create_data_policy))
             .build();
         DataPoliciesTab {
-            hivemq_address,
             tx: None,
             list_with_details,
         }

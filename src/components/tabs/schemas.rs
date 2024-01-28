@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct SchemasTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Schema>,
 }
@@ -42,7 +41,6 @@ impl ItemSelector<Schema> for SchemaSelector {
 
 impl SchemasTab<'_> {
     pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
-        let default_mode = Mode::FullTab;
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
             .details_title("Schema")
@@ -55,7 +53,6 @@ impl SchemasTab<'_> {
             .build();
 
         SchemasTab {
-            hivemq_address,
             tx: None,
             list_with_details,
         }

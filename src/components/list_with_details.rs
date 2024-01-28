@@ -1,13 +1,13 @@
 use std::cell::RefCell;
-use std::fmt::format;
+
 use std::rc::Rc;
 use std::sync::Arc;
 
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 use indexmap::IndexMap;
-use itertools::Itertools;
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::Stylize,
@@ -23,12 +23,9 @@ use State::Loaded;
 use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
 use crate::components::popup;
 use crate::components::popup::Popup;
-use crate::mode::Mode::ConfirmPopup;
+
 use crate::{
-    action::{
-        Action,
-        Action::{SelectedItem, Submit},
-    },
+    action::{Action, Action::SelectedItem},
     components::{
         editor::Editor,
         item_features::{CreateFn, DeleteFn, ItemSelector, ListFn},
@@ -38,7 +35,7 @@ use crate::{
         },
         Component,
     },
-    mode::{Mode, Mode::Home},
+    mode::Mode,
     tui,
 };
 
@@ -230,7 +227,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 FocusOnList(_) => {
                     *mode = FocusOnList(ListState::default());
                 }
-                FocusMode::FocusOnDetails((state, editor)) => {
+                FocusMode::FocusOnDetails((state, _editor)) => {
                     *mode = FocusOnList(state.clone());
                 }
                 _ => (),
@@ -312,13 +309,6 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         Ok(())
     }
 
-    fn focus_on_list(&mut self, list_state: ListState) {
-        if let Loaded(state) = &mut self.state {
-            (*state).focus_mode = FocusMode::FocusOnList(list_state);
-            *self.mode.borrow_mut() = self.get_standard_mode();
-        };
-    }
-
     fn focus_on_details(&mut self) {
         let Loaded(state) = &mut self.state else {
             return;
@@ -345,17 +335,6 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         (*state).focus_mode = FocusMode::FocusOnDetails((list_state.clone(), editor));
         *self.mode.borrow_mut() = Mode::EditorReadOnly;
-    }
-
-    fn is_focus_on_details(&self) -> bool {
-        let Loaded(state) = &self.state else {
-            return false;
-        };
-
-        match state.focus_mode {
-            FocusMode::FocusOnDetails(_) => true,
-            _ => false,
-        }
     }
 
     fn enter_popup(&mut self, popup: ListPopup) {

@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct TraceRecordingsTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, TraceRecording>,
 }
@@ -60,7 +59,6 @@ impl TraceRecordingsTab<'_> {
             .selector(Box::new(TraceRecordingSelector))
             .build();
         TraceRecordingsTab {
-            hivemq_address,
             tx: None,
             list_with_details,
         }

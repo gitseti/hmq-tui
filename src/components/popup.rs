@@ -1,4 +1,3 @@
-use crate::action::Action;
 use color_eyre::eyre::{Ok, Result};
 use ratatui::{
     buffer::Buffer,
@@ -6,9 +5,6 @@ use ratatui::{
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
-use tokio::sync::mpsc::UnboundedSender;
-
-use crate::components::Component;
 
 pub struct ConfirmPopup {
     pub title: String,

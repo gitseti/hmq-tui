@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct BehaviorPoliciesTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, BehaviorPolicy>,
 }
@@ -42,7 +41,6 @@ impl ItemSelector<BehaviorPolicy> for BehaviorPolicySelector {
 
 impl BehaviorPoliciesTab<'_> {
     pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
-        let default_mode = Mode::FullTab;
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
             .details_title("Behavior Policy")
@@ -54,7 +52,6 @@ impl BehaviorPoliciesTab<'_> {
             .selector(Box::new(BehaviorPolicySelector))
             .build();
         BehaviorPoliciesTab {
-            hivemq_address,
             tx: None,
             list_with_details,
         }

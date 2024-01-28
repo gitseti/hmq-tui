@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct ScriptsTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Script>,
 }
@@ -42,7 +41,6 @@ impl ItemSelector<Script> for ScriptSelector {
 
 impl ScriptsTab<'_> {
     pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
-        let default_mode = Mode::FullTab;
         let list_with_details = ListWithDetails::<Script>::builder()
             .list_title("Scripts")
             .details_title("Script")
@@ -54,7 +52,6 @@ impl ScriptsTab<'_> {
             .selector(Box::new(ScriptSelector))
             .build();
         ScriptsTab {
-            hivemq_address,
             tx: None,
             list_with_details,
         }

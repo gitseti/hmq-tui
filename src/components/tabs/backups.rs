@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub struct BackupsTab<'a> {
-    hivemq_address: String,
     tx: Option<UnboundedSender<Action>>,
     list_with_details: ListWithDetails<'a, Backup>,
 }
@@ -59,7 +58,6 @@ impl BackupsTab<'_> {
             .selector(Box::new(BackupSelector))
             .build();
         BackupsTab {
-            hivemq_address: hivemq_address.clone(),
             tx: None,
             list_with_details,
         }
@@ -81,7 +79,7 @@ impl Component for BackupsTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let list_action = self.list_with_details.update(action.clone());
+        let _ = self.list_with_details.update(action.clone());
         Ok(None)
     }
 

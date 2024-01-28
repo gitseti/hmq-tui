@@ -1,17 +1,14 @@
 use color_eyre::eyre::{Ok, Result};
-use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
-use itertools::Itertools;
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{prelude::*, widgets::*};
 use std::cell::RefCell;
 use std::rc::Rc;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing_subscriber::fmt::format;
 
 use super::{Component, Frame};
 use crate::{
     action::Action,
     components::{
-        popup::{ConfirmPopup, ErrorPopup, Popup},
         tabs::{
             backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
             data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
@@ -102,7 +99,7 @@ impl Component for Home {
         for tab in self.tabs.iter_mut() {
             tab.init(area)?;
         }
-        let mode = self.tabs[self.active_tab].activate();
+        let _mode = self.tabs[self.active_tab].activate();
         Ok(())
     }
 
@@ -146,9 +143,9 @@ impl Component for Home {
         Ok(None)
     }
 
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, _area: Rect) -> Result<()> {
         let tabs = &mut self.tabs;
-        let active_tab = &tabs[self.active_tab];
+        let _active_tab = &tabs[self.active_tab];
         let max_width = f.size().width;
 
         let mode = self.mode.borrow();

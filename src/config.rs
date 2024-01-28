@@ -1,15 +1,13 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use color_eyre::eyre::Result;
-use config::Map;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use derive_deref::{Deref, DerefMut};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use ratatui::style::{Color, Modifier, Style};
 use serde::{de::Deserializer, Deserialize};
-use tracing::Value;
-use tracing_subscriber::fmt::format;
 
 use crate::{action::Action, mode::Mode};
 

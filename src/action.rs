@@ -8,8 +8,6 @@ use serde::{
     Deserialize, Serialize,
 };
 
-use crate::mode::Mode;
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Item {
     ClientItem(ClientDetails),
