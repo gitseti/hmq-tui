@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct TraceRecordingsTab<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, TraceRecording>,
 }
 
@@ -48,30 +48,25 @@ impl ItemSelector<TraceRecording> for TraceRecordingSelector {
 }
 
 impl TraceRecordingsTab<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
             .details_title("Trace Recording")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_trace_recordings))
             .delete_fn(Arc::new(delete_trace_recording))
             .selector(Box::new(TraceRecordingSelector))
             .build();
         TraceRecordingsTab {
-            tx: None,
+            action_tx,
             list_with_details,
         }
     }
 }
 
 impl Component for TraceRecordingsTab<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx.clone());
-        self.list_with_details.register_action_handler(tx)?;
-        Ok(())
-    }
-
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }

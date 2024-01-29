@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct DataPoliciesTab<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, DataPolicy>,
 }
 
@@ -40,30 +40,26 @@ impl ItemSelector<DataPolicy> for DataPolicySelector {
 }
 
 impl DataPoliciesTab<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<DataPolicy>::builder()
             .list_title("Data Policies")
             .details_title("Data Policy")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .selector(Box::new(DataPolicySelector))
             .list_fn(Arc::new(fetch_data_policies))
             .delete_fn(Arc::new(delete_data_policy))
             .create_fn(Arc::new(create_data_policy))
             .build();
         DataPoliciesTab {
-            tx: None,
+            action_tx,
             list_with_details,
         }
     }
 }
 
 impl Component for DataPoliciesTab<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx.clone());
-        self.list_with_details.register_action_handler(tx)?;
-        Ok(())
-    }
 
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()

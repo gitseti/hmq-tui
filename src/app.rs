@@ -4,6 +4,7 @@ use ratatui::prelude::Rect;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     action::Action,
@@ -23,6 +24,8 @@ pub struct App {
     pub should_suspend: bool,
     pub mode: Rc<RefCell<Mode>>,
     pub last_tick_key_events: Vec<KeyEvent>,
+    pub action_tx: UnboundedSender<Action>,
+    pub action_rx: UnboundedReceiver<Action>
 }
 
 impl App {
@@ -34,7 +37,8 @@ impl App {
     ) -> Result<Self> {
         let config = Config::new()?;
         let mode = Rc::new(RefCell::new(Mode::Home));
-        let home = Home::new(hivemq_address.clone(), mode.clone());
+        let (action_tx, action_rx) = mpsc::unbounded_channel();
+        let home = Home::new(action_tx.clone(), config.clone(), hivemq_address.clone(), mode.clone());
         let fps = FpsCounter::default();
         let mut components: Vec<Box<dyn Component>> = vec![Box::new(home)];
         if is_debug {
@@ -51,11 +55,12 @@ impl App {
             config,
             mode,
             last_tick_key_events: Vec::new(),
+            action_tx,
+            action_rx
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
         let mut tui = tui::Tui::new()?
             .tick_rate(self.tick_rate)
@@ -64,16 +69,10 @@ impl App {
         tui.enter()?;
 
         for component in self.components.iter_mut() {
-            component.register_action_handler(action_tx.clone())?;
-        }
-
-        for component in self.components.iter_mut() {
-            component.register_config_handler(self.config.clone())?;
-        }
-
-        for component in self.components.iter_mut() {
             component.init(tui.size()?)?;
         }
+        let action_tx = &self.action_tx;
+        let action_rx = &mut self.action_rx;
 
         loop {
             if let Some(e) = tui.next().await {

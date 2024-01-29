@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub struct Clients<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     hivemq_address: String,
     list_with_details: ListWithDetails<'a, Option<ClientDetails>>,
 }
@@ -52,27 +52,24 @@ impl ItemSelector<Option<ClientDetails>> for ClientSelector {
 }
 
 impl Clients<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
             .list_title("Clients")
             .details_title("Client Details")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .selector(Box::new(ClientSelector))
             .build();
         Clients {
-            tx: None,
-            hivemq_address: hivemq_address.clone(),
+            action_tx,
+            hivemq_address,
             list_with_details,
         }
     }
 }
 
 impl Component for Clients<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
-        Ok(())
-    }
 
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
@@ -87,7 +84,7 @@ impl Component for Clients<'_> {
         match list_action {
             Ok(Some(Action::SelectedItem(key))) => {
                 if let Some(None) = self.list_with_details.get(key.to_owned()) {
-                    let tx = self.tx.clone().unwrap();
+                    let tx = self.action_tx.clone();
                     let hivemq_address = self.hivemq_address.clone();
                     let _ = tokio::spawn(async move {
                         let result = fetch_client_details(&key, hivemq_address).await;
@@ -101,7 +98,7 @@ impl Component for Clients<'_> {
 
         match action {
             Action::LoadAllItems => {
-                let tx = self.tx.clone().unwrap();
+                let tx = self.action_tx.clone();
                 let hivemq_address = self.hivemq_address.clone();
                 let _handle = tokio::spawn(async move {
                     let result = fetch_client_ids(hivemq_address).await;

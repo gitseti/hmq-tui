@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct SchemasTab<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Schema>,
 }
 
@@ -40,12 +40,13 @@ impl ItemSelector<Schema> for SchemaSelector {
 }
 
 impl SchemasTab<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
             .details_title("Schema")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_schemas))
             .delete_fn(Arc::new(delete_schema))
             .create_fn(Arc::new(create_schema))
@@ -53,19 +54,13 @@ impl SchemasTab<'_> {
             .build();
 
         SchemasTab {
-            tx: None,
+            action_tx,
             list_with_details,
         }
     }
 }
 
 impl Component for SchemasTab<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx.clone());
-        self.list_with_details.register_action_handler(tx)?;
-        Ok(())
-    }
-
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }

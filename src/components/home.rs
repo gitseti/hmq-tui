@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub struct Home {
-    command_tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     config: Config,
     mode: Rc<RefCell<Mode>>,
     tabs: [Box<dyn TabComponent>; 7],
@@ -29,28 +29,31 @@ pub struct Home {
 }
 
 impl Home {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, config: Config, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         return Home {
-            command_tx: None,
-            config: Config::default(),
+            action_tx: action_tx.clone(),
+            config,
             mode: mode.clone(),
             tabs: [
-                Box::new(Clients::new(hivemq_address.to_owned(), mode.clone())),
-                Box::new(SchemasTab::new(hivemq_address.to_owned(), mode.clone())),
-                Box::new(ScriptsTab::new(hivemq_address.to_owned(), mode.clone())),
+                Box::new(Clients::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
+                Box::new(SchemasTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
+                Box::new(ScriptsTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
                 Box::new(DataPoliciesTab::new(
+                    action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
                 )),
                 Box::new(BehaviorPoliciesTab::new(
+                    action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
                 )),
                 Box::new(TraceRecordingsTab::new(
+                    action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
                 )),
-                Box::new(BackupsTab::new(hivemq_address.to_owned(), mode.clone())),
+                Box::new(BackupsTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
             ],
             active_tab: 0,
         };
@@ -79,22 +82,6 @@ impl Home {
 }
 
 impl Component for Home {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx.clone());
-        for tab in self.tabs.iter_mut() {
-            tab.register_action_handler(tx.clone())?;
-        }
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        for tab in self.tabs.iter_mut() {
-            tab.register_config_handler(config.clone())?;
-        }
-        self.config = config;
-        Ok(())
-    }
-
     fn init(&mut self, area: Rect) -> Result<()> {
         for tab in self.tabs.iter_mut() {
             tab.init(area)?;
@@ -106,7 +93,7 @@ impl Component for Home {
     fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
         let tab_action = self.tabs[self.active_tab].handle_events(event.clone())?;
         if tab_action.is_some() {
-            self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
+            self.action_tx.send(tab_action.unwrap())?;
         }
 
         Ok(None)
@@ -115,7 +102,7 @@ impl Component for Home {
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         let tab_action = self.tabs[self.active_tab].handle_key_events(key)?;
         if tab_action.is_some() {
-            self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
+            self.action_tx.send(tab_action.unwrap())?;
         }
 
         Ok(None)
@@ -124,7 +111,7 @@ impl Component for Home {
     fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
         let tab_action = self.tabs[self.active_tab].handle_mouse_events(mouse)?;
         if tab_action.is_some() {
-            self.command_tx.clone().unwrap().send(tab_action.unwrap())?;
+            self.action_tx.send(tab_action.unwrap())?;
         }
 
         Ok(None)

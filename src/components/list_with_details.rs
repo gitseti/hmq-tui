@@ -73,8 +73,8 @@ pub struct ListWithDetails<'a, T> {
     }))]
     state: State<'a, T>,
 
-    #[builder(setter(skip), default)]
-    tx: Option<UnboundedSender<Action>>,
+    #[builder]
+    action_tx: UnboundedSender<Action>,
 
     #[builder(setter(skip), default)]
     new_item_editor: Option<Editor<'a>>,
@@ -504,10 +504,6 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 }
 
 impl<T: Serialize> Component for ListWithDetails<'_, T> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx);
-        Ok(())
-    }
 
     fn activate(&mut self) -> Result<()> {
         *self.mode.borrow_mut() = self.get_standard_mode();
@@ -539,7 +535,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
         match action {
             Action::LoadAllItems => {
                 if let Some(list_fn) = &self.list_fn {
-                    let tx = self.tx.clone().unwrap();
+                    let tx = self.action_tx.clone();
                     let hivemq_address = self.hivemq_address.clone();
                     let list_fn = list_fn.clone();
                     let _handle = tokio::spawn(async move {
@@ -632,7 +628,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 if let Some(editor) = &mut self.new_item_editor {
                     let text = editor.get_text();
                     let host = self.hivemq_address.clone();
-                    let tx = self.tx.clone().unwrap();
+                    let tx = self.action_tx.clone();
                     let create_fn = self.create_fn.clone().unwrap();
                     tokio::spawn(async move {
                         let result = create_fn.create(host, text).await;
@@ -675,7 +671,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             Action::ConfirmPopup => {
                 if let Some(DeletePopup { item_id, .. }) = &self.popup {
                     if let Some(delete_fn) = &self.delete_fn {
-                        let tx = self.tx.clone().unwrap();
+                        let tx = self.action_tx.clone();
                         let host = self.hivemq_address.clone();
                         let delete_fn = delete_fn.clone();
                         let item_type = self.details_title.clone();

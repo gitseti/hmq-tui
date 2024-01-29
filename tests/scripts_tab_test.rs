@@ -37,11 +37,10 @@ async fn test_scripts_tab() {
             .unwrap();
     }
 
-    let mode = Rc::new(RefCell::new(Mode::Home));
-    let mut tab = ScriptsTab::new(hivemq.host, mode.clone());
     let (tx, mut rx): (UnboundedSender<Action>, UnboundedReceiver<Action>) =
         mpsc::unbounded_channel();
-    tab.register_action_handler(tx.clone()).unwrap();
+    let mode = Rc::new(RefCell::new(Mode::Home));
+    let mut tab = ScriptsTab::new(tx, hivemq.host, mode.clone());
     tab.activate().unwrap();
 
     tab.update(Action::LoadAllItems).unwrap();

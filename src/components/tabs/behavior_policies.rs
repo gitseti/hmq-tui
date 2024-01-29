@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct BehaviorPoliciesTab<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, BehaviorPolicy>,
 }
 
@@ -40,31 +40,26 @@ impl ItemSelector<BehaviorPolicy> for BehaviorPolicySelector {
 }
 
 impl BehaviorPoliciesTab<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
             .details_title("Behavior Policy")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_behavior_policies))
             .delete_fn(Arc::new(delete_behavior_policy))
             .create_fn(Arc::new(create_behavior_policy))
             .selector(Box::new(BehaviorPolicySelector))
             .build();
         BehaviorPoliciesTab {
-            tx: None,
+            action_tx,
             list_with_details,
         }
     }
 }
 
 impl Component for BehaviorPoliciesTab<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx.clone());
-        self.list_with_details.register_action_handler(tx)?;
-        Ok(())
-    }
-
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }

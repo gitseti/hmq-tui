@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct BackupsTab<'a> {
-    tx: Option<UnboundedSender<Action>>,
+    action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Backup>,
 }
 
@@ -48,28 +48,24 @@ impl ItemSelector<Backup> for BackupSelector {
 }
 
 impl BackupsTab<'_> {
-    pub fn new(hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
             .details_title("Backup")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_backups))
             .selector(Box::new(BackupSelector))
             .build();
         BackupsTab {
-            tx: None,
+            action_tx,
             list_with_details,
         }
     }
 }
 
 impl Component for BackupsTab<'_> {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.tx = Some(tx.clone());
-        self.list_with_details.register_action_handler(tx)?;
-        Ok(())
-    }
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }
