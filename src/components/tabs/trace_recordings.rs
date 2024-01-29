@@ -90,7 +90,7 @@ impl Component for TraceRecordingsTab<'_> {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.list_with_details.draw(f, area).expect("panic");
+        self.list_with_details.draw(f, area).unwrap();
         Ok(())
     }
 }

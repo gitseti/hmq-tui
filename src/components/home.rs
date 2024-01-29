@@ -149,7 +149,7 @@ impl Component for Home {
         let max_width = f.size().width;
 
         let mode = self.mode.borrow();
-        let key_hints = self.config.keybindings.hints.get(&*mode).unwrap();
+        let key_hints = self.config.keybindings.display_names.get(&*mode).unwrap();
         let key_bindings = split_at_width(key_hints, max_width);
 
         let layout = Layout::default()
