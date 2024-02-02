@@ -71,6 +71,9 @@ pub enum Action {
     // Clients view
     ClientIdsLoadingFinished(Result<Vec<String>, String>),
     ClientDetailsLoadingFinished(Result<(String, ClientDetails), String>),
+
+    // Backups
+    StartBackup,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -113,6 +116,7 @@ impl<'de> Deserialize<'de> for Action {
                     "PrevTab" => Ok(Action::PrevTab),
                     "ClosePopup" => Ok(Action::ClosePopup),
                     "ConfirmPopup" => Ok(Action::ConfirmPopup),
+                    "StartBackup" => Ok(Action::StartBackup),
                     "Tab1" => Ok(Action::SelectTab(0)),
                     "Tab2" => Ok(Action::SelectTab(1)),
                     "Tab3" => Ok(Action::SelectTab(2)),

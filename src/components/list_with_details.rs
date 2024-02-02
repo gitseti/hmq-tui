@@ -65,6 +65,17 @@ pub struct ListWithDetails<'a, T> {
     #[builder(setter(strip_option), default)]
     create_fn: Option<Arc<dyn CreateFn>>,
 
+    #[builder(default =
+    if create_fn.is_some() && delete_fn.is_some() {
+        Mode::FullTab
+    } else if delete_fn.is_some() {
+        Mode::ReadDeleteTab
+    } else {
+        Mode::ReadTab
+    }
+    )]
+    default_mode: Mode,
+
     #[builder(setter(skip), default =
     Loaded(LoadedState {
     items: IndexMap::new(),
@@ -102,15 +113,6 @@ pub enum FocusMode<'a> {
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
-    pub fn get_standard_mode(&self) -> Mode {
-        if self.create_fn.is_some() && self.delete_fn.is_some() {
-            Mode::FullTab
-        } else if self.delete_fn.is_some() {
-            Mode::ReadDeleteTab
-        } else {
-            Mode::ReadTab
-        }
-    }
 
     pub fn reset(&mut self) {
         self.state = Loaded(LoadedState {
@@ -232,7 +234,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 }
                 _ => (),
             }
-            *self.mode.borrow_mut() = self.get_standard_mode();
+            *self.mode.borrow_mut() = self.default_mode;
         }
     }
 
@@ -337,6 +339,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         *self.mode.borrow_mut() = Mode::EditorReadOnly;
     }
 
+    pub fn error_popup(&mut self, popup: popup::ErrorPopup) {
+        self.enter_popup(ErrorPopup { popup });
+    }
+
     fn enter_popup(&mut self, popup: ListPopup) {
         *self.mode.borrow_mut() = match popup {
             DeletePopup { .. } => Mode::ConfirmPopup,
@@ -348,7 +354,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     fn exit_popup(&mut self) {
         if self.popup.is_some() {
             self.popup = None;
-            *self.mode.borrow_mut() = self.get_standard_mode();
+            *self.mode.borrow_mut() = self.default_mode;
         }
     }
 
@@ -506,7 +512,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 impl<T: Serialize> Component for ListWithDetails<'_, T> {
 
     fn activate(&mut self) -> Result<()> {
-        *self.mode.borrow_mut() = self.get_standard_mode();
+        *self.mode.borrow_mut() = self.default_mode;
         Ok(())
     }
 
@@ -652,7 +658,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                         );
                     }
                 }
-                *self.mode.borrow_mut() = self.get_standard_mode();
+                *self.mode.borrow_mut() = self.default_mode;
                 return Ok(None);
             }
             Action::Enter => self.focus_on_details(),

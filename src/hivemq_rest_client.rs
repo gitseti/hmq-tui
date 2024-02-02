@@ -25,6 +25,8 @@ use hivemq_openapi::{
     },
     models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
+use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
+use hivemq_openapi::models::{trace_recording_item, TraceRecording};
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
@@ -164,8 +166,8 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Ite
         &configuration,
         params,
     )
-    .await
-    .map_err(transform_api_err)?;
+        .await
+        .map_err(transform_api_err)?;
 
     Ok(DataPolicyItem(response))
 }
@@ -181,9 +183,9 @@ pub async fn delete_data_policy(host: String, policy_id: String) -> Result<Strin
         &configuration,
         params,
     )
-    .await
-    .map(|_| policy_id)
-    .map_err(transform_api_err)?;
+        .await
+        .map(|_| policy_id)
+        .map_err(transform_api_err)?;
 
     Ok(response)
 }
@@ -232,8 +234,8 @@ pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Re
         &configuration,
         params,
     )
-    .await
-    .map_err(transform_api_err)?;
+        .await
+        .map_err(transform_api_err)?;
 
     Ok(Item::BehaviorPolicyItem(response))
 }
@@ -249,9 +251,9 @@ pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<S
         &configuration,
         params,
     )
-    .await
-    .map(|_| policy_id)
-    .map_err(transform_api_err)?;
+        .await
+        .map(|_| policy_id)
+        .map_err(transform_api_err)?;
 
     Ok(response)
 }
@@ -400,6 +402,16 @@ pub async fn fetch_backups(host: String) -> Result<Vec<(String, Item)>, String> 
     Ok(backups)
 }
 
+pub async fn start_backup(host: String) -> Result<Item, String> {
+    let configuration = build_rest_api_config(host);
+
+    let response =
+        hivemq_openapi::apis::backup_restore_api::create_backup(&configuration).await
+            .map_err(transform_api_err)?;
+
+    Ok(BackupItem(*response.backup.unwrap()))
+}
+
 pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>, String> {
     let configuration = build_rest_api_config(host);
 
@@ -415,6 +427,23 @@ pub async fn fetch_trace_recordings(host: String) -> Result<Vec<(String, Item)>,
     }
 
     Ok(trace_recordings)
+}
+
+pub async fn create_trace_recording(host: String, trace_recording: String) -> Result<Item, String> {
+    let configuration = build_rest_api_config(host);
+
+    let trace_recording: TraceRecording =
+        serde_json::from_str(trace_recording.as_str()).or_else(|err| Err(err.to_string()))?;
+    let trace_recording_item = Some(hivemq_openapi::models::TraceRecordingItem::new(trace_recording));
+
+    let params = CreateTraceRecordingParams { trace_recording_item };
+
+    let response =
+        hivemq_openapi::apis::trace_recordings_api::create_trace_recording(&configuration, params)
+            .await
+            .map_err(transform_api_err)?;
+
+    Ok(TraceRecordingItem(*response.trace_recording))
 }
 
 pub async fn delete_trace_recording(
@@ -460,6 +489,8 @@ mod tests {
             ScriptList, TraceRecording, TraceRecordingList,
         },
     };
+    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
+    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
     use httpmock::{
         Method::{DELETE, GET, POST},
         Mock, MockServer,
@@ -1176,6 +1207,34 @@ mod tests {
         assert!(response.is_err());
     }
 
+    #[tokio::test]
+    async fn test_start_backup() {
+        let backup = hivemq_openapi::models::BackupItem { backup: Some(Box::new(build_backup(1))) };
+        let backup_json = serde_json::to_string(&backup).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(backup_json.clone());
+        });
+
+        let response = start_backup(broker.base_url()).await;
+        assert_eq!(*backup.backup.unwrap(), BackupSelector.select(response.unwrap()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_start_backup_error() {
+        let error = CreateBackupError::Status503(Errors::new());
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = start_backup(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
     fn build_trace_recording(trace_recording_num: usize) -> TraceRecording {
         let mut trace_recording = TraceRecording::new();
         trace_recording.name = Some(format!("trace-recording-{trace_recording_num}"));
@@ -1221,6 +1280,36 @@ mod tests {
         });
 
         let response = fetch_trace_recordings(broker.base_url()).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_trace_recording() {
+        let trace_recording = hivemq_openapi::models::TraceRecordingItem::new(build_trace_recording(1));
+        let trace_recording_json = serde_json::to_string(&trace_recording).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(201).body(trace_recording_json.clone());
+        });
+
+        let response = create_trace_recording(broker.base_url(), trace_recording_json).await;
+        assert_eq!(*trace_recording.trace_recording, TraceRecordingSelector.select(response.unwrap()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_create_trace_recording_error() {
+        let error = CreateTraceRecordingError::Status400(Errors::new());
+        let trace_recording = build_trace_recording(1);
+        let trace_recording_json = serde_json::to_string(&trace_recording).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(POST);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = create_trace_recording(broker.base_url(), trace_recording_json).await;
         assert!(response.is_err());
     }
 

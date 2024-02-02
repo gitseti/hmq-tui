@@ -18,6 +18,7 @@ use crate::{
     hivemq_rest_client::{delete_trace_recording, fetch_trace_recordings},
     tui::Frame,
 };
+use crate::hivemq_rest_client::create_trace_recording;
 
 pub struct TraceRecordingsTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -55,6 +56,7 @@ impl TraceRecordingsTab<'_> {
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
+            .create_fn(Arc::new(create_trace_recording))
             .list_fn(Arc::new(fetch_trace_recordings))
             .delete_fn(Arc::new(delete_trace_recording))
             .selector(Box::new(TraceRecordingSelector))

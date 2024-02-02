@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
+use futures::future::err;
 use hivemq_openapi::models::Backup;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
@@ -18,8 +19,11 @@ use crate::{
     hivemq_rest_client::fetch_backups,
     tui::Frame,
 };
+use crate::components::popup::ErrorPopup;
+use crate::hivemq_rest_client::start_backup;
 
 pub struct BackupsTab<'a> {
+    hivemq_address: String,
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Backup>,
 }
@@ -54,11 +58,13 @@ impl BackupsTab<'_> {
             .details_title("Backup")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
+            .default_mode(Mode::BackupTab)
             .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_backups))
             .selector(Box::new(BackupSelector))
             .build();
         BackupsTab {
+            hivemq_address,
             action_tx,
             list_with_details,
         }
@@ -75,7 +81,20 @@ impl Component for BackupsTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let _ = self.list_with_details.update(action.clone());
+        match action {
+            Action::StartBackup => {
+                let tx = self.action_tx.clone();
+                let hivemq_address = self.hivemq_address.clone();
+                tokio::spawn(async move {
+                    let result = start_backup(hivemq_address).await;
+                    tx.send(Action::ItemCreated { result }).unwrap();
+                });
+            }
+            _ => {
+                let _ = self.list_with_details.update(action.clone());
+            }
+        }
+
         Ok(None)
     }
 

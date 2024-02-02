@@ -124,6 +124,15 @@
         "displayName": "Load"
       }
     },
+    "BackupTab": {
+      "extends": [
+        "ReadDeleteTab"
+      ],
+      "<Ctrl-s>": {
+        "action": "StartBackup",
+        "displayName": "Start Backup"
+      }
+    },
     "EditorReadOnly": {
       "<Ctrl-d>": {
        "action": "Quit",

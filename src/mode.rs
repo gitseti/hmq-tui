@@ -9,6 +9,7 @@ pub enum Mode {
     Tab,
     ReadTab,
     ReadDeleteTab,
+    BackupTab,
     FullTab,
     ErrorPopup,
     ConfirmPopup,
