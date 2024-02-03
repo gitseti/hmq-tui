@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::fmt::format;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -301,7 +300,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     fn prev_item(&mut self) -> Option<(&String, &T)> {
         let Loaded {
             items,
-            list,
+            list: _,
             focus_mode,
         } = &mut self.loading_state
         else {
@@ -367,7 +366,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         };
 
         let item = serde_json::to_string_pretty(item).unwrap();
-        if let Some(update_fn) = &self.update_fn {
+        if let Some(_update_fn) = &self.update_fn {
             let update_editor =
                 Editor::writeable_with_text(format!("Update {}", self.item_name), item.to_owned());
             *focus_mode = Editing {

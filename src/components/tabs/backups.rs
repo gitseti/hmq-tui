@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use futures::future::err;
+
 use hivemq_openapi::models::Backup;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::components::popup::ErrorPopup;
 use crate::hivemq_rest_client::start_backup;
 use crate::mode::Mode;
 use crate::{

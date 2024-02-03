@@ -1,8 +1,7 @@
-use futures::future::err;
 use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
 use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
 use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
-use hivemq_openapi::models::{trace_recording_item, TraceRecording};
+use hivemq_openapi::models::TraceRecording;
 use hivemq_openapi::{
     apis::{
         backup_restore_api::get_all_backups,
