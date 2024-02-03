@@ -74,8 +74,8 @@ pub struct KeyBindings {
 
 impl<'de> Deserialize<'de> for KeyBindings {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let parsed_map = IndexMap::<Mode, ModeValue>::deserialize(deserializer)?;
         let modes: IndexMap<Mode, Vec<ModeValue>> = parsed_map
@@ -83,7 +83,8 @@ impl<'de> Deserialize<'de> for KeyBindings {
             .map(|mode| (mode.clone(), collect_modes(&parsed_map, mode)))
             .collect();
         let mut bindings: HashMap<Mode, HashMap<Vec<KeyEvent>, Action>> = HashMap::new();
-        let mut events_to_display_names: HashMap<Mode, IndexMap<Vec<KeyEvent>, String>> = HashMap::new();
+        let mut events_to_display_names: HashMap<Mode, IndexMap<Vec<KeyEvent>, String>> =
+            HashMap::new();
         for (mode, mode_values) in modes {
             let mut events_to_action: HashMap<Vec<KeyEvent>, Action> = HashMap::new();
             let mut events_to_display_name: IndexMap<Vec<KeyEvent>, String> = IndexMap::new();
@@ -419,8 +420,8 @@ pub struct Styles(pub HashMap<Mode, HashMap<String, Style>>);
 
 impl<'de> Deserialize<'de> for Styles {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let parsed_map = HashMap::<Mode, HashMap<String, String>>::deserialize(deserializer)?;
 
@@ -497,8 +498,8 @@ fn parse_color(s: &str) -> Option<Color> {
     } else if s.contains("gray") {
         let c = 232
             + s.trim_start_matches("gray")
-            .parse::<u8>()
-            .unwrap_or_default();
+                .parse::<u8>()
+                .unwrap_or_default();
         Some(Color::Indexed(c))
     } else if s.contains("rgb") {
         let red = (s.as_bytes()[3] as char).to_digit(10).unwrap_or_default() as u8;
@@ -608,11 +609,15 @@ mod tests {
                 .unwrap(),
             &Action::Quit
         );
-        assert_eq!(c.keybindings.display_names
-                       .get(&Mode::Home)
-                       .unwrap()
-                       .get(0).unwrap(),
-                   "Quit [q]");
+        assert_eq!(
+            c.keybindings
+                .display_names
+                .get(&Mode::Home)
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            "Quit [q]"
+        );
         Ok(())
     }
 

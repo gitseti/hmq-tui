@@ -15,7 +15,9 @@ use crate::{
         item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
         Component,
     },
-    hivemq_rest_client::{create_data_policy, delete_data_policy, fetch_data_policies, update_data_policy},
+    hivemq_rest_client::{
+        create_data_policy, delete_data_policy, fetch_data_policies, update_data_policy,
+    },
     tui::Frame,
 };
 
@@ -40,7 +42,11 @@ impl ItemSelector<DataPolicy> for DataPolicySelector {
 }
 
 impl DataPoliciesTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<DataPolicy>::builder()
             .list_title("Data Policies")
             .item_name("Data Policy")

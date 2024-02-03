@@ -8,6 +8,7 @@ use hivemq_openapi::models::TraceRecording;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::hivemq_rest_client::create_trace_recording;
 use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
@@ -18,7 +19,6 @@ use crate::{
     hivemq_rest_client::{delete_trace_recording, fetch_trace_recordings},
     tui::Frame,
 };
-use crate::hivemq_rest_client::create_trace_recording;
 
 pub struct TraceRecordingsTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -49,7 +49,11 @@ impl ItemSelector<TraceRecording> for TraceRecordingSelector {
 }
 
 impl TraceRecordingsTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
             .item_name("Trace Recording")

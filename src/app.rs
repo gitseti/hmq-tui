@@ -25,7 +25,7 @@ pub struct App {
     pub mode: Rc<RefCell<Mode>>,
     pub last_tick_key_events: Vec<KeyEvent>,
     pub action_tx: UnboundedSender<Action>,
-    pub action_rx: UnboundedReceiver<Action>
+    pub action_rx: UnboundedReceiver<Action>,
 }
 
 impl App {
@@ -38,7 +38,12 @@ impl App {
         let config = Config::new()?;
         let mode = Rc::new(RefCell::new(Mode::Home));
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let home = Home::new(action_tx.clone(), config.clone(), hivemq_address.clone(), mode.clone());
+        let home = Home::new(
+            action_tx.clone(),
+            config.clone(),
+            hivemq_address.clone(),
+            mode.clone(),
+        );
         let fps = FpsCounter::default();
         let mut components: Vec<Box<dyn Component>> = vec![Box::new(home)];
         if is_debug {
@@ -56,12 +61,11 @@ impl App {
             mode,
             last_tick_key_events: Vec::new(),
             action_tx,
-            action_rx
+            action_rx,
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
-
         let mut tui = tui::Tui::new()?
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);

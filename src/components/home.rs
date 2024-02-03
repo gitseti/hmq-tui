@@ -8,12 +8,10 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, Frame};
 use crate::{
     action::Action,
-    components::{
-        tabs::{
-            backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
-            data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
-            trace_recordings::TraceRecordingsTab, TabComponent,
-        },
+    components::tabs::{
+        backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
+        data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
+        trace_recordings::TraceRecordingsTab, TabComponent,
     },
     config::Config,
     mode::Mode,
@@ -29,15 +27,32 @@ pub struct Home {
 }
 
 impl Home {
-    pub fn new(action_tx: UnboundedSender<Action>, config: Config, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        config: Config,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         return Home {
             action_tx: action_tx.clone(),
             config,
             mode: mode.clone(),
             tabs: [
-                Box::new(Clients::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
-                Box::new(SchemasTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
-                Box::new(ScriptsTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
+                Box::new(Clients::new(
+                    action_tx.clone(),
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
+                Box::new(SchemasTab::new(
+                    action_tx.clone(),
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
+                Box::new(ScriptsTab::new(
+                    action_tx.clone(),
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
                 Box::new(DataPoliciesTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
@@ -53,7 +68,11 @@ impl Home {
                     hivemq_address.to_owned(),
                     mode.clone(),
                 )),
-                Box::new(BackupsTab::new(action_tx.clone(), hivemq_address.to_owned(), mode.clone())),
+                Box::new(BackupsTab::new(
+                    action_tx.clone(),
+                    hivemq_address.to_owned(),
+                    mode.clone(),
+                )),
             ],
             active_tab: 0,
         };

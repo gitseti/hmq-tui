@@ -8,6 +8,7 @@ use hivemq_openapi::models::BehaviorPolicy;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::hivemq_rest_client::update_behavior_policy;
 use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
@@ -18,7 +19,6 @@ use crate::{
     hivemq_rest_client::{create_behavior_policy, delete_behavior_policy, fetch_behavior_policies},
     tui::Frame,
 };
-use crate::hivemq_rest_client::update_behavior_policy;
 
 pub struct BehaviorPoliciesTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -41,7 +41,11 @@ impl ItemSelector<BehaviorPolicy> for BehaviorPolicySelector {
 }
 
 impl BehaviorPoliciesTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
             .item_name("Behavior Policy")

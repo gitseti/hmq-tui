@@ -40,7 +40,11 @@ impl ItemSelector<Schema> for SchemaSelector {
 }
 
 impl SchemasTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
             .item_name("Schema")

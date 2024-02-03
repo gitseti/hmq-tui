@@ -52,7 +52,11 @@ impl ItemSelector<Option<ClientDetails>> for ClientSelector {
 }
 
 impl Clients<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
             .list_title("Clients")
             .item_name("Client Details")
@@ -70,7 +74,6 @@ impl Clients<'_> {
 }
 
 impl Component for Clients<'_> {
-
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }

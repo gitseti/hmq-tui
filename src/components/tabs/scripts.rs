@@ -40,7 +40,11 @@ impl ItemSelector<Script> for ScriptSelector {
 }
 
 impl ScriptsTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<Script>::builder()
             .list_title("Scripts")
             .item_name("Script")
@@ -60,7 +64,6 @@ impl ScriptsTab<'_> {
 }
 
 impl Component for ScriptsTab<'_> {
-
     fn activate(&mut self) -> Result<()> {
         self.list_with_details.activate()
     }

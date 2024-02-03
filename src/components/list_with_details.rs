@@ -25,6 +25,9 @@ use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
 use crate::components::popup;
 use crate::components::popup::Popup;
 
+use crate::action::Item;
+use crate::components::item_features::UpdateFn;
+use crate::components::list_with_details::FocusMode::Editing;
 use crate::{
     action::{Action, Action::SelectedItem},
     components::{
@@ -39,9 +42,6 @@ use crate::{
     mode::Mode,
     tui,
 };
-use crate::action::Item;
-use crate::components::item_features::UpdateFn;
-use crate::components::list_with_details::FocusMode::Editing;
 
 #[derive(TypedBuilder)]
 pub struct ListWithDetails<'a, T> {
@@ -108,14 +108,19 @@ pub enum LoadingState<'a, T> {
         items: IndexMap<String, T>,
         list: Vec<ListItem<'a>>,
         focus_mode: FocusMode<'a>,
-
     },
 }
 
 pub enum FocusMode<'a> {
     Scrolling(ListState),
-    Editing { list_state: ListState, editor: Editor<'a> },
-    DetailsError { title: String, message: String },
+    Editing {
+        list_state: ListState,
+        editor: Editor<'a>,
+    },
+    DetailsError {
+        title: String,
+        message: String,
+    },
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
@@ -160,7 +165,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     pub fn remove(&mut self, key: String) -> Option<T> {
-        let Loaded { items, list, focus_mode } = &mut self.loading_state else {
+        let Loaded {
+            items,
+            list,
+            focus_mode,
+        } = &mut self.loading_state
+        else {
             return None;
         };
 
@@ -196,7 +206,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     pub fn get_selected(&self) -> Option<(&String, &T)> {
-        let Loaded { items, focus_mode, .. } = &self.loading_state else {
+        let Loaded {
+            items, focus_mode, ..
+        } = &self.loading_state
+        else {
             return None;
         };
 
@@ -227,7 +240,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     pub fn select_item(&mut self, item_key: String) {
-        if let Loaded { items, focus_mode, .. } = &mut self.loading_state {
+        if let Loaded {
+            items, focus_mode, ..
+        } = &mut self.loading_state
+        {
             let index = items.get_index_of(&item_key);
             *focus_mode = FocusMode::Scrolling(ListState::default().with_selected(index));
         }
@@ -254,7 +270,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn next_item(&mut self) -> Option<(&String, &T)> {
-        let Loaded { list, focus_mode, items } = &mut self.loading_state else {
+        let Loaded {
+            list,
+            focus_mode,
+            items,
+        } = &mut self.loading_state
+        else {
             return None;
         };
 
@@ -278,7 +299,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn prev_item(&mut self) -> Option<(&String, &T)> {
-        let Loaded { items, list, focus_mode } = &mut self.loading_state else {
+        let Loaded {
+            items,
+            list,
+            focus_mode,
+        } = &mut self.loading_state
+        else {
             return None;
         };
 
@@ -301,7 +327,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn copy_details_to_clipboard(&mut self) -> Result<(), String> {
-        let Loaded { focus_mode, items, .. } = &mut self.loading_state else {
+        let Loaded {
+            focus_mode, items, ..
+        } = &mut self.loading_state
+        else {
             return Ok(());
         };
 
@@ -318,7 +347,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn inspect(&mut self) {
-        let Loaded { items, focus_mode, .. } = &mut self.loading_state else {
+        let Loaded {
+            items, focus_mode, ..
+        } = &mut self.loading_state
+        else {
             return;
         };
 
@@ -336,7 +368,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         let item = serde_json::to_string_pretty(item).unwrap();
         if let Some(update_fn) = &self.update_fn {
-            let update_editor = Editor::writeable_with_text(format!("Update {}", self.item_name), item.to_owned());
+            let update_editor =
+                Editor::writeable_with_text(format!("Update {}", self.item_name), item.to_owned());
             *focus_mode = Editing {
                 list_state: list_state.clone(),
                 editor: update_editor,
@@ -348,7 +381,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
             editor.focus();
 
-            *focus_mode = FocusMode::Editing { list_state: list_state.clone(), editor };
+            *focus_mode = FocusMode::Editing {
+                list_state: list_state.clone(),
+                editor,
+            };
             *self.mode.borrow_mut() = Mode::EditorReadOnly;
         }
     }
@@ -388,10 +424,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 }
             }
             Err(message) => {
-                self.details_error(
-                    format!("{} update failed", self.item_name),
-                    message,
-                );
+                self.details_error(format!("{} update failed", self.item_name), message);
             }
         }
     }
@@ -406,18 +439,19 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 }
             }
             Err(error) => {
-                self.details_error(
-                    format!("{} creation failed", self.item_name),
-                    error,
-                );
+                self.details_error(format!("{} creation failed", self.item_name), error);
             }
         }
         *self.mode.borrow_mut() = self.base_mode;
     }
 
-
     fn update_item(&mut self) {
-        if let Loaded { focus_mode: Editing { editor, list_state }, items, .. } = &self.loading_state {
+        if let Loaded {
+            focus_mode: Editing { editor, list_state },
+            items,
+            ..
+        } = &self.loading_state
+        {
             let (id, _) = items.get_index(list_state.selected().unwrap()).unwrap();
             let id = id.clone();
             let text = editor.get_text();
@@ -472,7 +506,6 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-
     fn popup_delete_confirmation(&mut self) {
         if let Some((id, _)) = self.get_selected() {
             if self.delete_fn.is_some() {
@@ -484,7 +517,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                         "Are you sure you want to delete the {} with id '{}'",
                         item_type, item_id
                     )
-                        .to_string(),
+                    .to_string(),
                 };
                 self.enter_popup(DeletePopup { popup, item_id })
             }
@@ -575,7 +608,11 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     detail_layout,
                 );
             }
-            Loaded { items, focus_mode, list } => {
+            Loaded {
+                items,
+                focus_mode,
+                list,
+            } => {
                 let (list_state, list_style) = match focus_mode {
                     FocusMode::Scrolling(list_state) => {
                         (list_state.clone(), Style::default().not_dim())
@@ -695,7 +732,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             FocusMode::Editing { editor, .. } => {
                 return editor.handle_key_events(key);
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

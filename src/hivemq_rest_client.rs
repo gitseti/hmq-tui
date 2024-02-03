@@ -1,4 +1,8 @@
 use futures::future::err;
+use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
+use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
+use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
+use hivemq_openapi::models::{trace_recording_item, TraceRecording};
 use hivemq_openapi::{
     apis::{
         backup_restore_api::get_all_backups,
@@ -26,10 +30,6 @@ use hivemq_openapi::{
     },
     models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
-use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
-use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
-use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
-use hivemq_openapi::models::{trace_recording_item, TraceRecording};
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
@@ -169,13 +169,17 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Ite
         &configuration,
         params,
     )
-        .await
-        .map_err(transform_api_err)?;
+    .await
+    .map_err(transform_api_err)?;
 
     Ok(DataPolicyItem(response))
 }
 
-pub async fn update_data_policy(host: String, policy_id: String, data_policy: String) -> Result<Item, String> {
+pub async fn update_data_policy(
+    host: String,
+    policy_id: String,
+    data_policy: String,
+) -> Result<Item, String> {
     let configuration = build_rest_api_config(host);
 
     let data_policy: DataPolicy =
@@ -190,8 +194,8 @@ pub async fn update_data_policy(host: String, policy_id: String, data_policy: St
         &configuration,
         params,
     )
-        .await
-        .map_err(transform_api_err)?;
+    .await
+    .map_err(transform_api_err)?;
 
     Ok(DataPolicyItem(response))
 }
@@ -207,9 +211,9 @@ pub async fn delete_data_policy(host: String, policy_id: String) -> Result<Strin
         &configuration,
         params,
     )
-        .await
-        .map(|_| policy_id)
-        .map_err(transform_api_err)?;
+    .await
+    .map(|_| policy_id)
+    .map_err(transform_api_err)?;
 
     Ok(response)
 }
@@ -258,13 +262,17 @@ pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Re
         &configuration,
         params,
     )
-        .await
-        .map_err(transform_api_err)?;
+    .await
+    .map_err(transform_api_err)?;
 
     Ok(Item::BehaviorPolicyItem(response))
 }
 
-pub async fn update_behavior_policy(host: String, policy_id: String, behavior_policy: String) -> Result<Item, String> {
+pub async fn update_behavior_policy(
+    host: String,
+    policy_id: String,
+    behavior_policy: String,
+) -> Result<Item, String> {
     let configuration = build_rest_api_config(host);
 
     let behavior_policy: BehaviorPolicy =
@@ -279,8 +287,8 @@ pub async fn update_behavior_policy(host: String, policy_id: String, behavior_po
         &configuration,
         params,
     )
-        .await
-        .map_err(transform_api_err)?;
+    .await
+    .map_err(transform_api_err)?;
 
     Ok(BehaviorPolicyItem(response))
 }
@@ -296,9 +304,9 @@ pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<S
         &configuration,
         params,
     )
-        .await
-        .map(|_| policy_id)
-        .map_err(transform_api_err)?;
+    .await
+    .map(|_| policy_id)
+    .map_err(transform_api_err)?;
 
     Ok(response)
 }
@@ -450,9 +458,9 @@ pub async fn fetch_backups(host: String) -> Result<Vec<(String, Item)>, String> 
 pub async fn start_backup(host: String) -> Result<Item, String> {
     let configuration = build_rest_api_config(host);
 
-    let response =
-        hivemq_openapi::apis::backup_restore_api::create_backup(&configuration).await
-            .map_err(transform_api_err)?;
+    let response = hivemq_openapi::apis::backup_restore_api::create_backup(&configuration)
+        .await
+        .map_err(transform_api_err)?;
 
     Ok(BackupItem(*response.backup.unwrap()))
 }
@@ -479,9 +487,13 @@ pub async fn create_trace_recording(host: String, trace_recording: String) -> Re
 
     let trace_recording: TraceRecording =
         serde_json::from_str(trace_recording.as_str()).or_else(|err| Err(err.to_string()))?;
-    let trace_recording_item = Some(hivemq_openapi::models::TraceRecordingItem::new(trace_recording));
+    let trace_recording_item = Some(hivemq_openapi::models::TraceRecordingItem::new(
+        trace_recording,
+    ));
 
-    let params = CreateTraceRecordingParams { trace_recording_item };
+    let params = CreateTraceRecordingParams {
+        trace_recording_item,
+    };
 
     let response =
         hivemq_openapi::apis::trace_recordings_api::create_trace_recording(&configuration, params)
@@ -512,6 +524,10 @@ pub async fn delete_trace_recording(
 
 #[cfg(test)]
 mod tests {
+    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
+    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
+    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
     use hivemq_openapi::{
         apis::{
             backup_restore_api::GetAllBackupsError,
@@ -534,15 +550,11 @@ mod tests {
             ScriptList, TraceRecording, TraceRecordingList,
         },
     };
-    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
-    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
-    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
-    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
+    use httpmock::Method::PUT;
     use httpmock::{
         Method::{DELETE, GET, POST},
         Mock, MockServer,
     };
-    use httpmock::Method::PUT;
     use pretty_assertions::assert_eq;
     use serde::Serialize;
     use serde_json::{json, Value};
@@ -1005,7 +1017,8 @@ mod tests {
             then.status(200).body(policy_json.clone());
         });
 
-        let response = update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
+        let response =
+            update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
         assert_eq!(
             policy,
             BehaviorPolicySelector.select(response.unwrap()).unwrap()
@@ -1024,7 +1037,8 @@ mod tests {
                 .body(serde_json::to_string(&error).unwrap());
         });
 
-        let response = update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
+        let response =
+            update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
         assert!(response.is_err());
     }
 
@@ -1323,7 +1337,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_start_backup() {
-        let backup = hivemq_openapi::models::BackupItem { backup: Some(Box::new(build_backup(1))) };
+        let backup = hivemq_openapi::models::BackupItem {
+            backup: Some(Box::new(build_backup(1))),
+        };
         let backup_json = serde_json::to_string(&backup).unwrap();
         let broker = MockServer::start();
         broker.mock(|when, then| {
@@ -1332,7 +1348,10 @@ mod tests {
         });
 
         let response = start_backup(broker.base_url()).await;
-        assert_eq!(*backup.backup.unwrap(), BackupSelector.select(response.unwrap()).unwrap())
+        assert_eq!(
+            *backup.backup.unwrap(),
+            BackupSelector.select(response.unwrap()).unwrap()
+        )
     }
 
     #[tokio::test]
@@ -1399,7 +1418,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_trace_recording() {
-        let trace_recording = hivemq_openapi::models::TraceRecordingItem::new(build_trace_recording(1));
+        let trace_recording =
+            hivemq_openapi::models::TraceRecordingItem::new(build_trace_recording(1));
         let trace_recording_json = serde_json::to_string(&trace_recording).unwrap();
         let broker = MockServer::start();
         broker.mock(|when, then| {
@@ -1408,7 +1428,10 @@ mod tests {
         });
 
         let response = create_trace_recording(broker.base_url(), trace_recording_json).await;
-        assert_eq!(*trace_recording.trace_recording, TraceRecordingSelector.select(response.unwrap()).unwrap())
+        assert_eq!(
+            *trace_recording.trace_recording,
+            TraceRecordingSelector.select(response.unwrap()).unwrap()
+        )
     }
 
     #[tokio::test]

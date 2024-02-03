@@ -9,6 +9,8 @@ use hivemq_openapi::models::Backup;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::components::popup::ErrorPopup;
+use crate::hivemq_rest_client::start_backup;
 use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
@@ -19,8 +21,6 @@ use crate::{
     hivemq_rest_client::fetch_backups,
     tui::Frame,
 };
-use crate::components::popup::ErrorPopup;
-use crate::hivemq_rest_client::start_backup;
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
@@ -52,7 +52,11 @@ impl ItemSelector<Backup> for BackupSelector {
 }
 
 impl BackupsTab<'_> {
-    pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(
+        action_tx: UnboundedSender<Action>,
+        hivemq_address: String,
+        mode: Rc<RefCell<Mode>>,
+    ) -> Self {
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
             .item_name("Backup")
