@@ -1,6 +1,6 @@
 [package]
 name = "hmq-tui"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Unofficial TUI for interacting with the HiveMQ REST API"
 license = "MIT License"
