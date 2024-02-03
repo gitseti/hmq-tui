@@ -10,9 +10,9 @@ pub trait DeleteFn: Send + Sync {
 }
 
 impl<T, F> DeleteFn for T
-where
-    T: Fn(String, String) -> F + Sync + Send,
-    F: Future<Output = Result<String, String>> + 'static + Send,
+    where
+        T: Fn(String, String) -> F + Sync + Send,
+        F: Future<Output=Result<String, String>> + 'static + Send,
 {
     fn delete(&self, host: String, id: String) -> BoxFuture<'static, Result<String, String>> {
         Box::pin(self(host, id))
@@ -24,9 +24,9 @@ pub trait ListFn: Send + Sync {
 }
 
 impl<T, F> ListFn for T
-where
-    T: Fn(String) -> F + Sync + Send,
-    F: Future<Output = Result<Vec<(String, Item)>, String>> + 'static + Send,
+    where
+        T: Fn(String) -> F + Sync + Send,
+        F: Future<Output=Result<Vec<(String, Item)>, String>> + 'static + Send,
 {
     fn list(&self, host: String) -> BoxFuture<'static, Result<Vec<(String, Item)>, String>> {
         Box::pin(self(host))
@@ -38,12 +38,26 @@ pub trait CreateFn: Send + Sync {
 }
 
 impl<T, F> CreateFn for T
-where
-    T: Fn(String, String) -> F + Sync + Send,
-    F: Future<Output = Result<Item, String>> + 'static + Send,
+    where
+        T: Fn(String, String) -> F + Sync + Send,
+        F: Future<Output=Result<Item, String>> + 'static + Send,
 {
     fn create(&self, host: String, item: String) -> BoxFuture<'static, Result<Item, String>> {
         Box::pin(self(host, item))
+    }
+}
+
+pub trait UpdateFn: Send + Sync {
+    fn update(&self, host: String, item_id: String, item: String) -> BoxFuture<'static, Result<Item, String>>;
+}
+
+impl<T, F> UpdateFn for T
+    where
+        T: Fn(String, String, String) -> F + Sync + Send,
+        F: Future<Output=Result<Item, String>> + 'static + Send,
+{
+    fn update(&self, host: String, item_id: String, item: String) -> BoxFuture<'static, Result<Item, String>> {
+        Box::pin(self(host, item_id, item))
     }
 }
 

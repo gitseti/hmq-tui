@@ -55,13 +55,13 @@ impl BackupsTab<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
-            .details_title("Backup")
+            .item_name("Backup")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .default_mode(Mode::BackupTab)
+            .base_mode(Mode::BackupTab)
             .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_backups))
-            .selector(Box::new(BackupSelector))
+            .item_selector(Box::new(BackupSelector))
             .build();
         BackupsTab {
             hivemq_address,

@@ -55,11 +55,11 @@ impl Clients<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
             .list_title("Clients")
-            .details_title("Client Details")
+            .item_name("Client Details")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
-            .selector(Box::new(ClientSelector))
+            .item_selector(Box::new(ClientSelector))
             .build();
         Clients {
             action_tx,
@@ -120,7 +120,7 @@ impl Component for Clients<'_> {
                     for client_id in client_ids {
                         details.push((client_id, None));
                     }
-                    self.list_with_details.update_items(details);
+                    self.list_with_details.set_items(details);
                 }
                 Err(msg) => {
                     self.list_with_details.list_error(&msg);

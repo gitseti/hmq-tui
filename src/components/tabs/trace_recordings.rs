@@ -52,14 +52,14 @@ impl TraceRecordingsTab<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
-            .details_title("Trace Recording")
+            .item_name("Trace Recording")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
             .create_fn(Arc::new(create_trace_recording))
             .list_fn(Arc::new(fetch_trace_recordings))
             .delete_fn(Arc::new(delete_trace_recording))
-            .selector(Box::new(TraceRecordingSelector))
+            .item_selector(Box::new(TraceRecordingSelector))
             .build();
         TraceRecordingsTab {
             action_tx,

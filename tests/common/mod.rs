@@ -59,7 +59,7 @@ pub async fn create_item<T: TabComponent, I: Serialize>(
         tab.handle_key_events(KeyEvent::from(KeyCode::Char(c)))
             .unwrap();
     }
-    tab.update(Action::Submit).unwrap();
+    tab.update(Action::CreateItem).unwrap();
     let action = rx.recv().await.unwrap();
     let Action::ItemCreated { result } = &action else {
         panic!("Received wrong action {:?}", action);

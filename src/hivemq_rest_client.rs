@@ -1,3 +1,4 @@
+use futures::future::err;
 use hivemq_openapi::{
     apis::{
         backup_restore_api::get_all_backups,
@@ -25,6 +26,8 @@ use hivemq_openapi::{
     },
     models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
+use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
+use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
 use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
 use hivemq_openapi::models::{trace_recording_item, TraceRecording};
 use lazy_static::lazy_static;
@@ -60,7 +63,7 @@ fn build_rest_api_config(host: String) -> Configuration {
 }
 
 fn transform_api_err<T: Serialize>(error: Error<T>) -> String {
-    let msg = if let Error::ResponseError(response) = error {
+    let message = if let Error::ResponseError(response) = error {
         match &response.entity {
             None => response.content.clone(),
             Some(entity) => serde_json::to_string_pretty(entity).expect("Can not serialize entity"),
@@ -69,7 +72,7 @@ fn transform_api_err<T: Serialize>(error: Error<T>) -> String {
         error.to_string()
     };
 
-    format!("API request failed: {}", msg)
+    format!("API request failed: {}", message)
 }
 
 pub async fn fetch_client_details(
@@ -172,6 +175,27 @@ pub async fn create_data_policy(host: String, data_policy: String) -> Result<Ite
     Ok(DataPolicyItem(response))
 }
 
+pub async fn update_data_policy(host: String, policy_id: String, data_policy: String) -> Result<Item, String> {
+    let configuration = build_rest_api_config(host);
+
+    let data_policy: DataPolicy =
+        serde_json::from_str(data_policy.as_str()).or_else(|err| Err(err.to_string()))?;
+
+    let params = UpdateDataPolicyParams {
+        policy_id,
+        data_policy,
+    };
+
+    let response = hivemq_openapi::apis::data_hub_data_policies_api::update_data_policy(
+        &configuration,
+        params,
+    )
+        .await
+        .map_err(transform_api_err)?;
+
+    Ok(DataPolicyItem(response))
+}
+
 pub async fn delete_data_policy(host: String, policy_id: String) -> Result<String, String> {
     let configuration = build_rest_api_config(host);
 
@@ -238,6 +262,27 @@ pub async fn create_behavior_policy(host: String, behavior_policy: String) -> Re
         .map_err(transform_api_err)?;
 
     Ok(Item::BehaviorPolicyItem(response))
+}
+
+pub async fn update_behavior_policy(host: String, policy_id: String, behavior_policy: String) -> Result<Item, String> {
+    let configuration = build_rest_api_config(host);
+
+    let behavior_policy: BehaviorPolicy =
+        serde_json::from_str(behavior_policy.as_str()).or_else(|err| Err(err.to_string()))?;
+
+    let params = UpdateBehaviorPolicyParams {
+        policy_id,
+        behavior_policy,
+    };
+
+    let response = hivemq_openapi::apis::data_hub_behavior_policies_api::update_behavior_policy(
+        &configuration,
+        params,
+    )
+        .await
+        .map_err(transform_api_err)?;
+
+    Ok(BehaviorPolicyItem(response))
 }
 
 pub async fn delete_behavior_policy(host: String, policy_id: String) -> Result<String, String> {
@@ -490,11 +535,14 @@ mod tests {
         },
     };
     use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
+    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
     use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
     use httpmock::{
         Method::{DELETE, GET, POST},
         Mock, MockServer,
     };
+    use httpmock::Method::PUT;
     use pretty_assertions::assert_eq;
     use serde::Serialize;
     use serde_json::{json, Value};
@@ -794,6 +842,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_data_policy() {
+        let policy = build_data_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(PUT);
+            then.status(200).body(policy_json.clone());
+        });
+
+        let response = update_data_policy(broker.base_url(), policy.id.clone(), policy_json).await;
+        assert_eq!(
+            policy,
+            DataPolicySelector.select(response.unwrap()).unwrap()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_update_data_policy_error() {
+        let error = UpdateDataPolicyError::Status503(Errors::new());
+        let policy = build_data_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(PUT);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = update_data_policy(broker.base_url(), policy.id.clone(), policy_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
     async fn test_delete_data_policy() {
         let broker = MockServer::start();
         broker.mock(|when, then| {
@@ -911,6 +992,39 @@ mod tests {
         });
 
         let response = create_behavior_policy(broker.base_url(), policy_json).await;
+        assert!(response.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_behavior_policy() {
+        let policy = build_behavior_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(PUT);
+            then.status(200).body(policy_json.clone());
+        });
+
+        let response = update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
+        assert_eq!(
+            policy,
+            BehaviorPolicySelector.select(response.unwrap()).unwrap()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_update_behavior_policy_error() {
+        let error = UpdateBehaviorPolicyError::Status503(Errors::new());
+        let policy = build_behavior_policy(1);
+        let policy_json = serde_json::to_string(&policy).unwrap();
+        let broker = MockServer::start();
+        broker.mock(|when, then| {
+            when.any_request().method(PUT);
+            then.status(503)
+                .body(serde_json::to_string(&error).unwrap());
+        });
+
+        let response = update_behavior_policy(broker.base_url(), policy.id.clone(), policy_json).await;
         assert!(response.is_err());
     }
 

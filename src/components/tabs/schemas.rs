@@ -43,14 +43,14 @@ impl SchemasTab<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
-            .details_title("Schema")
+            .item_name("Schema")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_schemas))
             .delete_fn(Arc::new(delete_schema))
             .create_fn(Arc::new(create_schema))
-            .selector(Box::new(SchemaSelector))
+            .item_selector(Box::new(SchemaSelector))
             .build();
 
         SchemasTab {

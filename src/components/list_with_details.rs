@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::format;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
 use tui::Frame;
 use typed_builder::TypedBuilder;
-use State::Loaded;
+use LoadingState::Loaded;
 
 use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
 use crate::components::popup;
@@ -30,14 +31,17 @@ use crate::{
         editor::Editor,
         item_features::{CreateFn, DeleteFn, ItemSelector, ListFn},
         list_with_details::{
-            FocusMode::FocusOnList,
-            State::{Loading, LoadingError},
+            FocusMode::Scrolling,
+            LoadingState::{Loading, LoadingError},
         },
         Component,
     },
     mode::Mode,
     tui,
 };
+use crate::action::Item;
+use crate::components::item_features::UpdateFn;
+use crate::components::list_with_details::FocusMode::Editing;
 
 #[derive(TypedBuilder)]
 pub struct ListWithDetails<'a, T> {
@@ -45,7 +49,7 @@ pub struct ListWithDetails<'a, T> {
     list_title: String,
 
     #[builder(setter(into))]
-    details_title: String,
+    item_name: String,
 
     #[builder(setter(into))]
     hivemq_address: String,
@@ -54,7 +58,7 @@ pub struct ListWithDetails<'a, T> {
     mode: Rc<RefCell<Mode>>,
 
     #[builder]
-    selector: Box<dyn ItemSelector<T>>,
+    item_selector: Box<dyn ItemSelector<T>>,
 
     #[builder(setter(strip_option), default)]
     delete_fn: Option<Arc<dyn DeleteFn>>,
@@ -65,24 +69,27 @@ pub struct ListWithDetails<'a, T> {
     #[builder(setter(strip_option), default)]
     create_fn: Option<Arc<dyn CreateFn>>,
 
+    #[builder(setter(strip_option), default)]
+    update_fn: Option<Arc<dyn UpdateFn>>,
+
     #[builder(default =
     if create_fn.is_some() && delete_fn.is_some() {
-        Mode::FullTab
+    Mode::FullTab
     } else if delete_fn.is_some() {
-        Mode::ReadDeleteTab
+    Mode::ReadDeleteTab
     } else {
-        Mode::ReadTab
+    Mode::ReadTab
     }
     )]
-    default_mode: Mode,
+    base_mode: Mode,
 
     #[builder(setter(skip), default =
-    Loaded(LoadedState {
+    Loaded {
     items: IndexMap::new(),
     list: vec ! [],
-    focus_mode: FocusMode::FocusOnList(ListState::default()),
-    }))]
-    state: State<'a, T>,
+    focus_mode: FocusMode::Scrolling(ListState::default()),
+    })]
+    loading_state: LoadingState<'a, T>,
 
     #[builder]
     action_tx: UnboundedSender<Action>,
@@ -94,75 +101,86 @@ pub struct ListWithDetails<'a, T> {
     popup: Option<ListPopup>,
 }
 
-pub enum State<'a, T> {
+pub enum LoadingState<'a, T> {
     LoadingError(String),
-    Loading(),
-    Loaded(LoadedState<'a, T>),
-}
+    Loading,
+    Loaded {
+        items: IndexMap<String, T>,
+        list: Vec<ListItem<'a>>,
+        focus_mode: FocusMode<'a>,
 
-pub struct LoadedState<'a, T> {
-    items: IndexMap<String, T>,
-    list: Vec<ListItem<'a>>,
-    focus_mode: FocusMode<'a>,
+    },
 }
 
 pub enum FocusMode<'a> {
-    FocusOnList(ListState),
-    FocusOnDetails((ListState, Editor<'a>)),
-    FocusOnDetailsError(String, String),
+    Scrolling(ListState),
+    Editing { list_state: ListState, editor: Editor<'a> },
+    DetailsError { title: String, message: String },
 }
 
 impl<T: Serialize> ListWithDetails<'_, T> {
-
     pub fn reset(&mut self) {
-        self.state = Loaded(LoadedState {
+        self.loading_state = Loaded {
             items: IndexMap::new(),
             list: vec![],
-            focus_mode: FocusMode::FocusOnList(ListState::default()),
-        });
+            focus_mode: FocusMode::Scrolling(ListState::default()),
+        };
     }
 
-    pub fn update_items(&mut self, items: Vec<(String, T)>) {
+    pub fn set_items(&mut self, new_items: Vec<(String, T)>) {
         self.reset();
-        if let Loaded(state) = &mut self.state {
-            for item in items {
-                state.items.insert(item.0.clone(), item.1);
-                state.list.push(ListItem::new(item.0.clone()));
+        if let Loaded { items, list, .. } = &mut self.loading_state {
+            for item in new_items {
+                items.insert(item.0.clone(), item.1);
+                list.push(ListItem::new(item.0.clone()));
             }
         }
     }
 
+    fn fetch_items(&mut self) {
+        if let Some(list_fn) = &self.list_fn {
+            let tx = self.action_tx.clone();
+            let hivemq_address = self.hivemq_address.clone();
+            let list_fn = list_fn.clone();
+            let _handle = tokio::spawn(async move {
+                let result = list_fn.list(hivemq_address).await;
+                tx.send(Action::ItemsLoadingFinished { result }).unwrap();
+            });
+        }
+        self.loading();
+    }
+
     pub fn put(&mut self, key: String, value: T) {
-        if let Loaded(state) = &mut self.state {
-            let old_value = state.items.insert(key.to_owned(), value);
+        if let Loaded { items, list, .. } = &mut self.loading_state {
+            let old_value = items.insert(key.to_owned(), value);
             if old_value.is_none() {
-                state.list.push(ListItem::new(key.clone()));
+                list.push(ListItem::new(key.clone()));
             }
         }
     }
 
     pub fn remove(&mut self, key: String) -> Option<T> {
-        let Loaded(loaded) = &mut self.state else {
+        let Loaded { items, list, focus_mode } = &mut self.loading_state else {
             return None;
         };
 
-        let Some((index, _, item)) = loaded.items.shift_remove_full(&key) else {
+        let Some((index, _, item)) = items.shift_remove_full(&key) else {
             return None;
         };
 
-        loaded.list.remove(index);
+        list.remove(index);
 
-        let list_state = match &mut loaded.focus_mode {
-            FocusMode::FocusOnList(list_state) => list_state,
-            FocusMode::FocusOnDetails((list_state, _)) => list_state,
+        let list_state = match focus_mode {
+            FocusMode::Scrolling(list_state) => list_state,
+            FocusMode::Editing { list_state, .. } => list_state,
             _ => return Some(item),
         };
 
-        if index > loaded.list.len().saturating_sub(1) {
+        if index > list.len().saturating_sub(1) {
             list_state.select(Some(index.saturating_sub(1)))
         }
 
-        if loaded.list.len() == 0 {
+        if list.len() == 0 {
             list_state.select(None);
         }
 
@@ -170,18 +188,19 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     pub fn get(&mut self, key: String) -> Option<&T> {
-        if let Loaded(state) = &mut self.state {
-            return state.items.get(&key);
+        if let Loaded { items, .. } = &mut self.loading_state {
+            items.get(&key)
+        } else {
+            None
         }
-        None
     }
 
     pub fn get_selected(&self) -> Option<(&String, &T)> {
-        let Loaded(state) = &self.state else {
+        let Loaded { items, focus_mode, .. } = &self.loading_state else {
             return None;
         };
 
-        let FocusMode::FocusOnList(ref list_state) = state.focus_mode else {
+        let FocusMode::Scrolling(ref list_state) = focus_mode else {
             return None;
         };
 
@@ -189,7 +208,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return None;
         };
 
-        let Some((key, item)) = state.items.get_index(index) else {
+        let Some((key, item)) = items.get_index(index) else {
             return None;
         };
 
@@ -198,71 +217,60 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     pub fn list_error(&mut self, msg: &str) {
         self.reset();
-        self.state = LoadingError(msg.to_owned());
+        self.loading_state = LoadingError(msg.to_owned());
     }
 
     pub fn details_error(&mut self, title: String, message: String) {
-        if let Loaded(loaded_state) = &mut self.state {
-            loaded_state.focus_mode = FocusMode::FocusOnDetailsError(title, message);
+        if let Loaded { focus_mode, .. } = &mut self.loading_state {
+            *focus_mode = FocusMode::DetailsError { title, message };
         }
     }
 
     pub fn select_item(&mut self, item_key: String) {
-        if let Loaded(LoadedState {
-            items,
-            list: _,
-            focus_mode: mode,
-            ..
-        }) = &mut self.state
-        {
+        if let Loaded { items, focus_mode, .. } = &mut self.loading_state {
             let index = items.get_index_of(&item_key);
-            *mode = FocusMode::FocusOnList(ListState::default().with_selected(index));
+            *focus_mode = FocusMode::Scrolling(ListState::default().with_selected(index));
         }
     }
 
-    pub fn unfocus(&mut self) {
-        if let Loaded(LoadedState {
-            focus_mode: mode, ..
-        }) = &mut self.state
-        {
-            match mode {
-                FocusOnList(_) => {
-                    *mode = FocusOnList(ListState::default());
+    pub fn set_scrolling_mode(&mut self) {
+        if let Loaded { focus_mode, .. } = &mut self.loading_state {
+            match focus_mode {
+                Scrolling(_) => {
+                    *focus_mode = Scrolling(ListState::default());
                 }
-                FocusMode::FocusOnDetails((state, _editor)) => {
-                    *mode = FocusOnList(state.clone());
+                FocusMode::Editing { list_state, .. } => {
+                    *focus_mode = Scrolling(list_state.clone());
                 }
                 _ => (),
             }
-            *self.mode.borrow_mut() = self.default_mode;
+            *self.mode.borrow_mut() = self.base_mode;
         }
     }
 
     fn loading(&mut self) {
         self.reset();
-        self.state = Loading();
+        self.loading_state = Loading;
     }
 
     fn next_item(&mut self) -> Option<(&String, &T)> {
-        let Loaded(state) = &mut self.state else {
+        let Loaded { list, focus_mode, items } = &mut self.loading_state else {
             return None;
         };
 
-        let _list = &mut state.list;
-
-        match &mut state.focus_mode {
-            FocusMode::FocusOnList(list_state) => {
+        match focus_mode {
+            FocusMode::Scrolling(list_state) => {
                 let new_selected = match list_state.selected() {
-                    None if state.list.len() != 0 => 0,
-                    Some(i) if i + 1 < state.list.len() => i + 1,
+                    None if list.len() != 0 => 0,
+                    Some(i) if i + 1 < list.len() => i + 1,
                     _ => return None,
                 };
 
                 list_state.select(Some(new_selected));
-                Some(state.items.get_index(new_selected).unwrap())
+                Some(items.get_index(new_selected).unwrap())
             }
-            FocusMode::FocusOnDetailsError(_, _) => {
-                state.focus_mode = FocusMode::FocusOnList(ListState::default());
+            FocusMode::DetailsError { .. } => {
+                *focus_mode = FocusMode::Scrolling(ListState::default());
                 None
             }
             _ => None,
@@ -270,24 +278,22 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn prev_item(&mut self) -> Option<(&String, &T)> {
-        let Loaded(state) = &mut self.state else {
+        let Loaded { items, list, focus_mode } = &mut self.loading_state else {
             return None;
         };
 
-        let _list = &mut state.list;
-
-        match &mut state.focus_mode {
-            FocusMode::FocusOnList(list_state) => {
+        match focus_mode {
+            FocusMode::Scrolling(list_state) => {
                 let new_selected = match list_state.selected() {
                     Some(i) if i > 0 => i - 1,
                     _ => return None,
                 };
 
                 list_state.select(Some(new_selected));
-                Some(state.items.get_index(new_selected).unwrap())
+                Some(items.get_index(new_selected).unwrap())
             }
-            FocusMode::FocusOnDetailsError(_, _) => {
-                state.focus_mode = FocusMode::FocusOnList(ListState::default());
+            FocusMode::DetailsError { .. } => {
+                *focus_mode = FocusMode::Scrolling(ListState::default());
                 None
             }
             _ => None,
@@ -295,13 +301,13 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn copy_details_to_clipboard(&mut self) -> Result<(), String> {
-        let Loaded(loaded_state) = &mut self.state else {
+        let Loaded { focus_mode, items, .. } = &mut self.loading_state else {
             return Ok(());
         };
 
-        if let FocusMode::FocusOnList(selected) = &mut loaded_state.focus_mode {
+        if let FocusMode::Scrolling(selected) = focus_mode {
             if let Some(selected) = selected.selected() {
-                let item = loaded_state.items.get_index(selected).unwrap();
+                let item = items.get_index(selected).unwrap();
                 let details = serde_json::to_string_pretty(item.1).unwrap();
                 let mut clipboard = Clipboard::new().or_else(|err| Err(err.to_string()))?;
                 clipboard.set_text(details).unwrap();
@@ -311,12 +317,12 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         Ok(())
     }
 
-    fn focus_on_details(&mut self) {
-        let Loaded(state) = &mut self.state else {
+    fn inspect(&mut self) {
+        let Loaded { items, focus_mode, .. } = &mut self.loading_state else {
             return;
         };
 
-        let FocusMode::FocusOnList(list_state) = &state.focus_mode else {
+        let FocusMode::Scrolling(list_state) = focus_mode else {
             return;
         };
 
@@ -324,19 +330,181 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return;
         };
 
-        let Some((_, value)) = state.items.get_index(selected) else {
+        let Some((_, item)) = items.get_index(selected) else {
             return;
         };
 
-        let mut editor = Editor::readonly(
-            serde_json::to_string_pretty(value).unwrap(),
-            self.details_title.to_owned(),
-        );
+        let item = serde_json::to_string_pretty(item).unwrap();
+        if let Some(update_fn) = &self.update_fn {
+            let update_editor = Editor::writeable_with_text(format!("Update {}", self.item_name), item.to_owned());
+            *focus_mode = Editing {
+                list_state: list_state.clone(),
+                editor: update_editor,
+            };
 
-        editor.focus();
+            *self.mode.borrow_mut() = Mode::UpdateEditor;
+        } else {
+            let mut editor = Editor::readonly(item, self.item_name.to_owned());
 
-        (*state).focus_mode = FocusMode::FocusOnDetails((list_state.clone(), editor));
-        *self.mode.borrow_mut() = Mode::EditorReadOnly;
+            editor.focus();
+
+            *focus_mode = FocusMode::Editing { list_state: list_state.clone(), editor };
+            *self.mode.borrow_mut() = Mode::EditorReadOnly;
+        }
+    }
+    fn confirm_popup(&mut self) {
+        if let Some(DeletePopup { item_id, .. }) = &self.popup {
+            if let Some(delete_fn) = &self.delete_fn {
+                let tx = self.action_tx.clone();
+                let host = self.hivemq_address.clone();
+                let delete_fn = delete_fn.clone();
+                let item_type = self.item_name.clone();
+                let item_id = item_id.clone();
+                tokio::spawn(async move {
+                    let result = delete_fn.delete(host, item_id).await;
+                    tx.send(Action::ItemDeleted { item_type, result }).unwrap();
+                });
+            }
+        }
+    }
+
+    fn copy_json(&mut self) {
+        if let Err(message) = self.copy_details_to_clipboard() {
+            let popup = popup::ErrorPopup {
+                title: "Could not copy to clipboard".to_string(),
+                message,
+            };
+            self.enter_popup(ErrorPopup { popup })
+        }
+    }
+
+    fn handle_item_updated(&mut self, result: Result<Item, String>) {
+        self.set_scrolling_mode();
+        match result {
+            Ok(item) => {
+                if let Some((id, item)) = self.item_selector.select_with_id(item) {
+                    self.put(id.clone(), item);
+                    self.select_item(id)
+                }
+            }
+            Err(message) => {
+                self.details_error(
+                    format!("{} update failed", self.item_name),
+                    message,
+                );
+            }
+        }
+    }
+
+    fn handle_item_created(&mut self, result: Result<Item, String>) {
+        self.new_item_editor = None;
+        match result {
+            Ok(item) => {
+                if let Some((id, item)) = self.item_selector.select_with_id(item) {
+                    self.put(id.clone(), item);
+                    self.select_item(id)
+                }
+            }
+            Err(error) => {
+                self.details_error(
+                    format!("{} creation failed", self.item_name),
+                    error,
+                );
+            }
+        }
+        *self.mode.borrow_mut() = self.base_mode;
+    }
+
+
+    fn update_item(&mut self) {
+        if let Loaded { focus_mode: Editing { editor, list_state }, items, .. } = &self.loading_state {
+            let (id, _) = items.get_index(list_state.selected().unwrap()).unwrap();
+            let id = id.clone();
+            let text = editor.get_text();
+            let host = self.hivemq_address.clone();
+            let tx = self.action_tx.clone();
+            let update_fn = self.update_fn.clone().unwrap();
+            tokio::spawn(async move {
+                let result = update_fn.update(host, id, text).await;
+                tx.send(Action::ItemUpdated { result }).unwrap();
+            });
+        }
+    }
+
+    fn create_item(&mut self) {
+        if let Some(editor) = &mut self.new_item_editor {
+            let text = editor.get_text();
+            let host = self.hivemq_address.clone();
+            let tx = self.action_tx.clone();
+            let create_fn = self.create_fn.clone().unwrap();
+            tokio::spawn(async move {
+                let result = create_fn.create(host, text).await;
+                tx.send(Action::ItemCreated { result }).unwrap();
+            });
+        }
+    }
+
+    fn enter_new_item_editor(&mut self) {
+        if self.create_fn.is_some() {
+            self.set_scrolling_mode();
+            self.new_item_editor = Some(Editor::writeable(
+                format!("New {}", self.item_name).to_owned(),
+            ));
+            *self.mode.borrow_mut() = Mode::CreateEditor;
+        }
+    }
+
+    fn handle_item_deleted(&mut self, item_type: String, result: Result<String, String>) {
+        if item_type.eq(&self.item_name) {
+            match result {
+                Ok(id) => {
+                    self.remove(id);
+                    self.exit_popup();
+                }
+                Err(message) => {
+                    let popup = popup::ErrorPopup {
+                        title: "Deletion failed".to_string(),
+                        message: format!("Failed deletion of item:\n{}", message),
+                    };
+                    self.enter_popup(ErrorPopup { popup })
+                }
+            };
+        }
+    }
+
+
+    fn popup_delete_confirmation(&mut self) {
+        if let Some((id, _)) = self.get_selected() {
+            if self.delete_fn.is_some() {
+                let item_type = self.item_name.clone();
+                let item_id = id.clone();
+                let popup = popup::ConfirmPopup {
+                    title: format!("Delete {} '{}'?", item_type, item_id).to_string(),
+                    message: format!(
+                        "Are you sure you want to delete the {} with id '{}'",
+                        item_type, item_id
+                    )
+                        .to_string(),
+                };
+                self.enter_popup(DeletePopup { popup, item_id })
+            }
+        }
+    }
+
+    fn handle_loading_finished(&mut self, result: Result<Vec<(String, Item)>, String>) {
+        match result {
+            Ok(items) => {
+                let mut unwrapped_items = Vec::with_capacity(items.len());
+                for (id, item) in items {
+                    let Some(item) = self.item_selector.select(item) else {
+                        break;
+                    };
+                    unwrapped_items.push((id, item));
+                }
+                self.set_items(unwrapped_items);
+            }
+            Err(msg) => self.list_error(&msg),
+        }
     }
 
     pub fn error_popup(&mut self, popup: popup::ErrorPopup) {
@@ -354,7 +522,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     fn exit_popup(&mut self) {
         if self.popup.is_some() {
             self.popup = None;
-            *self.mode.borrow_mut() = self.default_mode;
+            *self.mode.borrow_mut() = self.base_mode;
         }
     }
 
@@ -371,10 +539,10 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
         let list_layout = layout[0];
         let detail_layout = layout[1];
-        let detail_title = self.details_title.clone();
+        let detail_title = self.item_name.clone();
         let list_title = self.list_title.clone();
 
-        match &mut self.state {
+        match &mut self.loading_state {
             LoadingError(msg) => {
                 let p = Paragraph::new(msg.clone())
                     .wrap(Wrap { trim: true })
@@ -393,7 +561,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     detail_layout,
                 );
             }
-            Loading() => {
+            Loading => {
                 let b = Block::default()
                     .borders(Borders::ALL)
                     .style(Style::default().fg(Color::Blue))
@@ -407,21 +575,15 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     detail_layout,
                 );
             }
-            Loaded(state) => {
-                let LoadedState {
-                    items,
-                    focus_mode: mode,
-                    list,
-                } = state;
-
-                let (list_state, list_style) = match mode {
-                    FocusMode::FocusOnList(list_state) => {
+            Loaded { items, focus_mode, list } => {
+                let (list_state, list_style) = match focus_mode {
+                    FocusMode::Scrolling(list_state) => {
                         (list_state.clone(), Style::default().not_dim())
                     }
-                    FocusMode::FocusOnDetails((list_state, _)) => {
+                    FocusMode::Editing { list_state, .. } => {
                         (list_state.clone(), Style::default().dim())
                     }
-                    FocusMode::FocusOnDetailsError(_, _) => {
+                    FocusMode::DetailsError { .. } => {
                         (ListState::default(), Style::default().dim())
                     }
                 };
@@ -458,8 +620,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     return Ok(());
                 }
 
-                match mode {
-                    FocusMode::FocusOnList(list_state) => match list_state.selected() {
+                match focus_mode {
+                    FocusMode::Scrolling(list_state) => match list_state.selected() {
                         None => {
                             f.render_widget(
                                 Block::default()
@@ -473,16 +635,16 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                             let item = items.get_index(selected).unwrap();
                             let mut editor = Editor::readonly(
                                 serde_json::to_string_pretty(item.1).unwrap(),
-                                self.details_title.to_owned(),
+                                self.item_name.to_owned(),
                             );
                             editor.unfocus();
                             editor.draw(f, detail_layout).unwrap();
                         }
                     },
-                    FocusMode::FocusOnDetails((_, editor)) => {
+                    FocusMode::Editing { editor, .. } => {
                         editor.draw(f, detail_layout).unwrap();
                     }
-                    FocusMode::FocusOnDetailsError(title, message) => {
+                    FocusMode::DetailsError { title, message } => {
                         let p = Paragraph::new(message.clone())
                             .wrap(Wrap { trim: true })
                             .style(Style::default().fg(Color::Red))
@@ -510,9 +672,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 }
 
 impl<T: Serialize> Component for ListWithDetails<'_, T> {
-
     fn activate(&mut self) -> Result<()> {
-        *self.mode.borrow_mut() = self.default_mode;
+        *self.mode.borrow_mut() = self.base_mode;
         Ok(())
     }
 
@@ -521,17 +682,20 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
             return editor.handle_key_events(key);
         }
 
-        let state = match &mut self.state {
+        let focus_mode = match &mut self.loading_state {
             LoadingError(_) => {
                 self.reset();
                 return Ok(None);
             }
-            Loading() => return Ok(None),
-            Loaded(state) => state,
+            Loading => return Ok(None),
+            Loaded { focus_mode, .. } => focus_mode,
         };
 
-        if let FocusMode::FocusOnDetails((_, editor)) = &mut state.focus_mode {
-            return editor.handle_key_events(key);
+        match focus_mode {
+            FocusMode::Editing { editor, .. } => {
+                return editor.handle_key_events(key);
+            }
+            _ => ()
         }
 
         Ok(None)
@@ -540,32 +704,10 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::LoadAllItems => {
-                if let Some(list_fn) = &self.list_fn {
-                    let tx = self.action_tx.clone();
-                    let hivemq_address = self.hivemq_address.clone();
-                    let list_fn = list_fn.clone();
-                    let _handle = tokio::spawn(async move {
-                        let result = list_fn.list(hivemq_address).await;
-                        tx.send(Action::ItemsLoadingFinished { result }).unwrap();
-                    });
-                }
-                self.loading();
+                self.fetch_items();
             }
             Action::ItemsLoadingFinished { result } => {
-                match result {
-                    Ok(items) => {
-                        let mut unwrapped_items = Vec::with_capacity(items.len());
-                        for (id, item) in items {
-                            let Some(item) = self.selector.select(item) else {
-                                break;
-                            };
-                            unwrapped_items.push((id, item));
-                        }
-                        self.update_items(unwrapped_items);
-                    }
-                    Err(msg) => self.list_error(&msg),
-                }
-                return Ok(None);
+                self.handle_loading_finished(result);
             }
             Action::PrevItem => {
                 if let Some((key, _value)) = self.prev_item() {
@@ -577,117 +719,45 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                     return Ok(Some(SelectedItem(key.to_owned())));
                 }
             }
-            Action::FocusDetails => {
-                self.focus_on_details();
+            Action::Inspect => {
+                self.inspect();
             }
             Action::Escape => {
-                self.unfocus();
-                if let Some(_editor) = &mut self.new_item_editor {
+                self.set_scrolling_mode();
+                if let Some(_) = &mut self.new_item_editor {
                     self.new_item_editor = None;
                 }
             }
             Action::Delete => {
-                if let Some((id, _)) = self.get_selected() {
-                    if self.delete_fn.is_some() {
-                        let item_type = self.details_title.clone();
-                        let item_id = id.clone();
-                        let popup = popup::ConfirmPopup {
-                            title: format!("Delete {} '{}'?", item_type, item_id).to_string(),
-                            message: format!(
-                                "Are you sure you want to delete the {} with id '{}'",
-                                item_type, item_id
-                            )
-                            .to_string(),
-                        };
-                        self.enter_popup(DeletePopup { popup, item_id })
-                    }
-                }
+                self.popup_delete_confirmation();
             }
             Action::ItemDeleted { item_type, result } => {
-                if item_type.eq(&self.details_title) {
-                    match result {
-                        Ok(id) => {
-                            self.remove(id);
-                            self.exit_popup();
-                        }
-                        Err(message) => {
-                            let popup = popup::ErrorPopup {
-                                title: "Deletion failed".to_string(),
-                                message: format!("Failed deletion of item:\n{}", message),
-                            };
-                            self.enter_popup(ErrorPopup { popup })
-                        }
-                    };
-                }
+                self.handle_item_deleted(item_type, result);
             }
             Action::NewItem => {
-                if self.create_fn.is_some() {
-                    self.unfocus();
-                    self.new_item_editor = Some(Editor::writeable(
-                        format!("New {}", self.details_title).to_owned(),
-                    ));
-                    *self.mode.borrow_mut() = Mode::Editor;
-                    return Ok(None);
-                }
+                self.enter_new_item_editor();
             }
-            Action::Submit => {
-                if let Some(editor) = &mut self.new_item_editor {
-                    let text = editor.get_text();
-                    let host = self.hivemq_address.clone();
-                    let tx = self.action_tx.clone();
-                    let create_fn = self.create_fn.clone().unwrap();
-                    tokio::spawn(async move {
-                        let result = create_fn.create(host, text).await;
-                        tx.send(Action::ItemCreated { result }).unwrap();
-                    });
-                }
+            Action::CreateItem => {
+                self.create_item();
+            }
+            Action::UpdateItem => {
+                self.update_item();
             }
             Action::ItemCreated { result } => {
-                self.new_item_editor = None;
-                match result {
-                    Ok(item) => {
-                        if let Some((id, item)) = self.selector.select_with_id(item) {
-                            self.put(id.clone(), item);
-                            self.select_item(id)
-                        }
-                    }
-                    Err(error) => {
-                        self.details_error(
-                            format!("{} creation failed", self.details_title),
-                            error,
-                        );
-                    }
-                }
-                *self.mode.borrow_mut() = self.default_mode;
-                return Ok(None);
+                self.handle_item_created(result);
             }
-            Action::Enter => self.focus_on_details(),
+            Action::ItemUpdated { result } => {
+                self.handle_item_updated(result);
+            }
+            Action::Enter => self.inspect(),
             Action::Copy => {
-                if let Err(message) = self.copy_details_to_clipboard() {
-                    let popup = popup::ErrorPopup {
-                        title: "Could not copy to clipboard".to_string(),
-                        message,
-                    };
-                    self.enter_popup(ErrorPopup { popup })
-                }
+                self.copy_json();
             }
             Action::ClosePopup => {
                 self.exit_popup();
             }
             Action::ConfirmPopup => {
-                if let Some(DeletePopup { item_id, .. }) = &self.popup {
-                    if let Some(delete_fn) = &self.delete_fn {
-                        let tx = self.action_tx.clone();
-                        let host = self.hivemq_address.clone();
-                        let delete_fn = delete_fn.clone();
-                        let item_type = self.details_title.clone();
-                        let item_id = item_id.clone();
-                        tokio::spawn(async move {
-                            let result = delete_fn.delete(host, item_id).await;
-                            tx.send(Action::ItemDeleted { item_type, result }).unwrap();
-                        });
-                    }
-                }
+                self.confirm_popup();
             }
             _ => {}
         }

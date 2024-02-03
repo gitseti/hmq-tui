@@ -2,17 +2,17 @@
   "keybindings": {
     "Home": {
       "<q>": {
-       "action": "Quit",
+        "action": "Quit",
         "displayName": "Quit"
       },
       "<Ctrl-d>": {
-       "action": "Quit"
+        "action": "Quit"
       },
       "<Ctrl-c>": {
-       "action": "Quit"
+        "action": "Quit"
       },
       "<Ctrl-z>": {
-       "action": "Suspend"
+        "action": "Suspend"
       },
     },
     "Tab": {
@@ -40,48 +40,48 @@
         "displayGroup": "scroll"
       },
       "<right>": {
-       "action": "FocusDetails",
-        "displayName": "Focus"
+        "action": "Inspect",
+        "displayName": "Inspect"
       },
       "<tab>": {
-       "action": "NextTab",
+        "action": "NextTab",
         "displayName": "Tab"
       },
       "<backtab>": {
-       "action": "PrevTab"
+        "action": "PrevTab"
       },
       "<enter>": {
-       "action": "Enter",
+        "action": "Enter",
       },
       "<esc>": {
-       "action": "Escape",
+        "action": "Escape",
       },
       "<1>": {
-       "action": "Tab1",
+        "action": "Tab1",
         "displayGroup": "tabs"
       },
       "<2>": {
-       "action": "Tab2",
+        "action": "Tab2",
         "displayGroup": "tabs"
       },
       "<3>": {
-       "action": "Tab3",
+        "action": "Tab3",
         "displayGroup": "tabs"
       },
       "<4>": {
-       "action": "Tab4",
+        "action": "Tab4",
         "displayGroup": "tabs"
       },
       "<5>": {
-       "action": "Tab5",
+        "action": "Tab5",
         "displayGroup": "tabs"
       },
       "<6>": {
-       "action": "Tab6",
+        "action": "Tab6",
         "displayGroup": "tabs"
       },
       "<7>": {
-       "action": "Tab7",
+        "action": "Tab7",
         "displayGroup": "tabs"
       }
     },
@@ -90,24 +90,24 @@
         "Tab"
       ],
       "<n>": {
-       "action": "NewItem",
+        "action": "NewItem",
         "displayName": "New"
       },
       "<d>": {
-       "action": "DeleteItem",
+        "action": "DeleteItem",
         "displayName": "Delete"
       },
       "<r>": {
         "action": "LoadAllItems",
         "displayName": "Load"
-      }
+      },
     },
     "ReadDeleteTab": {
       "extends": [
         "Tab"
       ],
       "<d>": {
-       "action": "DeleteItem",
+        "action": "DeleteItem",
         "displayName": "Delete"
       },
       "<r>": {
@@ -135,25 +135,36 @@
     },
     "EditorReadOnly": {
       "<Ctrl-d>": {
-       "action": "Quit",
+        "action": "Quit",
       },
       "<Ctrl-c>": {
-       "action": "Quit",
-       "displayName": "Quit"
+        "action": "Quit",
+        "displayName": "Quit"
       },
       "<Ctrl-z>": {
-       "action": "Suspend",
+        "action": "Suspend",
       },
       "<esc>": {
-       "action": "Escape",
-       "displayName": "Cancel"
+        "action": "Escape",
+        "displayName": "Cancel"
       }
     },
-    "Editor": {
-      "extends": ["EditorReadOnly"],
+    "CreateEditor": {
+      "extends": [
+        "EditorReadOnly"
+      ],
       "<Ctrl-n>": {
-       "action": "Submit",
-       "displayName": "Submit"
+        "action": "CreateItem",
+        "displayName": "Create"
+      }
+    },
+    "UpdateEditor": {
+      "extends": [
+        "EditorReadOnly"
+      ],
+      "<Ctrl-n>": {
+        "action": "UpdateItem",
+        "displayName": "Update"
       }
     },
     "ErrorPopup": {
@@ -161,8 +172,8 @@
         "Home"
       ],
       "<esc>": {
-       "action": "ClosePopup",
-       "displayName": "Close"
+        "action": "ClosePopup",
+        "displayName": "Close"
       }
     },
     "ConfirmPopup": {
@@ -170,12 +181,12 @@
         "Home"
       ],
       "<esc>": {
-       "action": "ClosePopup",
-       "displayName": "Cancel"
+        "action": "ClosePopup",
+        "displayName": "Cancel"
       },
       "<enter>": {
-       "action": "ConfirmPopup",
-       "displayName": "Confirm"
+        "action": "ConfirmPopup",
+        "displayName": "Confirm"
       },
     }
   }

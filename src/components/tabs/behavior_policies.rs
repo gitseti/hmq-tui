@@ -18,6 +18,7 @@ use crate::{
     hivemq_rest_client::{create_behavior_policy, delete_behavior_policy, fetch_behavior_policies},
     tui::Frame,
 };
+use crate::hivemq_rest_client::update_behavior_policy;
 
 pub struct BehaviorPoliciesTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -43,14 +44,15 @@ impl BehaviorPoliciesTab<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
-            .details_title("Behavior Policy")
+            .item_name("Behavior Policy")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_behavior_policies))
             .delete_fn(Arc::new(delete_behavior_policy))
             .create_fn(Arc::new(create_behavior_policy))
-            .selector(Box::new(BehaviorPolicySelector))
+            .update_fn(Arc::new(update_behavior_policy))
+            .item_selector(Box::new(BehaviorPolicySelector))
             .build();
         BehaviorPoliciesTab {
             action_tx,

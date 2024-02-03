@@ -43,14 +43,14 @@ impl ScriptsTab<'_> {
     pub fn new(action_tx: UnboundedSender<Action>, hivemq_address: String, mode: Rc<RefCell<Mode>>) -> Self {
         let list_with_details = ListWithDetails::<Script>::builder()
             .list_title("Scripts")
-            .details_title("Script")
+            .item_name("Script")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
             .list_fn(Arc::new(fetch_scripts))
             .delete_fn(Arc::new(delete_script))
             .create_fn(Arc::new(create_script))
-            .selector(Box::new(ScriptSelector))
+            .item_selector(Box::new(ScriptSelector))
             .build();
         ScriptsTab {
             action_tx,

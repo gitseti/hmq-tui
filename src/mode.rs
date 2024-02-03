@@ -5,7 +5,8 @@ pub enum Mode {
     #[default]
     Home,
     EditorReadOnly,
-    Editor,
+    CreateEditor,
+    UpdateEditor,
     Tab,
     ReadTab,
     ReadDeleteTab,

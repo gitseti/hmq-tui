@@ -46,6 +46,10 @@ impl Editor<'_> {
         return Editor::new(false, "".to_owned(), title.to_owned());
     }
 
+    pub fn writeable_with_text(title: String, text: String) -> Self {
+        return Editor::new(false, text, title);
+    }
+
     pub fn focus(&mut self) {
         self.textarea.set_style(Style::default().not_dim());
         self.textarea.set_block(
@@ -68,7 +72,7 @@ impl Editor<'_> {
         self.textarea.set_cursor_style(Style::default().hidden());
     }
 
-    pub fn get_text(&mut self) -> String {
+    pub fn get_text(&self) -> String {
         self.textarea.lines().join("\n")
     }
 }
