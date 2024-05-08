@@ -165,13 +165,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_data_policies() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let responses = crate::hivemq_rest_client::tests::create_responses(
             "/api/v1/data-hub/data-validation/policies",
             build_data_policy_list,
         );
-        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+        let _mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
             &broker,
             "/api/v1/data-hub/data-validation/policies",
             &responses,
@@ -193,7 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_data_policies_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllDataPoliciesError::Status503(Errors::new());
         broker.mock(|when, then| {
@@ -207,7 +207,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_data_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let data_policy = build_data_policy(1);
         let data_policy_json = serde_json::to_string(&data_policy).unwrap();
@@ -216,14 +216,14 @@ mod tests {
             then.status(201).body(data_policy_json.clone());
         });
 
-        let response = service.create_data_policy(&data_policy_json).await.unwrap();
+        let _response = service.create_data_policy(&data_policy_json).await.unwrap();
 
         assert_eq!(data_policy, repo.find_by_id(&data_policy.id).unwrap());
     }
 
     #[tokio::test]
     async fn test_create_data_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateDataPolicyError::Status503(Errors::new());
         let data_policy = build_data_policy(1);
@@ -240,7 +240,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_data_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         broker.mock(|when, then| {
             when.any_request().method(DELETE);
@@ -250,14 +250,14 @@ mod tests {
         let policy = build_data_policy(1);
         repo.save(&policy).unwrap();
 
-        let response = service.delete_data_policy("data_policy-1").await;
+        let _response = service.delete_data_policy("data_policy-1").await;
 
         assert!(repo.find_by_id("data_policy-1").is_err());
     }
 
     #[tokio::test]
     async fn test_update_data_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let policy = build_data_policy(1);
         let policy_json = serde_json::to_string(&policy).unwrap();
@@ -273,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_data_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let policy = build_data_policy(1);
         let error = UpdateDataPolicyError::Status503(Errors::new());
@@ -290,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_data_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = DeleteDataPolicyError::Status404(Errors::new());
         broker.mock(|when, then| {

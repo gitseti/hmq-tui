@@ -105,7 +105,7 @@ impl Component for BackupsTab<'_> {
             Action::StartBackup => {
                 let service = self.service.clone();
                 let tx = self.action_tx.clone();
-                let item_name = self.item_name.clone().to_string();
+                let item_name = self.item_name.to_string();
                 tokio::spawn(async move {
                     let result = service.start_backup().await;
                     tx.send(Action::ItemCreated { item_name, result }).unwrap();
@@ -114,7 +114,7 @@ impl Component for BackupsTab<'_> {
             Action::LoadAllItems => {
                 let service = self.service.clone();
                 let tx = self.action_tx.clone();
-                let item_name = self.item_name.clone().to_string();
+                let item_name = self.item_name.to_string();
                 tokio::spawn(async move {
                     let result = service.load_backups().await;
                     tx.send(Action::ItemsLoadingFinished { item_name, result })

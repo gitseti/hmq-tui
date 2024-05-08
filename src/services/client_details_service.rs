@@ -6,7 +6,7 @@ use hivemq_openapi::apis::mqtt_clients_api::{
     GetMqttClientDetailsParams,
 };
 use hivemq_openapi::models::ClientDetails;
-use std::error::Error;
+
 use std::sync::Arc;
 
 pub struct ClientDetailsService {

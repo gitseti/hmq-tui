@@ -67,7 +67,7 @@ impl BehaviorPoliciesTab<'_> {
         let item_name = "Behavior Policy";
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
-            .item_name(item_name.clone())
+            .item_name(item_name)
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())

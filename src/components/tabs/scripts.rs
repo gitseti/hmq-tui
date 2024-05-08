@@ -22,7 +22,6 @@ use crate::{
         item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
         Component,
     },
-    hivemq_rest_client::{create_script, delete_script, fetch_scripts},
     tui::Frame,
 };
 
