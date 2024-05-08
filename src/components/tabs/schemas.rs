@@ -10,21 +10,17 @@ use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-    action::Action,
-    components::{
-        Component, list_with_details::ListWithDetails,
-        tabs::TabComponent,
-    }
-    ,
-    tui::Frame,
-};
 use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::Features;
 use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::schema_service::SchemaService;
+use crate::{
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
+    tui::Frame,
+};
 
 pub struct SchemasTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -39,7 +35,12 @@ impl SchemasTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let repository = Repository::<Schema>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "schemas", |val| val.id.clone()).unwrap();
+        let repository = Repository::<Schema>::init(
+            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
+            "schemas",
+            |val| val.id.clone(),
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(SchemaService::new(repository.clone(), &hivemq_address));
         let item_name = "Schema";
@@ -116,7 +117,7 @@ impl Component for SchemasTab<'_> {
                         .expect("Schemas: Failed to send ItemsLoadingFinished action");
                 });
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

@@ -10,14 +10,18 @@ use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::{Action, Item}, components::{
-    Component, item_features::ItemSelector, list_with_details::ListWithDetails,
-    tabs::TabComponent,
-}, tui::Frame};
 use crate::components::list_with_details::Features;
 use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::backups_service::BackupService;
+use crate::{
+    action::{Action, Item},
+    components::{
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
+        Component,
+    },
+    tui::Frame,
+};
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
@@ -56,7 +60,12 @@ impl BackupsTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let repository = Repository::<Backup>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "backups", |val| val.id.clone().unwrap()).unwrap();
+        let repository = Repository::<Backup>::init(
+            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
+            "backups",
+            |val| val.id.clone().unwrap(),
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BackupService::new(repository.clone(), &hivemq_address));
         let item_name = "Backup";
@@ -108,10 +117,11 @@ impl Component for BackupsTab<'_> {
                 let item_name = self.item_name.clone().to_string();
                 tokio::spawn(async move {
                     let result = service.load_backups().await;
-                    tx.send(Action::ItemsLoadingFinished { item_name, result }).unwrap();
+                    tx.send(Action::ItemsLoadingFinished { item_name, result })
+                        .unwrap();
                 });
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

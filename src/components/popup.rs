@@ -1,3 +1,5 @@
+use crate::action::Action;
+use crate::tui::Frame;
 use color_eyre::eyre::{Ok, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
@@ -7,8 +9,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
 use tui_textarea::TextArea;
-use crate::action::Action;
-use crate::tui::Frame;
 
 pub struct ConfirmPopup {
     pub title: String,
@@ -121,18 +121,17 @@ fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 
 pub struct InputPopup<'a> {
     pub title: String,
-    pub text_area: TextArea<'a>
+    pub text_area: TextArea<'a>,
 }
 
 impl<'a> InputPopup<'a> {
-
     pub fn new(title: &str) -> Self {
         let mut text_area = TextArea::default();
         text_area.set_cursor_line_style(Style::default());
         text_area.set_placeholder_text("Enter a filter term");
         InputPopup {
             title: title.to_string(),
-            text_area
+            text_area,
         }
     }
 
@@ -202,7 +201,6 @@ impl<'a> Popup for InputPopup<'a> {
         Ok(())
     }
 }
-
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct Dim;

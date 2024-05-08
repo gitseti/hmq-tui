@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_schemas_api::{CreateSchemaParams, DeleteSchemaParams, get_all_schemas, GetAllSchemasParams};
+use hivemq_openapi::apis::data_hub_schemas_api::{
+    get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
+};
 use hivemq_openapi::models::Schema;
 
 use crate::hivemq_rest_client;
@@ -16,10 +18,7 @@ pub struct SchemaService {
 impl SchemaService {
     pub fn new(repository: Arc<Repository<Schema>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        SchemaService {
-            repository,
-            config,
-        }
+        SchemaService { repository, config }
     }
 
     pub async fn load_schemas(&self) -> Result<(), String> {
@@ -81,12 +80,13 @@ impl SchemaService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use hivemq_openapi::apis::data_hub_schemas_api::{CreateSchemaError, DeleteSchemaError, GetAllSchemasError};
+    use hivemq_openapi::apis::data_hub_schemas_api::{
+        CreateSchemaError, DeleteSchemaError, GetAllSchemasError,
+    };
     use hivemq_openapi::models::{Errors, PaginationCursor, Schema, SchemaList};
     use httpmock::Method::{DELETE, POST};
     use httpmock::MockServer;
@@ -117,14 +117,17 @@ mod tests {
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<Schema>>, SchemaService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<Schema>>,
+        SchemaService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
         let repo =
-            Repository::<Schema>::init(&connection_pool, "schemas", |schema| {
-                schema.id.clone()
-            }).unwrap();
+            Repository::<Schema>::init(&connection_pool, "schemas", |schema| schema.id.clone())
+                .unwrap();
         let repo = Arc::new(repo);
         let service = SchemaService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -134,15 +137,25 @@ mod tests {
     async fn test_load_schemas() {
         let (broker, pool, repo, service) = setup();
 
-        let responses = crate::hivemq_rest_client::tests::create_responses("/api/v1/data-hub/schemas", build_schema_list);
-        let mocks =
-            crate::hivemq_rest_client::tests::mock_cursor_responses(&broker, "/api/v1/data-hub/schemas", &responses, "foobar");
+        let responses = crate::hivemq_rest_client::tests::create_responses(
+            "/api/v1/data-hub/schemas",
+            build_schema_list,
+        );
+        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/schemas",
+            &responses,
+            "foobar",
+        );
 
         service.load_schemas().await.unwrap();
 
         let mut created_schemas = Vec::new();
         for mut schema_list in responses {
-            schema_list.items.iter_mut().for_each(|schemas| created_schemas.append(schemas))
+            schema_list
+                .items
+                .iter_mut()
+                .for_each(|schemas| created_schemas.append(schemas))
         }
 
         assert_eq!(created_schemas, repo.find_all().unwrap());
@@ -204,7 +217,12 @@ mod tests {
             then.status(200);
         });
 
-        repo.save(&Schema::new("schema-1".to_string(), "{}".to_string(), "JSON".to_string())).unwrap();
+        repo.save(&Schema::new(
+            "schema-1".to_string(),
+            "{}".to_string(),
+            "JSON".to_string(),
+        ))
+        .unwrap();
 
         let response = service.delete_schema("schema-1").await;
 

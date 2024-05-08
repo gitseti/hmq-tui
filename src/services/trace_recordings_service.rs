@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::trace_recordings_api::{create_trace_recording, CreateTraceRecordingParams, delete_trace_recording, DeleteTraceRecordingParams, get_all_trace_recordings};
+use hivemq_openapi::apis::trace_recordings_api::{
+    create_trace_recording, delete_trace_recording, get_all_trace_recordings,
+    CreateTraceRecordingParams, DeleteTraceRecordingParams,
+};
 use hivemq_openapi::models::{TraceRecording, TraceRecordingItem};
 
 use crate::hivemq_rest_client;
@@ -16,10 +19,7 @@ pub struct TraceRecordingService {
 impl TraceRecordingService {
     pub fn new(repository: Arc<Repository<TraceRecording>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        TraceRecordingService {
-            repository,
-            config,
-        }
+        TraceRecordingService { repository, config }
     }
 
     pub async fn load_trace_recordings(&self) -> Result<(), String> {
@@ -38,7 +38,9 @@ impl TraceRecordingService {
         let trace_recording: TraceRecordingItem =
             serde_json::from_str(trace_recording.as_str()).or_else(|err| Err(err.to_string()))?;
 
-        let params = CreateTraceRecordingParams { trace_recording_item: Some(trace_recording) };
+        let params = CreateTraceRecordingParams {
+            trace_recording_item: Some(trace_recording),
+        };
 
         let response = create_trace_recording(&self.config, params)
             .await
@@ -64,13 +66,16 @@ impl TraceRecordingService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use hivemq_openapi::apis::trace_recordings_api::{CreateTraceRecordingError, DeleteTraceRecordingError, GetAllTraceRecordingsError};
-    use hivemq_openapi::models::{Errors, trace_recording, TraceRecording, TraceRecordingItem, TraceRecordingList};
+    use hivemq_openapi::apis::trace_recordings_api::{
+        CreateTraceRecordingError, DeleteTraceRecordingError, GetAllTraceRecordingsError,
+    };
+    use hivemq_openapi::models::{
+        trace_recording, Errors, TraceRecording, TraceRecordingItem, TraceRecordingList,
+    };
     use httpmock::Method::{DELETE, GET, POST};
     use httpmock::MockServer;
     use r2d2::Pool;
@@ -94,14 +99,20 @@ mod tests {
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<TraceRecording>>, TraceRecordingService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<TraceRecording>>,
+        TraceRecordingService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo =
-            Repository::<TraceRecording>::init(&connection_pool, "trace_recordings", |trace_recording| {
-                trace_recording.name.clone().unwrap()
-            }).unwrap();
+        let repo = Repository::<TraceRecording>::init(
+            &connection_pool,
+            "trace_recordings",
+            |trace_recording| trace_recording.name.clone().unwrap(),
+        )
+        .unwrap();
         let repo = Arc::new(repo);
         let service = TraceRecordingService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -148,9 +159,18 @@ mod tests {
             then.status(201).body(trace_recording_json.clone());
         });
 
-        let response = service.create_trace_recording(&trace_recording_json).await.unwrap();
+        let response = service
+            .create_trace_recording(&trace_recording_json)
+            .await
+            .unwrap();
 
-        assert_eq!(trace_recording.trace_recording, Box::new(repo.find_by_id(&trace_recording.trace_recording.name.clone().unwrap()).unwrap()));
+        assert_eq!(
+            trace_recording.trace_recording,
+            Box::new(
+                repo.find_by_id(&trace_recording.trace_recording.name.clone().unwrap())
+                    .unwrap()
+            )
+        );
     }
 
     #[tokio::test]

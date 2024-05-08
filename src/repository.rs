@@ -5,7 +5,7 @@ use serde::Serialize;
 #[derive(Debug)]
 pub enum RepositoryError {
     SerdeError(serde_json::Error),
-    SqlError(rusqlite::Error)
+    SqlError(rusqlite::Error),
 }
 
 impl From<serde_json::Error> for RepositoryError {
@@ -117,7 +117,11 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
         Ok(vec)
     }
 
-    pub fn find_ids_by(&self, json_path: &str, to_match: &str) -> Result<Vec<String>, RepositoryError> {
+    pub fn find_ids_by(
+        &self,
+        json_path: &str,
+        to_match: &str,
+    ) -> Result<Vec<String>, RepositoryError> {
         let binding = self.connection_pool.get().unwrap();
         let mut stmt = binding.prepare(&format!(
             "

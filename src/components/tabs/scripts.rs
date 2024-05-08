@@ -10,7 +10,12 @@ use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
+use crate::action::ListWithDetailsAction;
+use crate::components::list_with_details::Features;
 use crate::mode::Mode;
+use crate::repository::Repository;
+use crate::services::scripts_service::ScriptService;
 use crate::{
     action::{Action, Item},
     components::{
@@ -20,11 +25,6 @@ use crate::{
     hivemq_rest_client::{create_script, delete_script, fetch_scripts},
     tui::Frame,
 };
-use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
-use crate::action::ListWithDetailsAction;
-use crate::components::list_with_details::Features;
-use crate::repository::Repository;
-use crate::services::scripts_service::ScriptService;
 
 pub struct ScriptsTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -54,7 +54,12 @@ impl ScriptsTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let repository = Repository::<Script>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "scripts", |val| val.id.clone()).unwrap();
+        let repository = Repository::<Script>::init(
+            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
+            "scripts",
+            |val| val.id.clone(),
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(ScriptService::new(repository.clone(), &hivemq_address));
         let item_name = "Script";
@@ -71,7 +76,7 @@ impl ScriptsTab<'_> {
             action_tx,
             list_with_details,
             service,
-            item_name
+            item_name,
         }
     }
 }
@@ -130,7 +135,7 @@ impl Component for ScriptsTab<'_> {
                         .expect("Scripts: Failed to send ItemsLoadingFinished action");
                 });
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

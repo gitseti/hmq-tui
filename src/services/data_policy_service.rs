@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_data_policies_api::{CreateDataPolicyParams, DeleteDataPolicyParams, get_all_data_policies, GetAllDataPoliciesParams, UpdateDataPolicyParams};
+use hivemq_openapi::apis::data_hub_data_policies_api::{
+    get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams,
+    GetAllDataPoliciesParams, UpdateDataPolicyParams,
+};
 use hivemq_openapi::models::DataPolicy;
 
 use crate::hivemq_rest_client;
@@ -16,10 +19,7 @@ pub struct DataPolicyService {
 impl DataPolicyService {
     pub fn new(repository: Arc<Repository<DataPolicy>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        DataPolicyService {
-            repository,
-            config,
-        }
+        DataPolicyService { repository, config }
     }
 
     pub async fn load_data_policies(&self) -> Result<(), String> {
@@ -57,10 +57,12 @@ impl DataPolicyService {
 
         let params = CreateDataPolicyParams { data_policy };
 
-        let response =
-            hivemq_openapi::apis::data_hub_data_policies_api::create_data_policy(&self.config, params)
-                .await
-                .map_err(transform_api_err)?;
+        let response = hivemq_openapi::apis::data_hub_data_policies_api::create_data_policy(
+            &self.config,
+            params,
+        )
+        .await
+        .map_err(transform_api_err)?;
 
         self.repository.save(&response).unwrap();
 
@@ -72,12 +74,17 @@ impl DataPolicyService {
             serde_json::from_str(data_policy.as_str()).or_else(|err| Err(err.to_string()))?;
         let policy_id = data_policy.id.clone();
 
-        let params = UpdateDataPolicyParams { policy_id: policy_id.clone(), data_policy };
+        let params = UpdateDataPolicyParams {
+            policy_id: policy_id.clone(),
+            data_policy,
+        };
 
-        let response =
-            hivemq_openapi::apis::data_hub_data_policies_api::update_data_policy(&self.config, params)
-                .await
-                .map_err(transform_api_err)?;
+        let response = hivemq_openapi::apis::data_hub_data_policies_api::update_data_policy(
+            &self.config,
+            params,
+        )
+        .await
+        .map_err(transform_api_err)?;
 
         self.repository.save(&response).unwrap();
 
@@ -99,13 +106,17 @@ impl DataPolicyService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use hivemq_openapi::apis::data_hub_data_policies_api::{CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError, UpdateDataPolicyError};
-    use hivemq_openapi::models::{DataPolicy, DataPolicyList, DataPolicyMatching, Errors, PaginationCursor};
+    use hivemq_openapi::apis::data_hub_data_policies_api::{
+        CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
+        UpdateDataPolicyError,
+    };
+    use hivemq_openapi::models::{
+        DataPolicy, DataPolicyList, DataPolicyMatching, Errors, PaginationCursor,
+    };
     use httpmock::Method::{DELETE, POST, PUT};
     use httpmock::MockServer;
     use r2d2::Pool;
@@ -134,14 +145,19 @@ mod tests {
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<DataPolicy>>, DataPolicyService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<DataPolicy>>,
+        DataPolicyService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
         let repo =
             Repository::<DataPolicy>::init(&connection_pool, "data_policies", |data_policy| {
                 data_policy.id.clone()
-            }).unwrap();
+            })
+            .unwrap();
         let repo = Arc::new(repo);
         let service = DataPolicyService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -151,15 +167,25 @@ mod tests {
     async fn test_load_data_policies() {
         let (broker, pool, repo, service) = setup();
 
-        let responses = crate::hivemq_rest_client::tests::create_responses("/api/v1/data-hub/data-validation/policies", build_data_policy_list);
-        let mocks =
-            crate::hivemq_rest_client::tests::mock_cursor_responses(&broker, "/api/v1/data-hub/data-validation/policies", &responses, "foobar");
+        let responses = crate::hivemq_rest_client::tests::create_responses(
+            "/api/v1/data-hub/data-validation/policies",
+            build_data_policy_list,
+        );
+        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/data-validation/policies",
+            &responses,
+            "foobar",
+        );
 
         service.load_data_policies().await.unwrap();
 
         let mut created_data_policies = Vec::new();
         for mut data_policy_list in responses {
-            data_policy_list.items.iter_mut().for_each(|data_policies| created_data_policies.append(data_policies))
+            data_policy_list
+                .items
+                .iter_mut()
+                .for_each(|data_policies| created_data_policies.append(data_policies))
         }
 
         assert_eq!(created_data_policies, repo.find_all().unwrap());
