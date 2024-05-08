@@ -5,25 +5,32 @@ use std::sync::Arc;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::DataPolicy;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
     components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
-    hivemq_rest_client::{
-        create_data_policy, delete_data_policy, fetch_data_policies, update_data_policy,
-    },
+        Component, item_features::ItemSelector, list_with_details::ListWithDetails,
+        tabs::TabComponent,
+    }
+    ,
     tui::Frame,
 };
+use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
+use crate::action::ListWithDetailsAction;
+use crate::components::list_with_details::Features;
+use crate::mode::Mode;
+use crate::repository::Repository;
+use crate::services::data_policy_service::DataPolicyService;
 
 pub struct DataPoliciesTab<'a> {
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, DataPolicy>,
+    service: Arc<DataPolicyService>,
+    item_name: &'static str,
 }
 
 pub struct DataPolicySelector;
@@ -47,21 +54,24 @@ impl DataPoliciesTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
+        let repository = Repository::<DataPolicy>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "data_policies", |val| val.id.clone()).unwrap();
+        let repository = Arc::new(repository);
+        let service = Arc::new(DataPolicyService::new(repository.clone(), &hivemq_address));
+        let item_name = "Data Policy";
         let list_with_details = ListWithDetails::<DataPolicy>::builder()
             .list_title("Data Policies")
             .item_name("Data Policy")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
-            .item_selector(Box::new(DataPolicySelector))
-            .list_fn(Arc::new(fetch_data_policies))
-            .delete_fn(Arc::new(delete_data_policy))
-            .create_fn(Arc::new(create_data_policy))
-            .update_fn(Arc::new(update_data_policy))
+            .repository(repository.clone())
+            .features(Features::builder().deletable().creatable().updatable().build())
             .build();
         DataPoliciesTab {
             action_tx,
             list_with_details,
+            service,
+            item_name
         }
     }
 }
@@ -76,9 +86,61 @@ impl Component for DataPoliciesTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let list_action = self.list_with_details.update(action.clone());
-        if let Ok(Some(action)) = list_action {
-            return Ok(Some(action));
+        if let Ok(Some(action)) = self.list_with_details.update(action.clone()) {
+            let Action::LWD(lwd_action) = action else {
+                return Ok(Some(action));
+            };
+
+            match lwd_action {
+                ListWithDetailsAction::Delete(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.delete_data_policy(&item).await;
+                        let action = ItemDeleted { item_name, result };
+                        tx.send(action)
+                            .expect("Data Policies: Failed to send ItemDeleted action");
+                    });
+                }
+                ListWithDetailsAction::Create(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.create_data_policy(&item).await;
+                        let action = ItemCreated { item_name, result };
+                        tx.send(action)
+                            .expect("Data Policies: Failed to send ItemCreated action");
+                    });
+                }
+                ListWithDetailsAction::Update(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.update_data_policy(&item).await;
+                        let action = ItemCreated { item_name, result };
+                        tx.send(action)
+                            .expect("Data Policies: Failed to send ItemCreated action");
+                    });
+                }
+            }
+        }
+
+        match action {
+            Action::LoadAllItems => {
+                let service = self.service.clone();
+                let tx = self.action_tx.clone();
+                let item_name = String::from(self.item_name);
+                let _ = tokio::spawn(async move {
+                    let result = service.load_data_policies().await;
+                    let action = ItemsLoadingFinished { item_name, result };
+                    tx.send(action)
+                        .expect("Data Policies: Failed to send ItemsLoadingFinished action");
+                });
+            }
+            _ => ()
         }
 
         Ok(None)

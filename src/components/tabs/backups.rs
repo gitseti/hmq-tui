@@ -4,27 +4,27 @@ use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-
 use hivemq_openapi::models::Backup;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::hivemq_rest_client::start_backup;
+use crate::{action::{Action, Item}, components::{
+    Component, item_features::ItemSelector, list_with_details::ListWithDetails,
+    tabs::TabComponent,
+}, tui::Frame};
+use crate::components::list_with_details::Features;
 use crate::mode::Mode;
-use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
-    hivemq_rest_client::fetch_backups,
-    tui::Frame,
-};
+use crate::repository::Repository;
+use crate::services::backups_service::BackupService;
 
 pub struct BackupsTab<'a> {
     hivemq_address: String,
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Backup>,
+    service: Arc<BackupService>,
+    item_name: &'static str,
 }
 
 pub struct BackupSelector;
@@ -56,20 +56,26 @@ impl BackupsTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
+        let repository = Repository::<Backup>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "backups", |val| val.id.clone().unwrap()).unwrap();
+        let repository = Arc::new(repository);
+        let service = Arc::new(BackupService::new(repository.clone(), &hivemq_address));
+        let item_name = "Backup";
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
-            .item_name("Backup")
+            .item_name(item_name)
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .base_mode(Mode::BackupTab)
             .action_tx(action_tx.clone())
-            .list_fn(Arc::new(fetch_backups))
-            .item_selector(Box::new(BackupSelector))
+            .repository(repository.clone())
+            .features(Features::builder().build())
             .build();
         BackupsTab {
             hivemq_address,
             action_tx,
             list_with_details,
+            service,
+            item_name,
         }
     }
 }
@@ -84,18 +90,28 @@ impl Component for BackupsTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        let _ = self.list_with_details.update(action.clone());
+
         match action {
             Action::StartBackup => {
+                let service = self.service.clone();
                 let tx = self.action_tx.clone();
-                let hivemq_address = self.hivemq_address.clone();
+                let item_name = self.item_name.clone().to_string();
                 tokio::spawn(async move {
-                    let result = start_backup(hivemq_address).await;
-                    tx.send(Action::ItemCreated { result }).unwrap();
+                    let result = service.start_backup().await;
+                    tx.send(Action::ItemCreated { item_name, result }).unwrap();
                 });
             }
-            _ => {
-                let _ = self.list_with_details.update(action.clone());
+            Action::LoadAllItems => {
+                let service = self.service.clone();
+                let tx = self.action_tx.clone();
+                let item_name = self.item_name.clone().to_string();
+                tokio::spawn(async move {
+                    let result = service.load_backups().await;
+                    tx.send(Action::ItemsLoadingFinished { item_name, result }).unwrap();
+                });
             }
+            _ => ()
         }
 
         Ok(None)

@@ -1,49 +1,62 @@
 use std::cell::RefCell;
-
 use std::rc::Rc;
 use std::sync::Arc;
 
 use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use indexmap::IndexMap;
-
+use indexmap::IndexSet;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::Stylize,
     style::{Color, Modifier, Style, Styled},
     widgets::{block::Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
+use ratatui::text::Span;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
-use tui::Frame;
 use typed_builder::TypedBuilder;
+
+use ListPopup::FilterPopup;
 use LoadingState::Loaded;
+use tui::Frame;
 
-use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
-use crate::components::popup;
-use crate::components::popup::Popup;
-
-use crate::action::Item;
-use crate::components::item_features::UpdateFn;
-use crate::components::list_with_details::FocusMode::Editing;
 use crate::{
     action::{Action, Action::SelectedItem},
     components::{
+        Component,
         editor::Editor,
-        item_features::{CreateFn, DeleteFn, ItemSelector, ListFn},
+        item_features::ItemSelector,
         list_with_details::{
             FocusMode::Scrolling,
             LoadingState::{Loading, LoadingError},
         },
-        Component,
     },
     mode::Mode,
     tui,
 };
+use crate::action::ListWithDetailsAction;
+use crate::components::list_with_details::FocusMode::Editing;
+use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
+use crate::components::popup;
+use crate::components::popup::{InputPopup, Popup};
+use crate::repository::Repository;
 
 #[derive(TypedBuilder)]
-pub struct ListWithDetails<'a, T> {
+pub struct Features {
+    #[builder(setter(strip_bool))]
+    pub deletable: bool,
+
+    #[builder(setter(strip_bool))]
+    pub creatable: bool,
+
+    #[builder(setter(strip_bool))]
+    updatable: bool,
+}
+
+#[derive(TypedBuilder)]
+pub struct ListWithDetails<'a, T: Serialize + DeserializeOwned> {
     #[builder(setter(into))]
     list_title: String,
 
@@ -54,27 +67,18 @@ pub struct ListWithDetails<'a, T> {
     hivemq_address: String,
 
     #[builder]
-    mode: Rc<RefCell<Mode>>,
+    features: Features,
 
     #[builder]
-    item_selector: Box<dyn ItemSelector<T>>,
+    repository: Arc<Repository<T>>,
 
-    #[builder(setter(strip_option), default)]
-    delete_fn: Option<Arc<dyn DeleteFn>>,
-
-    #[builder(setter(strip_option), default)]
-    list_fn: Option<Arc<dyn ListFn>>,
-
-    #[builder(setter(strip_option), default)]
-    create_fn: Option<Arc<dyn CreateFn>>,
-
-    #[builder(setter(strip_option), default)]
-    update_fn: Option<Arc<dyn UpdateFn>>,
+    #[builder]
+    mode: Rc<RefCell<Mode>>,
 
     #[builder(default =
-    if create_fn.is_some() && delete_fn.is_some() {
+    if features.creatable && features.deletable {
     Mode::FullTab
-    } else if delete_fn.is_some() {
+    } else if features.deletable {
     Mode::ReadDeleteTab
     } else {
     Mode::ReadTab
@@ -84,11 +88,12 @@ pub struct ListWithDetails<'a, T> {
 
     #[builder(setter(skip), default =
     Loaded {
-    items: IndexMap::new(),
+    items: IndexSet::new(),
     list: vec ! [],
     focus_mode: FocusMode::Scrolling(ListState::default()),
+    filter: None
     })]
-    loading_state: LoadingState<'a, T>,
+    loading_state: LoadingState<'a>,
 
     #[builder]
     action_tx: UnboundedSender<Action>,
@@ -97,16 +102,18 @@ pub struct ListWithDetails<'a, T> {
     new_item_editor: Option<Editor<'a>>,
 
     #[builder(setter(skip), default)]
-    popup: Option<ListPopup>,
+    popup: Option<ListPopup<'a>>,
+
 }
 
-pub enum LoadingState<'a, T> {
+pub enum LoadingState<'a> {
     LoadingError(String),
     Loading,
     Loaded {
-        items: IndexMap<String, T>,
+        items: IndexSet<String>,
         list: Vec<ListItem<'a>>,
         focus_mode: FocusMode<'a>,
+        filter: Option<String>,
     },
 }
 
@@ -122,59 +129,52 @@ pub enum FocusMode<'a> {
     },
 }
 
-impl<T: Serialize> ListWithDetails<'_, T> {
+impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
     pub fn reset(&mut self) {
         self.loading_state = Loaded {
-            items: IndexMap::new(),
+            items: IndexSet::new(),
             list: vec![],
             focus_mode: FocusMode::Scrolling(ListState::default()),
+            filter: None,
         };
     }
 
-    pub fn set_items(&mut self, new_items: Vec<(String, T)>) {
-        self.reset();
+    pub fn set_items(&mut self, new_items: Vec<String>, filter: Option<String>) {
+        self.loading_state = Loaded {
+            items: IndexSet::new(),
+            list: vec![],
+            focus_mode: Scrolling(ListState::default()),
+            filter,
+        };
         if let Loaded { items, list, .. } = &mut self.loading_state {
             for item in new_items {
-                items.insert(item.0.clone(), item.1);
-                list.push(ListItem::new(item.0.clone()));
+                items.insert(item.clone());
+                list.push(ListItem::new(item.clone()));
             }
         }
     }
 
-    fn fetch_items(&mut self) {
-        if let Some(list_fn) = &self.list_fn {
-            let tx = self.action_tx.clone();
-            let hivemq_address = self.hivemq_address.clone();
-            let list_fn = list_fn.clone();
-            let _handle = tokio::spawn(async move {
-                let result = list_fn.list(hivemq_address).await;
-                tx.send(Action::ItemsLoadingFinished { result }).unwrap();
-            });
-        }
-        self.loading();
-    }
-
-    pub fn put(&mut self, key: String, value: T) {
+    pub fn put(&mut self, key: String) {
         if let Loaded { items, list, .. } = &mut self.loading_state {
-            let old_value = items.insert(key.to_owned(), value);
-            if old_value.is_none() {
+            let old_value = items.insert(key.to_owned());
+            if old_value {
                 list.push(ListItem::new(key.clone()));
             }
         }
     }
 
-    pub fn remove(&mut self, key: String) -> Option<T> {
+    pub fn remove(&mut self, key: String) {
         let Loaded {
             items,
             list,
             focus_mode,
-        } = &mut self.loading_state
-        else {
-            return None;
+            ..
+        } = &mut self.loading_state else {
+            return;
         };
 
-        let Some((index, _, item)) = items.shift_remove_full(&key) else {
-            return None;
+        let Some((index, item)) = items.shift_remove_full(&key) else {
+            return;
         };
 
         list.remove(index);
@@ -182,7 +182,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         let list_state = match focus_mode {
             FocusMode::Scrolling(list_state) => list_state,
             FocusMode::Editing { list_state, .. } => list_state,
-            _ => return Some(item),
+            _ => return,
         };
 
         if index > list.len().saturating_sub(1) {
@@ -192,25 +192,29 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         if list.len() == 0 {
             list_state.select(None);
         }
-
-        Some(item)
     }
 
-    pub fn get(&mut self, key: String) -> Option<&T> {
-        if let Loaded { items, .. } = &mut self.loading_state {
-            items.get(&key)
+    pub fn get(&self, key: &str) -> Option<T> {
+        if let Loaded { items, .. } = &self.loading_state {
+            if let None = items.get(key) {
+                return None;
+            }
+            match self.repository.find_by_id(key) {
+                Ok(item) => Some(item),
+                Err(_) => None
+            }
         } else {
             None
         }
     }
 
-    pub fn get_selected(&self) -> Option<(&String, &T)> {
+    pub fn get_selected(&self) -> Option<(&String, T)> {
         let Loaded {
             items, focus_mode, ..
         } = &self.loading_state
-        else {
-            return None;
-        };
+            else {
+                return None;
+            };
 
         let FocusMode::Scrolling(ref list_state) = focus_mode else {
             return None;
@@ -220,11 +224,14 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return None;
         };
 
-        let Some((key, item)) = items.get_index(index) else {
+        let Some((key)) = items.get_index(index) else {
             return None;
         };
 
-        Some((key, item))
+        match self.repository.find_by_id(key) {
+            Ok(item) => Some((key, item)),
+            Err(_) => None
+        }
     }
 
     pub fn list_error(&mut self, msg: &str) {
@@ -268,15 +275,15 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         self.loading_state = Loading;
     }
 
-    fn next_item(&mut self) -> Option<(&String, &T)> {
+    fn next_item(&mut self) -> Option<(&String, T)> {
         let Loaded {
             list,
             focus_mode,
-            items,
+            ..
         } = &mut self.loading_state
-        else {
-            return None;
-        };
+            else {
+                return None;
+            };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -287,7 +294,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 };
 
                 list_state.select(Some(new_selected));
-                Some(items.get_index(new_selected).unwrap())
+                self.get_selected()
             }
             FocusMode::DetailsError { .. } => {
                 *focus_mode = FocusMode::Scrolling(ListState::default());
@@ -297,15 +304,11 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    fn prev_item(&mut self) -> Option<(&String, &T)> {
-        let Loaded {
-            items,
-            list: _,
-            focus_mode,
-        } = &mut self.loading_state
-        else {
-            return None;
-        };
+    fn prev_item(&mut self) -> Option<(&String, T)> {
+        let Loaded { focus_mode, .. } = &mut self.loading_state
+            else {
+                return None;
+            };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -315,7 +318,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 };
 
                 list_state.select(Some(new_selected));
-                Some(items.get_index(new_selected).unwrap())
+                self.get_selected()
             }
             FocusMode::DetailsError { .. } => {
                 *focus_mode = FocusMode::Scrolling(ListState::default());
@@ -329,14 +332,15 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         let Loaded {
             focus_mode, items, ..
         } = &mut self.loading_state
-        else {
-            return Ok(());
-        };
+            else {
+                return Ok(());
+            };
 
         if let FocusMode::Scrolling(selected) = focus_mode {
             if let Some(selected) = selected.selected() {
-                let item = items.get_index(selected).unwrap();
-                let details = serde_json::to_string_pretty(item.1).unwrap();
+                let key = items.get_index(selected).unwrap();
+                let item = self.repository.find_by_id(key).unwrap();
+                let details = serde_json::to_string_pretty(&item).unwrap();
                 let mut clipboard = Clipboard::new().or_else(|err| Err(err.to_string()))?;
                 clipboard.set_text(details).unwrap();
             }
@@ -346,12 +350,16 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 
     fn inspect(&mut self) {
-        let Loaded {
-            items, focus_mode, ..
-        } = &mut self.loading_state
-        else {
+        let Some((_, item)) = self.get_selected() else {
             return;
         };
+
+        let Loaded {
+            focus_mode, ..
+        } = &mut self.loading_state
+            else {
+                return;
+            };
 
         let FocusMode::Scrolling(list_state) = focus_mode else {
             return;
@@ -361,12 +369,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             return;
         };
 
-        let Some((_, item)) = items.get_index(selected) else {
-            return;
-        };
-
-        let item = serde_json::to_string_pretty(item).unwrap();
-        if let Some(_update_fn) = &self.update_fn {
+        let item = serde_json::to_string_pretty(&item).unwrap();
+        if self.features.updatable {
             let update_editor =
                 Editor::writeable_with_text(format!("Update {}", self.item_name), item.to_owned());
             *focus_mode = Editing {
@@ -387,18 +391,19 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             *self.mode.borrow_mut() = Mode::EditorReadOnly;
         }
     }
-    fn confirm_popup(&mut self) {
-        if let Some(DeletePopup { item_id, .. }) = &self.popup {
-            if let Some(delete_fn) = &self.delete_fn {
-                let tx = self.action_tx.clone();
-                let host = self.hivemq_address.clone();
-                let delete_fn = delete_fn.clone();
-                let item_type = self.item_name.clone();
-                let item_id = item_id.clone();
-                tokio::spawn(async move {
-                    let result = delete_fn.delete(host, item_id).await;
-                    tx.send(Action::ItemDeleted { item_type, result }).unwrap();
-                });
+    fn confirm_popup(&mut self) -> Option<Action> {
+        let Some(popup) = &self.popup else {
+            return None;
+        };
+
+        match popup {
+            DeletePopup { item_id, .. } => Some(Action::LWD(ListWithDetailsAction::Delete(item_id.clone()))),
+            ErrorPopup { .. } => None,
+            FilterPopup { popup, .. } => {
+                let result = self.repository.find_ids_by("$", popup.get_text().as_str());
+                self.set_items(result.unwrap(), Some(popup.get_text().to_string()));
+                self.exit_popup();
+                None
             }
         }
     }
@@ -413,28 +418,23 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    fn handle_item_updated(&mut self, result: Result<Item, String>) {
+    fn handle_item_updated(&mut self, result: Result<String, String>) {
         self.set_scrolling_mode();
         match result {
-            Ok(item) => {
-                if let Some((id, item)) = self.item_selector.select_with_id(item) {
-                    self.put(id.clone(), item);
-                    self.select_item(id)
-                }
-            }
             Err(message) => {
                 self.details_error(format!("{} update failed", self.item_name), message);
             }
+            _ => {}
         }
     }
 
-    fn handle_item_created(&mut self, result: Result<Item, String>) {
+    fn handle_item_created(&mut self, result: Result<String, String>) {
         self.new_item_editor = None;
         match result {
-            Ok(item) => {
-                if let Some((id, item)) = self.item_selector.select_with_id(item) {
-                    self.put(id.clone(), item);
-                    self.select_item(id)
+            Ok(key) => {
+                if self.repository.find_by_id(&key).is_ok() {
+                    self.put(key.clone());
+                    self.select_item(key);
                 }
             }
             Err(error) => {
@@ -444,41 +444,28 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         *self.mode.borrow_mut() = self.base_mode;
     }
 
-    fn update_item(&mut self) {
+    fn update_item(&mut self) -> Option<Action>{
         if let Loaded {
-            focus_mode: Editing { editor, list_state },
-            items,
+            focus_mode: Editing { editor, .. },
             ..
         } = &self.loading_state
         {
-            let (id, _) = items.get_index(list_state.selected().unwrap()).unwrap();
-            let id = id.clone();
-            let text = editor.get_text();
-            let host = self.hivemq_address.clone();
-            let tx = self.action_tx.clone();
-            let update_fn = self.update_fn.clone().unwrap();
-            tokio::spawn(async move {
-                let result = update_fn.update(host, id, text).await;
-                tx.send(Action::ItemUpdated { result }).unwrap();
-            });
+            Some(Action::LWD(ListWithDetailsAction::Update(editor.get_text())))
+        } else {
+            None
         }
     }
 
-    fn create_item(&mut self) {
+    fn create_item(&mut self) -> Option<Action> {
         if let Some(editor) = &mut self.new_item_editor {
-            let text = editor.get_text();
-            let host = self.hivemq_address.clone();
-            let tx = self.action_tx.clone();
-            let create_fn = self.create_fn.clone().unwrap();
-            tokio::spawn(async move {
-                let result = create_fn.create(host, text).await;
-                tx.send(Action::ItemCreated { result }).unwrap();
-            });
+            Some(Action::LWD(ListWithDetailsAction::Create(editor.get_text())))
+        } else {
+            None
         }
     }
 
     fn enter_new_item_editor(&mut self) {
-        if self.create_fn.is_some() {
+        if self.features.creatable {
             self.set_scrolling_mode();
             self.new_item_editor = Some(Editor::writeable(
                 format!("New {}", self.item_name).to_owned(),
@@ -487,8 +474,8 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         }
     }
 
-    fn handle_item_deleted(&mut self, item_type: String, result: Result<String, String>) {
-        if item_type.eq(&self.item_name) {
+    fn handle_item_deleted(&mut self, item_name: String, result: Result<String, String>) {
+        if item_name.eq(&self.item_name) {
             match result {
                 Ok(id) => {
                     self.remove(id);
@@ -507,7 +494,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
 
     fn popup_delete_confirmation(&mut self) {
         if let Some((id, _)) = self.get_selected() {
-            if self.delete_fn.is_some() {
+            if self.features.deletable {
                 let item_type = self.item_name.clone();
                 let item_id = id.clone();
                 let popup = popup::ConfirmPopup {
@@ -516,24 +503,23 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                         "Are you sure you want to delete the {} with id '{}'",
                         item_type, item_id
                     )
-                    .to_string(),
+                        .to_string(),
                 };
                 self.enter_popup(DeletePopup { popup, item_id })
             }
         }
     }
 
-    fn handle_loading_finished(&mut self, result: Result<Vec<(String, Item)>, String>) {
+    pub fn popup_filter(&mut self) {
+        let popup = InputPopup::new("Filter Items");
+        self.enter_popup(FilterPopup { popup })
+    }
+
+    fn handle_loading_finished(&mut self, result: Result<(), String>) {
         match result {
-            Ok(items) => {
-                let mut unwrapped_items = Vec::with_capacity(items.len());
-                for (id, item) in items {
-                    let Some(item) = self.item_selector.select(item) else {
-                        break;
-                    };
-                    unwrapped_items.push((id, item));
-                }
-                self.set_items(unwrapped_items);
+            Ok(_) => {
+                let items = self.repository.find_all_ids().unwrap();
+                self.set_items(items, None);
             }
             Err(msg) => self.list_error(&msg),
         }
@@ -543,10 +529,11 @@ impl<T: Serialize> ListWithDetails<'_, T> {
         self.enter_popup(ErrorPopup { popup });
     }
 
-    fn enter_popup(&mut self, popup: ListPopup) {
+    fn enter_popup(&mut self, popup: ListPopup<'a>) {
         *self.mode.borrow_mut() = match popup {
             DeletePopup { .. } => Mode::ConfirmPopup,
             ErrorPopup { .. } => Mode::ErrorPopup,
+            FilterPopup { .. } => Mode::FilterPopup,
         };
         self.popup = Some(popup);
     }
@@ -611,6 +598,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                 items,
                 focus_mode,
                 list,
+                filter,
             } => {
                 let (list_state, list_style) = match focus_mode {
                     FocusMode::Scrolling(list_state) => {
@@ -630,13 +618,21 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                     list_style
                 };
 
+                let mut title_spans = Vec::with_capacity(2);
+                let title = Span::raw(format!(
+                    "{} ({}/{})",
+                    list_title,
+                    list_state.selected().map_or(0, |i| i + 1),
+                    list.len()
+                ));
+                title_spans.push(title);
+                if let Some(filter_str) = filter {
+                    let filter_title = Span::default().content(format!(" filtered by '{}'", &filter_str)).style(Style::default().fg(Color::Blue));
+                    title_spans.push(filter_title);
+                }
+
                 let list_widget = List::new(list.clone())
-                    .block(Block::default().borders(Borders::ALL).title(format!(
-                        "{} ({}/{})",
-                        list_title,
-                        list_state.selected().map_or(0, |i| i + 1),
-                        list.len()
-                    )))
+                    .block(Block::default().borders(Borders::ALL).title(title_spans))
                     .highlight_style(
                         Style::default()
                             .bg(Color::Blue)
@@ -669,8 +665,9 @@ impl<T: Serialize> ListWithDetails<'_, T> {
                         }
                         Some(selected) => {
                             let item = items.get_index(selected).unwrap();
+                            let item = self.repository.find_by_id(item).unwrap();
                             let mut editor = Editor::readonly(
-                                serde_json::to_string_pretty(item.1).unwrap(),
+                                serde_json::to_string_pretty(&item).unwrap(),
                                 self.item_name.to_owned(),
                             );
                             editor.unfocus();
@@ -699,6 +696,7 @@ impl<T: Serialize> ListWithDetails<'_, T> {
             let popup: &mut dyn Popup = match popup {
                 DeletePopup { popup, .. } => popup,
                 ErrorPopup { popup, .. } => popup,
+                FilterPopup { popup } => popup
             };
             popup.draw(f, f.size()).unwrap();
         }
@@ -707,13 +705,17 @@ impl<T: Serialize> ListWithDetails<'_, T> {
     }
 }
 
-impl<T: Serialize> Component for ListWithDetails<'_, T> {
+impl<T: Serialize + DeserializeOwned> Component for ListWithDetails<'_, T> {
     fn activate(&mut self) -> Result<()> {
         *self.mode.borrow_mut() = self.base_mode;
         Ok(())
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
+        if let Some(ListPopup::FilterPopup { popup }) = &mut self.popup {
+            return popup.handle_key_events(key);
+        }
+
         if let Some(editor) = &mut self.new_item_editor {
             return editor.handle_key_events(key);
         }
@@ -740,10 +742,12 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::LoadAllItems => {
-                self.fetch_items();
+                self.loading();
             }
-            Action::ItemsLoadingFinished { result } => {
-                self.handle_loading_finished(result);
+            Action::ItemsLoadingFinished { item_name, result } => {
+                if self.item_name.eq(&item_name) {
+                    self.handle_loading_finished(result);
+                }
             }
             Action::PrevItem => {
                 if let Some((key, _value)) = self.prev_item() {
@@ -763,27 +767,38 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 if let Some(_) = &mut self.new_item_editor {
                     self.new_item_editor = None;
                 }
+                if let Loaded { filter: Some(_), .. } = &self.loading_state {
+                    let items = self.repository.find_all_ids().unwrap();
+                    self.set_items(items, None);
+                }
             }
             Action::Delete => {
                 self.popup_delete_confirmation();
             }
-            Action::ItemDeleted { item_type, result } => {
-                self.handle_item_deleted(item_type, result);
+            Action::Filter => {
+                self.popup_filter();
+            }
+            Action::ItemDeleted { item_name, result } => {
+                self.handle_item_deleted(item_name, result);
             }
             Action::NewItem => {
                 self.enter_new_item_editor();
             }
             Action::CreateItem => {
-                self.create_item();
+                return Ok(self.create_item());
             }
             Action::UpdateItem => {
-                self.update_item();
+                return Ok(self.update_item());
             }
-            Action::ItemCreated { result } => {
-                self.handle_item_created(result);
+            Action::ItemCreated { item_name, result } => {
+                if self.item_name.eq(&item_name) {
+                    self.handle_item_created(result);
+                }
             }
-            Action::ItemUpdated { result } => {
-                self.handle_item_updated(result);
+            Action::ItemUpdated { item_name, result } => {
+                if self.item_name.eq(&item_name) {
+                    self.handle_item_updated(result);
+                }
             }
             Action::Enter => self.inspect(),
             Action::Copy => {
@@ -793,7 +808,7 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
                 self.exit_popup();
             }
             Action::ConfirmPopup => {
-                self.confirm_popup();
+                return Ok(self.confirm_popup());
             }
             _ => {}
         }
@@ -806,12 +821,15 @@ impl<T: Serialize> Component for ListWithDetails<'_, T> {
     }
 }
 
-enum ListPopup {
+enum ListPopup<'a> {
     DeletePopup {
         popup: popup::ConfirmPopup,
         item_id: String,
     },
     ErrorPopup {
         popup: popup::ErrorPopup,
+    },
+    FilterPopup {
+        popup: popup::InputPopup<'a>,
     },
 }

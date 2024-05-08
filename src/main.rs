@@ -2,24 +2,11 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-pub mod action;
-pub mod app;
-pub mod cli;
-pub mod components;
-pub mod config;
-mod hivemq_rest_client;
-pub mod mode;
-pub mod tui;
-pub mod utils;
-
 use clap::Parser;
-use cli::Cli;
 use color_eyre::eyre::Result;
-
-use crate::{
-    app::App,
-    utils::{initialize_logging, initialize_panic_handler, version},
-};
+use hmq_tui::app::App;
+use hmq_tui::cli::Cli;
+use hmq_tui::utils::{initialize_logging, initialize_panic_handler};
 
 async fn tokio_main() -> Result<()> {
     initialize_logging()?;
