@@ -73,9 +73,7 @@ mod tests {
     use hivemq_openapi::apis::trace_recordings_api::{
         CreateTraceRecordingError, DeleteTraceRecordingError, GetAllTraceRecordingsError,
     };
-    use hivemq_openapi::models::{
-        Errors, TraceRecording, TraceRecordingItem, TraceRecordingList,
-    };
+    use hivemq_openapi::models::{Errors, TraceRecording, TraceRecordingItem, TraceRecordingList};
     use httpmock::Method::{DELETE, GET, POST};
     use httpmock::MockServer;
     use r2d2::Pool;

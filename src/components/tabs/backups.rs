@@ -15,43 +15,16 @@ use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::backups_service::BackupService;
 use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
     tui::Frame,
 };
 
 pub struct BackupsTab<'a> {
-    hivemq_address: String,
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Backup>,
     service: Arc<BackupService>,
     item_name: &'static str,
-}
-
-pub struct BackupSelector;
-
-impl ItemSelector<Backup> for BackupSelector {
-    fn select(&self, item: Item) -> Option<Backup> {
-        match item {
-            Item::BackupItem(backup) => Some(backup),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, Backup)> {
-        let Some(item) = self.select(item) else {
-            return None;
-        };
-
-        let Some(id) = &item.id else {
-            return None;
-        };
-
-        Some((id.clone(), item))
-    }
 }
 
 impl BackupsTab<'_> {
@@ -59,28 +32,23 @@ impl BackupsTab<'_> {
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<Backup>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "backups",
-            |val| val.id.clone().unwrap(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<Backup>::init(sqlite_pool, "backups", |val| val.id.clone().unwrap())
+                .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BackupService::new(repository.clone(), &hivemq_address));
         let item_name = "Backup";
         let list_with_details = ListWithDetails::<Backup>::builder()
             .list_title("Backups")
             .item_name(item_name)
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .base_mode(Mode::BackupTab)
-            .action_tx(action_tx.clone())
             .repository(repository.clone())
             .features(Features::builder().build())
             .build();
         BackupsTab {
-            hivemq_address,
             action_tx,
             list_with_details,
             service,

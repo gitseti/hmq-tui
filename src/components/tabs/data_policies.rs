@@ -17,11 +17,8 @@ use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::data_policy_service::DataPolicyService;
 use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
     tui::Frame,
 };
 
@@ -32,42 +29,23 @@ pub struct DataPoliciesTab<'a> {
     item_name: &'static str,
 }
 
-pub struct DataPolicySelector;
-
-impl ItemSelector<DataPolicy> for DataPolicySelector {
-    fn select(&self, item: Item) -> Option<DataPolicy> {
-        match item {
-            Item::DataPolicyItem(policy) => Some(policy),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, DataPolicy)> {
-        self.select(item).map(|item| (item.id.clone(), item))
-    }
-}
-
 impl DataPoliciesTab<'_> {
     pub fn new(
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<DataPolicy>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "data_policies",
-            |val| val.id.clone(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<DataPolicy>::init(sqlite_pool, "data_policies", |val| val.id.clone())
+                .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(DataPolicyService::new(repository.clone(), &hivemq_address));
         let item_name = "Data Policy";
         let list_with_details = ListWithDetails::<DataPolicy>::builder()
             .list_title("Data Policies")
             .item_name("Data Policy")
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .repository(repository.clone())
             .features(
                 Features::builder()

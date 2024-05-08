@@ -17,11 +17,8 @@ use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::trace_recordings_service::TraceRecordingService;
 use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
     tui::Frame,
 };
 
@@ -32,41 +29,18 @@ pub struct TraceRecordingsTab<'a> {
     item_name: &'static str,
 }
 
-pub struct TraceRecordingSelector;
-
-impl ItemSelector<TraceRecording> for TraceRecordingSelector {
-    fn select(&self, item: Item) -> Option<TraceRecording> {
-        match item {
-            Item::TraceRecordingItem(trace_recording_item) => Some(trace_recording_item),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, TraceRecording)> {
-        let Some(item) = self.select(item) else {
-            return None;
-        };
-
-        let Some(id) = &item.start_at else {
-            return None;
-        };
-
-        Some((id.clone(), item))
-    }
-}
-
 impl TraceRecordingsTab<'_> {
     pub fn new(
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<TraceRecording>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "trace_recordings",
-            |val| val.name.clone().unwrap(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<TraceRecording>::init(sqlite_pool, "trace_recordings", |val| {
+                val.name.clone().unwrap()
+            })
+            .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(TraceRecordingService::new(
             repository.clone(),
@@ -76,9 +50,7 @@ impl TraceRecordingsTab<'_> {
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
             .item_name(item_name)
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .repository(repository.clone())
             .features(Features::builder().deletable().creatable().build())
             .build();

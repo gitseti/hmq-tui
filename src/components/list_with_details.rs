@@ -15,7 +15,6 @@ use ratatui::{
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use tokio::sync::mpsc::UnboundedSender;
 use typed_builder::TypedBuilder;
 
 use tui::Frame;
@@ -32,7 +31,6 @@ use crate::{
     action::{Action, Action::SelectedItem},
     components::{
         editor::Editor,
-        item_features::ItemSelector,
         list_with_details::{
             FocusMode::Scrolling,
             LoadingState::{Loading, LoadingError},
@@ -63,9 +61,6 @@ pub struct ListWithDetails<'a, T: Serialize + DeserializeOwned> {
     #[builder(setter(into))]
     item_name: String,
 
-    #[builder(setter(into))]
-    hivemq_address: String,
-
     #[builder]
     features: Features,
 
@@ -94,9 +89,6 @@ pub struct ListWithDetails<'a, T: Serialize + DeserializeOwned> {
     filter: None
     })]
     loading_state: LoadingState<'a>,
-
-    #[builder]
-    action_tx: UnboundedSender<Action>,
 
     #[builder(setter(skip), default)]
     new_item_editor: Option<Editor<'a>>,
