@@ -34,7 +34,6 @@ impl ClientDetailsService {
         Ok(())
     }
 
-
     async fn fetch_client_details(
         &self,
         client_id: &str,

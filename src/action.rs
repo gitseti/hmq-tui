@@ -85,13 +85,13 @@ pub enum Action {
 pub enum ListWithDetailsAction {
     Delete(String),
     Create(String),
-    Update(String)
+    Update(String),
 }
 
 impl<'de> Deserialize<'de> for Action {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct ActionVisitor;
 
@@ -103,8 +103,8 @@ impl<'de> Deserialize<'de> for Action {
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Action, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
                 match value {
                     "Tick" => Ok(Action::Tick),

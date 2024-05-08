@@ -10,21 +10,20 @@ use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-    action::{Action, Item},
-    components::{
-        Component, item_features::ItemSelector, list_with_details::ListWithDetails,
-        tabs::TabComponent,
-    }
-    ,
-    tui::Frame,
-};
 use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::Features;
 use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::trace_recordings_service::TraceRecordingService;
+use crate::{
+    action::{Action, Item},
+    components::{
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
+        Component,
+    },
+    tui::Frame,
+};
 
 pub struct TraceRecordingsTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -62,9 +61,17 @@ impl TraceRecordingsTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let repository = Repository::<TraceRecording>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "trace_recordings", |val| val.name.clone().unwrap()).unwrap();
+        let repository = Repository::<TraceRecording>::init(
+            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
+            "trace_recordings",
+            |val| val.name.clone().unwrap(),
+        )
+        .unwrap();
         let repository = Arc::new(repository);
-        let service = Arc::new(TraceRecordingService::new(repository.clone(), &hivemq_address));
+        let service = Arc::new(TraceRecordingService::new(
+            repository.clone(),
+            &hivemq_address,
+        ));
         let item_name = "Trace Recording";
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
@@ -138,7 +145,7 @@ impl Component for TraceRecordingsTab<'_> {
                         .expect("Trace Recordings: Failed to send ItemsLoadingFinished action");
                 });
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

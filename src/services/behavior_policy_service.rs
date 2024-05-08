@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_behavior_policies_api::{CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams, get_all_behavior_policies, GetAllBehaviorPoliciesParams, UpdateBehaviorPolicyParams};
+use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+    get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
+    GetAllBehaviorPoliciesParams, UpdateBehaviorPolicyParams,
+};
 use hivemq_openapi::models::BehaviorPolicy;
 
 use crate::hivemq_rest_client;
@@ -16,10 +19,7 @@ pub struct BehaviorPolicyService {
 impl BehaviorPolicyService {
     pub fn new(repository: Arc<Repository<BehaviorPolicy>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        BehaviorPolicyService {
-            repository,
-            config,
-        }
+        BehaviorPolicyService { repository, config }
     }
 
     pub async fn load_behavior_policies(&self) -> Result<(), String> {
@@ -57,9 +57,12 @@ impl BehaviorPolicyService {
         let params = CreateBehaviorPolicyParams { behavior_policy };
 
         let response =
-            hivemq_openapi::apis::data_hub_behavior_policies_api::create_behavior_policy(&self.config, params)
-                .await
-                .map_err(transform_api_err)?;
+            hivemq_openapi::apis::data_hub_behavior_policies_api::create_behavior_policy(
+                &self.config,
+                params,
+            )
+            .await
+            .map_err(transform_api_err)?;
 
         self.repository.save(&response).unwrap();
 
@@ -71,12 +74,18 @@ impl BehaviorPolicyService {
             serde_json::from_str(behavior_policy.as_str()).or_else(|err| Err(err.to_string()))?;
         let policy_id = behavior_policy.id.clone();
 
-        let params = UpdateBehaviorPolicyParams { policy_id: policy_id.clone(), behavior_policy };
+        let params = UpdateBehaviorPolicyParams {
+            policy_id: policy_id.clone(),
+            behavior_policy,
+        };
 
         let response =
-            hivemq_openapi::apis::data_hub_behavior_policies_api::update_behavior_policy(&self.config, params)
-                .await
-                .map_err(transform_api_err)?;
+            hivemq_openapi::apis::data_hub_behavior_policies_api::update_behavior_policy(
+                &self.config,
+                params,
+            )
+            .await
+            .map_err(transform_api_err)?;
 
         self.repository.save(&response).unwrap();
 
@@ -88,9 +97,12 @@ impl BehaviorPolicyService {
             policy_id: behavior_policy_id.to_owned(),
         };
 
-        hivemq_openapi::apis::data_hub_behavior_policies_api::delete_behavior_policy(&self.config, params)
-            .await
-            .map_err(transform_api_err)?;
+        hivemq_openapi::apis::data_hub_behavior_policies_api::delete_behavior_policy(
+            &self.config,
+            params,
+        )
+        .await
+        .map_err(transform_api_err)?;
 
         self.repository.delete_by_id(&behavior_policy_id).unwrap();
 
@@ -98,13 +110,18 @@ impl BehaviorPolicyService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use hivemq_openapi::apis::data_hub_behavior_policies_api::{CreateBehaviorPolicyError, DeleteBehaviorPolicyError, GetAllBehaviorPoliciesError, UpdateBehaviorPolicyError};
-    use hivemq_openapi::models::{BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Errors, PaginationCursor};
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::{
+        CreateBehaviorPolicyError, DeleteBehaviorPolicyError, GetAllBehaviorPoliciesError,
+        UpdateBehaviorPolicyError,
+    };
+    use hivemq_openapi::models::{
+        BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList, BehaviorPolicyMatching, Errors,
+        PaginationCursor,
+    };
     use httpmock::Method::{DELETE, POST, PUT};
     use httpmock::MockServer;
     use r2d2::Pool;
@@ -127,21 +144,28 @@ mod tests {
         end: usize,
         cursor: Option<Option<Box<PaginationCursor>>>,
     ) -> BehaviorPolicyList {
-        let behavior_policies: Vec<BehaviorPolicy> = (start..end).map(|i| build_behavior_policy(i)).collect();
+        let behavior_policies: Vec<BehaviorPolicy> =
+            (start..end).map(|i| build_behavior_policy(i)).collect();
         BehaviorPolicyList {
             _links: cursor,
             items: Some(behavior_policies),
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<BehaviorPolicy>>, BehaviorPolicyService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<BehaviorPolicy>>,
+        BehaviorPolicyService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo =
-            Repository::<BehaviorPolicy>::init(&connection_pool, "behavior_policies", |behavior_policy| {
-                behavior_policy.id.clone()
-            }).unwrap();
+        let repo = Repository::<BehaviorPolicy>::init(
+            &connection_pool,
+            "behavior_policies",
+            |behavior_policy| behavior_policy.id.clone(),
+        )
+        .unwrap();
         let repo = Arc::new(repo);
         let service = BehaviorPolicyService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -151,15 +175,25 @@ mod tests {
     async fn test_load_behavior_policies() {
         let (broker, pool, repo, service) = setup();
 
-        let responses = crate::hivemq_rest_client::tests::create_responses("/api/v1/data-hub/behavior-validation/policies", build_behavior_policy_list);
-        let mocks =
-            crate::hivemq_rest_client::tests::mock_cursor_responses(&broker, "/api/v1/data-hub/behavior-validation/policies", &responses, "foobar");
+        let responses = crate::hivemq_rest_client::tests::create_responses(
+            "/api/v1/data-hub/behavior-validation/policies",
+            build_behavior_policy_list,
+        );
+        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/behavior-validation/policies",
+            &responses,
+            "foobar",
+        );
 
         service.load_behavior_policies().await.unwrap();
 
         let mut created_behavior_policies = Vec::new();
         for mut behavior_policy_list in responses {
-            behavior_policy_list.items.iter_mut().for_each(|behavior_policies| created_behavior_policies.append(behavior_policies))
+            behavior_policy_list
+                .items
+                .iter_mut()
+                .for_each(|behavior_policies| created_behavior_policies.append(behavior_policies))
         }
 
         assert_eq!(created_behavior_policies, repo.find_all().unwrap());
@@ -190,9 +224,15 @@ mod tests {
             then.status(201).body(behavior_policy_json.clone());
         });
 
-        let response = service.create_behavior_policy(&behavior_policy_json).await.unwrap();
+        let response = service
+            .create_behavior_policy(&behavior_policy_json)
+            .await
+            .unwrap();
 
-        assert_eq!(behavior_policy, repo.find_by_id(&behavior_policy.id).unwrap());
+        assert_eq!(
+            behavior_policy,
+            repo.find_by_id(&behavior_policy.id).unwrap()
+        );
     }
 
     #[tokio::test]

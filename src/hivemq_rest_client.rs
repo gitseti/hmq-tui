@@ -1,34 +1,34 @@
+use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
+use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
+use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
+use hivemq_openapi::models::TraceRecording;
 use hivemq_openapi::{
     apis::{
         backup_restore_api::get_all_backups,
         configuration::Configuration,
         data_hub_behavior_policies_api::{
-            CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams, get_all_behavior_policies,
+            get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
             GetAllBehaviorPoliciesParams,
         },
         data_hub_data_policies_api::{
-            CreateDataPolicyParams, DeleteDataPolicyParams, get_all_data_policies,
+            get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams,
             GetAllDataPoliciesParams,
         },
         data_hub_schemas_api::{
-            CreateSchemaParams, DeleteSchemaParams, get_all_schemas, GetAllSchemasParams,
+            get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
         },
         data_hub_scripts_api::{
-            CreateScriptParams, DeleteScriptParams, get_all_scripts, GetAllScriptsParams,
+            get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
         },
-        Error,
         mqtt_clients_api,
         mqtt_clients_api::{
             get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams,
         },
-        trace_recordings_api::{DeleteTraceRecordingParams, get_all_trace_recordings},
+        trace_recordings_api::{get_all_trace_recordings, DeleteTraceRecordingParams},
+        Error,
     },
     models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
-use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
-use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
-use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
-use hivemq_openapi::models::TraceRecording;
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
@@ -523,6 +523,10 @@ pub async fn delete_trace_recording(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
+    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
+    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
     use hivemq_openapi::{
         apis::{
             backup_restore_api::GetAllBackupsError,
@@ -531,29 +535,24 @@ pub(crate) mod tests {
             },
             data_hub_data_policies_api::{
                 CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
-            }
-            ,
+            },
             data_hub_scripts_api::{CreateScriptError, DeleteScriptError, GetAllScriptsError},
             mqtt_clients_api::GetMqttClientDetailsError,
             trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError},
         },
         models::{
-            Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList,
-            BehaviorPolicyMatching, Client, ClientDetails, ClientItem, ClientList,
-            ClientRestrictions, ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching,
-            Error, Errors, PaginationCursor, Script, script::FunctionType,
-            ScriptList, TraceRecording, TraceRecordingList,
+            script::FunctionType, Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior,
+            BehaviorPolicyList, BehaviorPolicyMatching, Client, ClientDetails, ClientItem,
+            ClientList, ClientRestrictions, ConnectionDetails, DataPolicy, DataPolicyList,
+            DataPolicyMatching, Error, Errors, PaginationCursor, Script, ScriptList,
+            TraceRecording, TraceRecordingList,
         },
     };
-    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
-    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
-    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
-    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
+    use httpmock::Method::PUT;
     use httpmock::{
         Method::{DELETE, GET, POST},
         Mock, MockServer,
     };
-    use httpmock::Method::PUT;
     use pretty_assertions::assert_eq;
     use serde::Serialize;
     use serde_json::{json, Value};

@@ -8,22 +8,19 @@ use hivemq_openapi::models::ClientDetails;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use Action::LoadAllItems;
 use tui::Frame;
+use Action::LoadAllItems;
 
-use crate::{
-    action::Action,
-    components::{
-        Component, list_with_details::ListWithDetails,
-        tabs::TabComponent,
-    },
-    tui,
-};
 use crate::action::Action::ClientDetailsLoadingFinished;
 use crate::components::list_with_details::Features;
 use crate::mode::Mode;
 use crate::repository::{Repository, RepositoryError};
 use crate::services::client_details_service::ClientDetailsService;
+use crate::{
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
+    tui,
+};
 
 pub struct Clients<'a> {
     action_tx: UnboundedSender<Action>,

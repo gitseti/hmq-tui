@@ -10,21 +10,20 @@ use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-    action::{Action, Item},
-    components::{
-        Component, item_features::ItemSelector, list_with_details::ListWithDetails,
-        tabs::TabComponent,
-    }
-    ,
-    tui::Frame,
-};
 use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::Features;
 use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::data_policy_service::DataPolicyService;
+use crate::{
+    action::{Action, Item},
+    components::{
+        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
+        Component,
+    },
+    tui::Frame,
+};
 
 pub struct DataPoliciesTab<'a> {
     action_tx: UnboundedSender<Action>,
@@ -54,7 +53,12 @@ impl DataPoliciesTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let repository = Repository::<DataPolicy>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "data_policies", |val| val.id.clone()).unwrap();
+        let repository = Repository::<DataPolicy>::init(
+            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
+            "data_policies",
+            |val| val.id.clone(),
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(DataPolicyService::new(repository.clone(), &hivemq_address));
         let item_name = "Data Policy";
@@ -65,13 +69,19 @@ impl DataPoliciesTab<'_> {
             .mode(mode)
             .action_tx(action_tx.clone())
             .repository(repository.clone())
-            .features(Features::builder().deletable().creatable().updatable().build())
+            .features(
+                Features::builder()
+                    .deletable()
+                    .creatable()
+                    .updatable()
+                    .build(),
+            )
             .build();
         DataPoliciesTab {
             action_tx,
             list_with_details,
             service,
-            item_name
+            item_name,
         }
     }
 }
@@ -140,7 +150,7 @@ impl Component for DataPoliciesTab<'_> {
                         .expect("Data Policies: Failed to send ItemsLoadingFinished action");
                 });
             }
-            _ => ()
+            _ => (),
         }
 
         Ok(None)

@@ -16,10 +16,7 @@ pub struct BackupService {
 impl BackupService {
     pub fn new(repository: Arc<Repository<Backup>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        BackupService {
-            repository,
-            config,
-        }
+        BackupService { repository, config }
     }
 
     pub async fn load_backups(&self) -> Result<(), String> {
@@ -35,10 +32,9 @@ impl BackupService {
     }
 
     pub async fn start_backup(&self) -> Result<String, String> {
-        let response =
-            hivemq_openapi::apis::backup_restore_api::create_backup(&self.config)
-                .await
-                .map_err(transform_api_err)?;
+        let response = hivemq_openapi::apis::backup_restore_api::create_backup(&self.config)
+            .await
+            .map_err(transform_api_err)?;
 
         if let Some(backup) = response.backup {
             self.repository.save(&backup).unwrap();
@@ -48,7 +44,6 @@ impl BackupService {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -75,24 +70,25 @@ mod tests {
         }
     }
 
-    fn build_backup_list(
-        start: usize,
-        end: usize,
-    ) -> BackupList {
+    fn build_backup_list(start: usize, end: usize) -> BackupList {
         let backups: Vec<Backup> = (start..end).map(|i| build_backup(i)).collect();
         BackupList {
             items: Some(backups),
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<Backup>>, BackupService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<Backup>>,
+        BackupService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo =
-            Repository::<Backup>::init(&connection_pool, "backups", |backup| {
-                backup.id.clone().unwrap()
-            }).unwrap();
+        let repo = Repository::<Backup>::init(&connection_pool, "backups", |backup| {
+            backup.id.clone().unwrap()
+        })
+        .unwrap();
         let repo = Arc::new(repo);
         let service = BackupService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -143,7 +139,10 @@ mod tests {
 
         let response = service.start_backup().await.unwrap();
 
-        assert_eq!(backup.backup.unwrap(), Box::new(repo.find_by_id(&response).unwrap()));
+        assert_eq!(
+            backup.backup.unwrap(),
+            Box::new(repo.find_by_id(&response).unwrap())
+        );
     }
 
     #[tokio::test]

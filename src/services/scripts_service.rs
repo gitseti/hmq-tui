@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use hivemq_openapi::apis::configuration::Configuration;
-use hivemq_openapi::apis::data_hub_scripts_api::{CreateScriptParams, DeleteScriptParams, get_all_scripts, GetAllScriptsParams};
+use hivemq_openapi::apis::data_hub_scripts_api::{
+    get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
+};
 use hivemq_openapi::models::Script;
 
 use crate::hivemq_rest_client;
@@ -16,10 +18,7 @@ pub struct ScriptService {
 impl ScriptService {
     pub fn new(repository: Arc<Repository<Script>>, host: &str) -> Self {
         let config = hivemq_rest_client::build_rest_api_config(host.to_string());
-        ScriptService {
-            repository,
-            config,
-        }
+        ScriptService { repository, config }
     }
 
     pub async fn load_scripts(&self) -> Result<(), String> {
@@ -81,14 +80,15 @@ impl ScriptService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use hivemq_openapi::apis::data_hub_scripts_api::{CreateScriptError, DeleteScriptError, GetAllScriptsError};
-    use hivemq_openapi::models::{Errors, PaginationCursor, Script, ScriptList};
+    use hivemq_openapi::apis::data_hub_scripts_api::{
+        CreateScriptError, DeleteScriptError, GetAllScriptsError,
+    };
     use hivemq_openapi::models::script::FunctionType;
+    use hivemq_openapi::models::{Errors, PaginationCursor, Script, ScriptList};
     use httpmock::Method::{DELETE, POST};
     use httpmock::MockServer;
     use r2d2::Pool;
@@ -118,14 +118,17 @@ mod tests {
         }
     }
 
-
-    fn setup() -> (MockServer, Pool<SqliteConnectionManager>, Arc<Repository<Script>>, ScriptService) {
+    fn setup() -> (
+        MockServer,
+        Pool<SqliteConnectionManager>,
+        Arc<Repository<Script>>,
+        ScriptService,
+    ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
         let repo =
-            Repository::<Script>::init(&connection_pool, "scripts", |script| {
-                script.id.clone()
-            }).unwrap();
+            Repository::<Script>::init(&connection_pool, "scripts", |script| script.id.clone())
+                .unwrap();
         let repo = Arc::new(repo);
         let service = ScriptService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)
@@ -135,15 +138,25 @@ mod tests {
     async fn test_load_scripts() {
         let (broker, pool, repo, service) = setup();
 
-        let responses = crate::hivemq_rest_client::tests::create_responses("/api/v1/data-hub/scripts", build_script_list);
-        let mocks =
-            crate::hivemq_rest_client::tests::mock_cursor_responses(&broker, "/api/v1/data-hub/scripts", &responses, "foobar");
+        let responses = crate::hivemq_rest_client::tests::create_responses(
+            "/api/v1/data-hub/scripts",
+            build_script_list,
+        );
+        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+            &broker,
+            "/api/v1/data-hub/scripts",
+            &responses,
+            "foobar",
+        );
 
         service.load_scripts().await.unwrap();
 
         let mut created_scripts = Vec::new();
         for mut script_list in responses {
-            script_list.items.iter_mut().for_each(|scripts| created_scripts.append(scripts))
+            script_list
+                .items
+                .iter_mut()
+                .for_each(|scripts| created_scripts.append(scripts))
         }
 
         assert_eq!(created_scripts, repo.find_all().unwrap());

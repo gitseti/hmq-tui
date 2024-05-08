@@ -6,42 +6,42 @@ use arboard::Clipboard;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use indexmap::IndexSet;
+use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::Stylize,
     style::{Color, Modifier, Style, Styled},
     widgets::{block::Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use ratatui::text::Span;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
 use typed_builder::TypedBuilder;
 
+use tui::Frame;
 use ListPopup::FilterPopup;
 use LoadingState::Loaded;
-use tui::Frame;
 
-use crate::{
-    action::{Action, Action::SelectedItem},
-    components::{
-        Component,
-        editor::Editor,
-        item_features::ItemSelector,
-        list_with_details::{
-            FocusMode::Scrolling,
-            LoadingState::{Loading, LoadingError},
-        },
-    },
-    mode::Mode,
-    tui,
-};
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::FocusMode::Editing;
 use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
 use crate::components::popup;
 use crate::components::popup::{InputPopup, Popup};
 use crate::repository::Repository;
+use crate::{
+    action::{Action, Action::SelectedItem},
+    components::{
+        editor::Editor,
+        item_features::ItemSelector,
+        list_with_details::{
+            FocusMode::Scrolling,
+            LoadingState::{Loading, LoadingError},
+        },
+        Component,
+    },
+    mode::Mode,
+    tui,
+};
 
 #[derive(TypedBuilder)]
 pub struct Features {
@@ -103,7 +103,6 @@ pub struct ListWithDetails<'a, T: Serialize + DeserializeOwned> {
 
     #[builder(setter(skip), default)]
     popup: Option<ListPopup<'a>>,
-
 }
 
 pub enum LoadingState<'a> {
@@ -169,7 +168,8 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             list,
             focus_mode,
             ..
-        } = &mut self.loading_state else {
+        } = &mut self.loading_state
+        else {
             return;
         };
 
@@ -201,7 +201,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             }
             match self.repository.find_by_id(key) {
                 Ok(item) => Some(item),
-                Err(_) => None
+                Err(_) => None,
             }
         } else {
             None
@@ -212,9 +212,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             items, focus_mode, ..
         } = &self.loading_state
-            else {
-                return None;
-            };
+        else {
+            return None;
+        };
 
         let FocusMode::Scrolling(ref list_state) = focus_mode else {
             return None;
@@ -230,7 +230,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
 
         match self.repository.find_by_id(key) {
             Ok(item) => Some((key, item)),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 
@@ -277,13 +277,11 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
 
     fn next_item(&mut self) -> Option<(&String, T)> {
         let Loaded {
-            list,
-            focus_mode,
-            ..
+            list, focus_mode, ..
         } = &mut self.loading_state
-            else {
-                return None;
-            };
+        else {
+            return None;
+        };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -305,10 +303,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
     }
 
     fn prev_item(&mut self) -> Option<(&String, T)> {
-        let Loaded { focus_mode, .. } = &mut self.loading_state
-            else {
-                return None;
-            };
+        let Loaded { focus_mode, .. } = &mut self.loading_state else {
+            return None;
+        };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -332,9 +329,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             focus_mode, items, ..
         } = &mut self.loading_state
-            else {
-                return Ok(());
-            };
+        else {
+            return Ok(());
+        };
 
         if let FocusMode::Scrolling(selected) = focus_mode {
             if let Some(selected) = selected.selected() {
@@ -354,12 +351,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             return;
         };
 
-        let Loaded {
-            focus_mode, ..
-        } = &mut self.loading_state
-            else {
-                return;
-            };
+        let Loaded { focus_mode, .. } = &mut self.loading_state else {
+            return;
+        };
 
         let FocusMode::Scrolling(list_state) = focus_mode else {
             return;
@@ -397,7 +391,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         };
 
         match popup {
-            DeletePopup { item_id, .. } => Some(Action::LWD(ListWithDetailsAction::Delete(item_id.clone()))),
+            DeletePopup { item_id, .. } => {
+                Some(Action::LWD(ListWithDetailsAction::Delete(item_id.clone())))
+            }
             ErrorPopup { .. } => None,
             FilterPopup { popup, .. } => {
                 let result = self.repository.find_ids_by("$", popup.get_text().as_str());
@@ -444,13 +440,15 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         *self.mode.borrow_mut() = self.base_mode;
     }
 
-    fn update_item(&mut self) -> Option<Action>{
+    fn update_item(&mut self) -> Option<Action> {
         if let Loaded {
             focus_mode: Editing { editor, .. },
             ..
         } = &self.loading_state
         {
-            Some(Action::LWD(ListWithDetailsAction::Update(editor.get_text())))
+            Some(Action::LWD(ListWithDetailsAction::Update(
+                editor.get_text(),
+            )))
         } else {
             None
         }
@@ -458,7 +456,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
 
     fn create_item(&mut self) -> Option<Action> {
         if let Some(editor) = &mut self.new_item_editor {
-            Some(Action::LWD(ListWithDetailsAction::Create(editor.get_text())))
+            Some(Action::LWD(ListWithDetailsAction::Create(
+                editor.get_text(),
+            )))
         } else {
             None
         }
@@ -503,7 +503,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
                         "Are you sure you want to delete the {} with id '{}'",
                         item_type, item_id
                     )
-                        .to_string(),
+                    .to_string(),
                 };
                 self.enter_popup(DeletePopup { popup, item_id })
             }
@@ -627,7 +627,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
                 ));
                 title_spans.push(title);
                 if let Some(filter_str) = filter {
-                    let filter_title = Span::default().content(format!(" filtered by '{}'", &filter_str)).style(Style::default().fg(Color::Blue));
+                    let filter_title = Span::default()
+                        .content(format!(" filtered by '{}'", &filter_str))
+                        .style(Style::default().fg(Color::Blue));
                     title_spans.push(filter_title);
                 }
 
@@ -696,7 +698,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             let popup: &mut dyn Popup = match popup {
                 DeletePopup { popup, .. } => popup,
                 ErrorPopup { popup, .. } => popup,
-                FilterPopup { popup } => popup
+                FilterPopup { popup } => popup,
             };
             popup.draw(f, f.size()).unwrap();
         }
@@ -767,7 +769,10 @@ impl<T: Serialize + DeserializeOwned> Component for ListWithDetails<'_, T> {
                 if let Some(_) = &mut self.new_item_editor {
                     self.new_item_editor = None;
                 }
-                if let Loaded { filter: Some(_), .. } = &self.loading_state {
+                if let Loaded {
+                    filter: Some(_), ..
+                } = &self.loading_state
+                {
                     let items = self.repository.find_all_ids().unwrap();
                     self.set_items(items, None);
                 }
