@@ -5,6 +5,8 @@ use std::sync::Arc;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::ClientDetails;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -24,7 +26,6 @@ use crate::{
 
 pub struct Clients<'a> {
     action_tx: UnboundedSender<Action>,
-    hivemq_address: String,
     list_with_details: ListWithDetails<'a, ClientDetails>,
     service: Arc<ClientDetailsService>,
     repository: Arc<Repository<ClientDetails>>,
@@ -35,21 +36,25 @@ impl<'a> Clients<'a> {
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
-        service: Arc<ClientDetailsService>,
-        repository: Arc<Repository<ClientDetails>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
+        let repository = Arc::new(
+            Repository::<ClientDetails>::init(sqlite_pool, "client_details", |details| {
+                details.id.clone().unwrap()
+            })
+            .unwrap(),
+        );
+        let client_details_service = ClientDetailsService::new(repository.clone(), &hivemq_address);
+        let service = Arc::new(client_details_service);
         let list_with_details = ListWithDetails::<ClientDetails>::builder()
             .list_title("Clients")
             .item_name("Client Details")
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .features(Features::builder().build())
             .repository(repository.clone())
             .build();
         Clients {
             action_tx,
-            hivemq_address,
             list_with_details,
             service,
             repository,

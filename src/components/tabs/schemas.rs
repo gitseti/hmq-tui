@@ -34,22 +34,17 @@ impl SchemasTab<'_> {
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<Schema>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "schemas",
-            |val| val.id.clone(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<Schema>::init(sqlite_pool, "schemas", |val| val.id.clone()).unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(SchemaService::new(repository.clone(), &hivemq_address));
         let item_name = "Schema";
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
             .item_name(item_name)
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .repository(repository)
             .features(Features::builder().creatable().deletable().build())
             .build();

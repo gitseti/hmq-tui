@@ -1,17 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use color_eyre::eyre::{Ok, Result};
 use crossterm::event::{KeyEvent, MouseEvent};
-use hivemq_openapi::models::ClientDetails;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::{prelude::*, widgets::*};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{Component, Frame};
-use crate::repository::Repository;
-use crate::services::client_details_service::ClientDetailsService;
 use crate::{
     action::Action,
     components::tabs::{
@@ -23,6 +19,8 @@ use crate::{
     mode::Mode,
     tui::Event,
 };
+
+use super::{Component, Frame};
 
 pub struct Home {
     action_tx: UnboundedSender<Action>,
@@ -39,16 +37,7 @@ impl Home {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let client_details_repo = Arc::new(
-            Repository::<ClientDetails>::init(&pool, "client_details", |details| {
-                details.id.clone().unwrap()
-            })
-            .unwrap(),
-        );
-        let client_details_service =
-            ClientDetailsService::new(client_details_repo.clone(), &hivemq_address);
-        let client_details_service = Arc::new(client_details_service);
+        let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
         return Home {
             action_tx: action_tx.clone(),
             config,
@@ -58,38 +47,43 @@ impl Home {
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
-                    client_details_service,
-                    client_details_repo,
+                    &sqlite_pool,
                 )),
                 Box::new(SchemasTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
                 Box::new(ScriptsTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
                 Box::new(DataPoliciesTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
                 Box::new(BehaviorPoliciesTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
                 Box::new(TraceRecordingsTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
                 Box::new(BackupsTab::new(
                     action_tx.clone(),
                     hivemq_address.to_owned(),
                     mode.clone(),
+                    &sqlite_pool,
                 )),
             ],
             active_tab: 0,

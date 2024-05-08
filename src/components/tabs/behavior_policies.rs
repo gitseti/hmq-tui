@@ -17,11 +17,8 @@ use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::behavior_policy_service::BehaviorPolicyService;
 use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
     tui::Frame,
 };
 
@@ -32,33 +29,18 @@ pub struct BehaviorPoliciesTab<'a> {
     item_name: &'static str,
 }
 
-pub struct BehaviorPolicySelector;
-
-impl ItemSelector<BehaviorPolicy> for BehaviorPolicySelector {
-    fn select(&self, item: Item) -> Option<BehaviorPolicy> {
-        match item {
-            Item::BehaviorPolicyItem(policy) => Some(policy),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, BehaviorPolicy)> {
-        self.select(item).map(|item| (item.id.clone(), item))
-    }
-}
-
 impl BehaviorPoliciesTab<'_> {
     pub fn new(
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<BehaviorPolicy>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "behavior_policies",
-            |val| val.id.clone(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<BehaviorPolicy>::init(sqlite_pool, "behavior_policies", |val| {
+                val.id.clone()
+            })
+            .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BehaviorPolicyService::new(
             repository.clone(),
@@ -68,9 +50,7 @@ impl BehaviorPoliciesTab<'_> {
         let list_with_details = ListWithDetails::<BehaviorPolicy>::builder()
             .list_title("Behavior Policies")
             .item_name(item_name)
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .repository(repository.clone())
             .features(
                 Features::builder()

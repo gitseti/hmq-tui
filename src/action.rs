@@ -1,23 +1,9 @@
 use std::{fmt, fmt::Debug};
 
-use hivemq_openapi::models::{
-    Backup, BehaviorPolicy, ClientDetails, DataPolicy, Schema, Script, TraceRecording,
-};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum Item {
-    ClientItem(ClientDetails),
-    SchemaItem(Schema),
-    ScriptItem(Script),
-    DataPolicyItem(DataPolicy),
-    BehaviorPolicyItem(BehaviorPolicy),
-    BackupItem(Backup),
-    TraceRecordingItem(TraceRecording),
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Action {

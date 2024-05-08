@@ -17,11 +17,8 @@ use crate::mode::Mode;
 use crate::repository::Repository;
 use crate::services::scripts_service::ScriptService;
 use crate::{
-    action::{Action, Item},
-    components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
+    action::Action,
+    components::{list_with_details::ListWithDetails, tabs::TabComponent, Component},
     tui::Frame,
 };
 
@@ -32,42 +29,22 @@ pub struct ScriptsTab<'a> {
     item_name: &'static str,
 }
 
-pub struct ScriptSelector;
-
-impl ItemSelector<Script> for ScriptSelector {
-    fn select(&self, item: Item) -> Option<Script> {
-        match item {
-            Item::ScriptItem(script) => Some(script),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, Script)> {
-        self.select(item).map(|item| (item.id.clone(), item))
-    }
-}
-
 impl ScriptsTab<'_> {
     pub fn new(
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository = Repository::<Script>::init(
-            &Pool::new(SqliteConnectionManager::memory()).unwrap(),
-            "scripts",
-            |val| val.id.clone(),
-        )
-        .unwrap();
+        let repository =
+            Repository::<Script>::init(sqlite_pool, "scripts", |val| val.id.clone()).unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(ScriptService::new(repository.clone(), &hivemq_address));
         let item_name = "Script";
         let list_with_details = ListWithDetails::<Script>::builder()
             .list_title("Scripts")
             .item_name("Script")
-            .hivemq_address(hivemq_address.clone())
             .mode(mode)
-            .action_tx(action_tx.clone())
             .repository(repository.clone())
             .features(Features::builder().creatable().deletable().build())
             .build();
