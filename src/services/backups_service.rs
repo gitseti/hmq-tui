@@ -38,7 +38,7 @@ impl BackupService {
 
         if let Some(backup) = response.backup {
             self.repository.save(&backup).unwrap();
-            Ok((backup.id.unwrap()))
+            Ok(backup.id.unwrap())
         } else {
             return Err(String::from("No backup was created"));
         }
@@ -96,7 +96,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_backups() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
         let backup_list = build_backup_list(0, 10);
         broker.mock(|when, then| {
             when.any_request().method(GET);
@@ -112,7 +112,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_backups_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllBackupsError::Status503(Errors::new());
         broker.mock(|when, then| {
@@ -126,7 +126,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_start_backup() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let backup = hivemq_openapi::models::BackupItem {
             backup: Some(Box::new(build_backup(1))),
@@ -147,11 +147,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_backup_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateBackupError::Status503(Errors::new());
         let backup = build_backup(1);
-        let backup_json = serde_json::to_string(&backup).unwrap();
+        let _backup_json = serde_json::to_string(&backup).unwrap();
         broker.mock(|when, then| {
             when.any_request().method(POST);
             then.status(503)

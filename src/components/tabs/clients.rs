@@ -87,7 +87,7 @@ impl Component for Clients<'_> {
                 Ok(_) => {
                     let result = self.repository.find_all();
                     match result {
-                        Ok(mut client_details) => {
+                        Ok(client_details) => {
                             let items: Vec<String> = client_details
                                 .into_iter()
                                 .filter(|item| item.id.is_some())

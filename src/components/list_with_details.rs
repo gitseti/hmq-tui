@@ -173,7 +173,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             return;
         };
 
-        let Some((index, item)) = items.shift_remove_full(&key) else {
+        let Some((index, _item)) = items.shift_remove_full(&key) else {
             return;
         };
 
@@ -224,7 +224,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             return None;
         };
 
-        let Some((key)) = items.get_index(index) else {
+        let Some(key) = items.get_index(index) else {
             return None;
         };
 
@@ -359,7 +359,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             return;
         };
 
-        let Some(selected) = list_state.selected() else {
+        let Some(_selected) = list_state.selected() else {
             return;
         };
 

@@ -135,13 +135,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_schemas() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let responses = crate::hivemq_rest_client::tests::create_responses(
             "/api/v1/data-hub/schemas",
             build_schema_list,
         );
-        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+        let _mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
             &broker,
             "/api/v1/data-hub/schemas",
             &responses,
@@ -163,7 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_schemas_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllSchemasError::Status503(Errors::new());
         broker.mock(|when, then| {
@@ -177,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_schema() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let schema = build_schema(1);
         let schema_json = serde_json::to_string(&schema).unwrap();
@@ -186,14 +186,14 @@ mod tests {
             then.status(201).body(schema_json.clone());
         });
 
-        let response = service.create_schema(&schema_json).await.unwrap();
+        let _response = service.create_schema(&schema_json).await.unwrap();
 
         assert_eq!(schema, repo.find_by_id(&schema.id).unwrap());
     }
 
     #[tokio::test]
     async fn test_create_schema_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateSchemaError::Status503(Errors::new());
         let schema = build_schema(1);
@@ -210,7 +210,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_schema() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         broker.mock(|when, then| {
             when.any_request().method(DELETE);
@@ -224,14 +224,14 @@ mod tests {
         ))
         .unwrap();
 
-        let response = service.delete_schema("schema-1").await;
+        let _response = service.delete_schema("schema-1").await;
 
         assert!(repo.find_by_id("schema-1").is_err());
     }
 
     #[tokio::test]
     async fn test_delete_schema_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = DeleteSchemaError::Status404(Errors::new());
         broker.mock(|when, then| {

@@ -173,13 +173,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_behavior_policies() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let responses = crate::hivemq_rest_client::tests::create_responses(
             "/api/v1/data-hub/behavior-validation/policies",
             build_behavior_policy_list,
         );
-        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+        let _mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
             &broker,
             "/api/v1/data-hub/behavior-validation/policies",
             &responses,
@@ -201,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_behavior_policies_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllBehaviorPoliciesError::Status503(Errors::new());
         broker.mock(|when, then| {
@@ -215,7 +215,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_behavior_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let behavior_policy = build_behavior_policy(1);
         let behavior_policy_json = serde_json::to_string(&behavior_policy).unwrap();
@@ -224,7 +224,7 @@ mod tests {
             then.status(201).body(behavior_policy_json.clone());
         });
 
-        let response = service
+        let _response = service
             .create_behavior_policy(&behavior_policy_json)
             .await
             .unwrap();
@@ -237,7 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_behavior_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateBehaviorPolicyError::Status503(Errors::new());
         let behavior_policy = build_behavior_policy(1);
@@ -254,7 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_behavior_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         broker.mock(|when, then| {
             when.any_request().method(DELETE);
@@ -264,14 +264,14 @@ mod tests {
         let policy = build_behavior_policy(1);
         repo.save(&policy).unwrap();
 
-        let response = service.delete_behavior_policy("behavior_policy-1").await;
+        let _response = service.delete_behavior_policy("behavior_policy-1").await;
 
         assert!(repo.find_by_id("behavior_policy-1").is_err());
     }
 
     #[tokio::test]
     async fn test_update_behavior_policy() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let policy = build_behavior_policy(1);
         let policy_json = serde_json::to_string(&policy).unwrap();
@@ -287,7 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_behavior_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let policy = build_behavior_policy(1);
         let error = UpdateBehaviorPolicyError::Status503(Errors::new());
@@ -304,7 +304,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_behavior_policy_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = DeleteBehaviorPolicyError::Status404(Errors::new());
         broker.mock(|when, then| {

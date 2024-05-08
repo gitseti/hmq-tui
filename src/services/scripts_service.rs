@@ -136,13 +136,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_scripts() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let responses = crate::hivemq_rest_client::tests::create_responses(
             "/api/v1/data-hub/scripts",
             build_script_list,
         );
-        let mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
+        let _mocks = crate::hivemq_rest_client::tests::mock_cursor_responses(
             &broker,
             "/api/v1/data-hub/scripts",
             &responses,
@@ -164,7 +164,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_scripts_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllScriptsError::Status503(Errors::new());
         broker.mock(|when, then| {
@@ -178,7 +178,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_script() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let script = build_script(1);
         let script_json = serde_json::to_string(&script).unwrap();
@@ -187,14 +187,14 @@ mod tests {
             then.status(201).body(script_json.clone());
         });
 
-        let response = service.create_script(&script_json).await.unwrap();
+        let _response = service.create_script(&script_json).await.unwrap();
 
         assert_eq!(script, repo.find_by_id(&script.id).unwrap());
     }
 
     #[tokio::test]
     async fn test_create_script_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateScriptError::Status503(Errors::new());
         let script = build_script(1);
@@ -211,7 +211,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_script() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         broker.mock(|when, then| {
             when.any_request().method(DELETE);
@@ -221,14 +221,14 @@ mod tests {
         let script = build_script(1);
         repo.save(&script).unwrap();
 
-        let response = service.delete_script("script-1").await;
+        let _response = service.delete_script("script-1").await;
 
         assert!(repo.find_by_id("script-1").is_err());
     }
 
     #[tokio::test]
     async fn test_delete_script_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = DeleteScriptError::Status404(Errors::new());
         broker.mock(|when, then| {

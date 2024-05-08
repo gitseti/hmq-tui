@@ -45,7 +45,7 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
         )?;
         Ok(Repository {
             connection_pool: connection_pool.clone(),
-            table_name: table_name.clone().to_string(),
+            table_name: table_name.to_string(),
             get_id: Box::new(get_id),
         })
     }
@@ -68,7 +68,7 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
                 ),
                 [],
             )
-            .map(|size| ())?)
+            .map(|_size| ())?)
     }
 
     pub fn find_by_id(&self, id: &str) -> Result<T, RepositoryError> {
@@ -214,7 +214,7 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
                 ),
                 [],
             )
-            .map(|size| ())?)
+            .map(|_size| ())?)
     }
 
     fn delete_all(&self) -> Result<(), RepositoryError> {
@@ -232,7 +232,7 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
                 ),
                 [],
             )
-            .map(|size| ())?)
+            .map(|_size| ())?)
     }
 }
 

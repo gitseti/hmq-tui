@@ -74,7 +74,7 @@ mod tests {
         CreateTraceRecordingError, DeleteTraceRecordingError, GetAllTraceRecordingsError,
     };
     use hivemq_openapi::models::{
-        trace_recording, Errors, TraceRecording, TraceRecordingItem, TraceRecordingList,
+        Errors, TraceRecording, TraceRecordingItem, TraceRecordingList,
     };
     use httpmock::Method::{DELETE, GET, POST};
     use httpmock::MockServer;
@@ -120,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_trace_recordings() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let trace_recordings = build_trace_recording_list(0, 10);
         broker.mock(|when, then| {
@@ -135,7 +135,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_trace_recordings_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = GetAllTraceRecordingsError::UnknownValue(Value::String("unknown".to_string()));
         broker.mock(|when, then| {
@@ -149,7 +149,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_trace_recording() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         let trace_recording = build_trace_recording(1);
         let trace_recording = TraceRecordingItem::new(trace_recording);
@@ -159,7 +159,7 @@ mod tests {
             then.status(201).body(trace_recording_json.clone());
         });
 
-        let response = service
+        let _response = service
             .create_trace_recording(&trace_recording_json)
             .await
             .unwrap();
@@ -175,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_trace_recording_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = CreateTraceRecordingError::Status400(Errors::new());
         let trace_recording = build_trace_recording(1);
@@ -192,7 +192,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_trace_recording() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, repo, service) = setup();
 
         broker.mock(|when, then| {
             when.any_request().method(DELETE);
@@ -202,14 +202,14 @@ mod tests {
         let trace_recording = build_trace_recording(1);
         repo.save(&trace_recording).unwrap();
 
-        let response = service.delete_trace_recording("trace_recording-1").await;
+        let _response = service.delete_trace_recording("trace_recording-1").await;
 
         assert!(repo.find_by_id("trace_recording-1").is_err());
     }
 
     #[tokio::test]
     async fn test_delete_trace_recording_error() {
-        let (broker, pool, repo, service) = setup();
+        let (broker, _pool, _repo, service) = setup();
 
         let error = DeleteTraceRecordingError::Status404(Errors::new());
         broker.mock(|when, then| {
