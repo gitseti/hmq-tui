@@ -1,34 +1,34 @@
-use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
-use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
-use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
-use hivemq_openapi::models::TraceRecording;
 use hivemq_openapi::{
     apis::{
         backup_restore_api::get_all_backups,
         configuration::Configuration,
         data_hub_behavior_policies_api::{
-            get_all_behavior_policies, CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams,
+            CreateBehaviorPolicyParams, DeleteBehaviorPolicyParams, get_all_behavior_policies,
             GetAllBehaviorPoliciesParams,
         },
         data_hub_data_policies_api::{
-            get_all_data_policies, CreateDataPolicyParams, DeleteDataPolicyParams,
+            CreateDataPolicyParams, DeleteDataPolicyParams, get_all_data_policies,
             GetAllDataPoliciesParams,
         },
         data_hub_schemas_api::{
-            get_all_schemas, CreateSchemaParams, DeleteSchemaParams, GetAllSchemasParams,
+            CreateSchemaParams, DeleteSchemaParams, get_all_schemas, GetAllSchemasParams,
         },
         data_hub_scripts_api::{
-            get_all_scripts, CreateScriptParams, DeleteScriptParams, GetAllScriptsParams,
+            CreateScriptParams, DeleteScriptParams, get_all_scripts, GetAllScriptsParams,
         },
+        Error,
         mqtt_clients_api,
         mqtt_clients_api::{
             get_all_mqtt_clients, GetAllMqttClientsParams, GetMqttClientDetailsParams,
         },
-        trace_recordings_api::{get_all_trace_recordings, DeleteTraceRecordingParams},
-        Error,
+        trace_recordings_api::{DeleteTraceRecordingParams, get_all_trace_recordings},
     },
     models::{BehaviorPolicy, ClientDetails, DataPolicy, PaginationCursor, Schema, Script},
 };
+use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyParams;
+use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyParams;
+use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingParams;
+use hivemq_openapi::models::TraceRecording;
 use lazy_static::lazy_static;
 use mqtt_clients_api::get_mqtt_client_details;
 use regex::Regex;
@@ -41,7 +41,7 @@ use crate::action::{
     },
 };
 
-fn get_cursor(links: Option<Option<Box<PaginationCursor>>>) -> Option<String> {
+pub fn get_cursor(links: Option<Option<Box<PaginationCursor>>>) -> Option<String> {
     lazy_static! {
         static ref CURSOR_REGEX: Regex = Regex::new(r"cursor=([^&]*)").unwrap();
     }
@@ -55,13 +55,13 @@ fn get_cursor(links: Option<Option<Box<PaginationCursor>>>) -> Option<String> {
         .map(|mat| mat.as_str().to_string())
 }
 
-fn build_rest_api_config(host: String) -> Configuration {
+pub fn build_rest_api_config(host: String) -> Configuration {
     let mut configuration = Configuration::default();
     configuration.base_path = host.to_string();
     configuration
 }
 
-fn transform_api_err<T: Serialize>(error: Error<T>) -> String {
+pub fn transform_api_err<T: Serialize>(error: Error<T>) -> String {
     let message = if let Error::ResponseError(response) = error {
         match &response.entity {
             None => response.content.clone(),
@@ -522,11 +522,7 @@ pub async fn delete_trace_recording(
 }
 
 #[cfg(test)]
-mod tests {
-    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
-    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
-    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
-    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
+pub(crate) mod tests {
     use hivemq_openapi::{
         apis::{
             backup_restore_api::GetAllBackupsError,
@@ -535,40 +531,45 @@ mod tests {
             },
             data_hub_data_policies_api::{
                 CreateDataPolicyError, DeleteDataPolicyError, GetAllDataPoliciesError,
-            },
-            data_hub_schemas_api::{CreateSchemaError, DeleteSchemaError, GetAllSchemasError},
+            }
+            ,
             data_hub_scripts_api::{CreateScriptError, DeleteScriptError, GetAllScriptsError},
             mqtt_clients_api::GetMqttClientDetailsError,
             trace_recordings_api::{DeleteTraceRecordingError, GetAllTraceRecordingsError},
         },
         models::{
-            script::FunctionType, Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior,
-            BehaviorPolicyList, BehaviorPolicyMatching, Client, ClientDetails, ClientItem,
-            ClientList, ClientRestrictions, ConnectionDetails, DataPolicy, DataPolicyList,
-            DataPolicyMatching, Error, Errors, PaginationCursor, Schema, SchemaList, Script,
+            Backup, BackupList, BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyList,
+            BehaviorPolicyMatching, Client, ClientDetails, ClientItem, ClientList,
+            ClientRestrictions, ConnectionDetails, DataPolicy, DataPolicyList, DataPolicyMatching,
+            Error, Errors, PaginationCursor, Script, script::FunctionType,
             ScriptList, TraceRecording, TraceRecordingList,
         },
     };
-    use httpmock::Method::PUT;
+    use hivemq_openapi::apis::backup_restore_api::CreateBackupError;
+    use hivemq_openapi::apis::data_hub_behavior_policies_api::UpdateBehaviorPolicyError;
+    use hivemq_openapi::apis::data_hub_data_policies_api::UpdateDataPolicyError;
+    use hivemq_openapi::apis::trace_recordings_api::CreateTraceRecordingError;
     use httpmock::{
         Method::{DELETE, GET, POST},
         Mock, MockServer,
     };
+    use httpmock::Method::PUT;
     use pretty_assertions::assert_eq;
     use serde::Serialize;
     use serde_json::{json, Value};
 
-    use super::*;
     use crate::components::{
         item_features::ItemSelector,
         tabs::{
             backups::BackupSelector, behavior_policies::BehaviorPolicySelector,
-            data_policies::DataPolicySelector, schemas::SchemaSelector, scripts::ScriptSelector,
+            data_policies::DataPolicySelector, scripts::ScriptSelector,
             trace_recordings::TraceRecordingSelector,
         },
     };
 
-    fn create_responses<T>(
+    use super::*;
+
+    pub fn create_responses<T>(
         url: &str,
         build_list: fn(usize, usize, Option<Option<Box<PaginationCursor>>>) -> T,
     ) -> Vec<T> {
@@ -588,7 +589,7 @@ mod tests {
         responses
     }
 
-    fn mock_cursor_responses<'a, T: Serialize>(
+    pub fn mock_cursor_responses<'a, T: Serialize>(
         broker: &'a MockServer,
         url: &str,
         responses: &Vec<T>,
@@ -1064,116 +1065,6 @@ mod tests {
         });
 
         let response = delete_behavior_policy(broker.base_url(), String::from("policy-1")).await;
-        assert!(response.is_err())
-    }
-
-    fn build_schema(schema_num: usize) -> Schema {
-        Schema::new(
-            format!("schema-{schema_num}"),
-            String::from("{}"),
-            String::from("JSON"),
-        )
-    }
-
-    fn build_schema_list(
-        start: usize,
-        end: usize,
-        cursor: Option<Option<Box<PaginationCursor>>>,
-    ) -> SchemaList {
-        let schemas: Vec<Schema> = (start..end).map(|i| build_schema(i)).collect();
-        SchemaList {
-            _links: cursor,
-            items: Some(schemas),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_fetch_schemas() {
-        let broker = MockServer::start();
-        let responses = create_responses("/api/v1/data-hub/schemas", build_schema_list);
-        let mocks =
-            mock_cursor_responses(&broker, "/api/v1/data-hub/schemas", &responses, "foobar");
-
-        let response = fetch_schemas(broker.base_url()).await.unwrap();
-        let items: Vec<Schema> = response
-            .into_iter()
-            .map(|(_id, item)| SchemaSelector.select(item).unwrap())
-            .collect();
-
-        for mock in mocks {
-            mock.assert();
-        }
-        for schema in responses.into_iter().flat_map(|list| list.items).flatten() {
-            assert!(items.contains(&schema));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_fetch_schemas_error() {
-        let error = GetAllSchemasError::Status503(Errors::new());
-        let broker = MockServer::start();
-        broker.mock(|when, then| {
-            when.any_request();
-            then.status(503).json_body(json!(error));
-        });
-
-        let response = fetch_schemas(broker.base_url()).await;
-        assert!(response.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_create_schema() {
-        let schema = build_schema(1);
-        let schema_json = serde_json::to_string(&schema).unwrap();
-        let broker = MockServer::start();
-        broker.mock(|when, then| {
-            when.any_request().method(POST);
-            then.status(201).body(schema_json.clone());
-        });
-
-        let response = create_schema(broker.base_url(), schema_json).await;
-        assert_eq!(schema, SchemaSelector.select(response.unwrap()).unwrap())
-    }
-
-    #[tokio::test]
-    async fn test_create_schema_error() {
-        let error = CreateSchemaError::Status503(Errors::new());
-        let schema = build_schema(1);
-        let schema_json = serde_json::to_string(&schema).unwrap();
-        let broker = MockServer::start();
-        broker.mock(|when, then| {
-            when.any_request().method(POST);
-            then.status(503)
-                .body(serde_json::to_string(&error).unwrap());
-        });
-
-        let response = create_schema(broker.base_url(), schema_json).await;
-        assert!(response.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_delete_schema() {
-        let broker = MockServer::start();
-        broker.mock(|when, then| {
-            when.any_request().method(DELETE);
-            then.status(200);
-        });
-
-        let response = delete_schema(broker.base_url(), String::from("schema-1")).await;
-        assert_eq!(response.unwrap(), "schema-1");
-    }
-
-    #[tokio::test]
-    async fn test_delete_schema_error() {
-        let error = DeleteSchemaError::Status404(Errors::new());
-        let broker = MockServer::start();
-        broker.mock(|when, then| {
-            when.any_request().method(DELETE);
-            then.status(503)
-                .body(serde_json::to_string(&error).unwrap());
-        });
-
-        let response = delete_schema(broker.base_url(), String::from("schema-1")).await;
         assert!(response.is_err())
     }
 

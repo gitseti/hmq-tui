@@ -33,6 +33,7 @@ pub enum Action {
 
     ClosePopup,
     ConfirmPopup,
+    FilterPopup,
 
     // Key Events
     PrevItem,
@@ -50,40 +51,47 @@ pub enum Action {
     Copy,
     CreateItem,
     UpdateItem,
+    Filter,
 
     SelectedItem(String),
 
-    // ListWithDetails
-    ItemDelete {
-        item_type: String,
-        item_id: String,
-    },
+    LWD(ListWithDetailsAction),
+
     ItemDeleted {
-        item_type: String,
+        item_name: String,
         result: Result<String, String>,
     },
     ItemsLoadingFinished {
-        result: Result<Vec<(String, Item)>, String>,
+        item_name: String,
+        result: Result<(), String>,
     },
     ItemCreated {
-        result: Result<Item, String>,
+        item_name: String,
+        result: Result<String, String>,
     },
     ItemUpdated {
-        result: Result<Item, String>,
+        item_name: String,
+        result: Result<String, String>,
     },
 
     // Clients view
-    ClientIdsLoadingFinished(Result<Vec<String>, String>),
-    ClientDetailsLoadingFinished(Result<(String, ClientDetails), String>),
+    ClientDetailsLoadingFinished(Result<(), String>),
 
     // Backups
     StartBackup,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum ListWithDetailsAction {
+    Delete(String),
+    Create(String),
+    Update(String)
+}
+
 impl<'de> Deserialize<'de> for Action {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         struct ActionVisitor;
 
@@ -95,8 +103,8 @@ impl<'de> Deserialize<'de> for Action {
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Action, E>
-            where
-                E: de::Error,
+                where
+                    E: de::Error,
             {
                 match value {
                     "Tick" => Ok(Action::Tick),
@@ -119,6 +127,7 @@ impl<'de> Deserialize<'de> for Action {
                     "Escape" => Ok(Action::Escape),
                     "NextTab" => Ok(Action::NextTab),
                     "PrevTab" => Ok(Action::PrevTab),
+                    "Filter" => Ok(Action::Filter),
                     "ClosePopup" => Ok(Action::ClosePopup),
                     "ConfirmPopup" => Ok(Action::ConfirmPopup),
                     "StartBackup" => Ok(Action::StartBackup),

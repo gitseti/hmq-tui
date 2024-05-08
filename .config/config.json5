@@ -47,6 +47,10 @@
         "action": "NextTab",
         "displayName": "Tab"
       },
+      "<f>": {
+        "action": "Filter",
+        "displayName": "Filter"
+      },
       "<backtab>": {
         "action": "PrevTab"
       },
@@ -187,6 +191,19 @@
       "<enter>": {
         "action": "ConfirmPopup",
         "displayName": "Confirm"
+      },
+    },
+    "FilterPopup": {
+      "extends": [
+        "Home"
+      ],
+      "<esc>": {
+        "action": "ClosePopup",
+        "displayName": "Cancel"
+      },
+      "<enter>": {
+        "action": "ConfirmPopup",
+        "displayName": "Confirm Filter"
       },
     }
   }

@@ -5,38 +5,32 @@ use std::sync::Arc;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::Schema;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::mode::Mode;
 use crate::{
-    action::{Action, Item},
+    action::Action,
     components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
-    hivemq_rest_client::{create_schema, delete_schema, fetch_schemas},
+        Component, list_with_details::ListWithDetails,
+        tabs::TabComponent,
+    }
+    ,
     tui::Frame,
 };
+use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
+use crate::action::ListWithDetailsAction;
+use crate::components::list_with_details::Features;
+use crate::mode::Mode;
+use crate::repository::Repository;
+use crate::services::schema_service::SchemaService;
 
 pub struct SchemasTab<'a> {
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, Schema>,
-}
-
-pub struct SchemaSelector;
-
-impl ItemSelector<Schema> for SchemaSelector {
-    fn select(&self, item: Item) -> Option<Schema> {
-        match item {
-            Item::SchemaItem(schema) => Some(schema),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, Schema)> {
-        self.select(item).map(|item| (item.id.clone(), item))
-    }
+    service: Arc<SchemaService>,
+    item_name: &'static str,
 }
 
 impl SchemasTab<'_> {
@@ -45,21 +39,25 @@ impl SchemasTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
+        let repository = Repository::<Schema>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "schemas", |val| val.id.clone()).unwrap();
+        let repository = Arc::new(repository);
+        let service = Arc::new(SchemaService::new(repository.clone(), &hivemq_address));
+        let item_name = "Schema";
         let list_with_details = ListWithDetails::<Schema>::builder()
             .list_title("Schemas")
-            .item_name("Schema")
+            .item_name(item_name.clone())
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
-            .list_fn(Arc::new(fetch_schemas))
-            .delete_fn(Arc::new(delete_schema))
-            .create_fn(Arc::new(create_schema))
-            .item_selector(Box::new(SchemaSelector))
+            .repository(repository)
+            .features(Features::builder().creatable().deletable().build())
             .build();
 
         SchemasTab {
             action_tx,
             list_with_details,
+            service,
+            item_name,
         }
     }
 }
@@ -74,9 +72,51 @@ impl Component for SchemasTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let list_action = self.list_with_details.update(action.clone());
-        if let Ok(Some(action)) = list_action {
-            return Ok(Some(action));
+        if let Ok(Some(action)) = self.list_with_details.update(action.clone()) {
+            let Action::LWD(lwd_action) = action else {
+                return Ok(Some(action));
+            };
+
+            match lwd_action {
+                ListWithDetailsAction::Delete(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.delete_schema(&item).await;
+                        let action = ItemDeleted { item_name, result };
+                        tx.send(action)
+                            .expect("Schemas: Failed to send ItemDeleted action");
+                    });
+                }
+                ListWithDetailsAction::Create(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.create_schema(&item).await;
+                        let action = ItemCreated { item_name, result };
+                        tx.send(action)
+                            .expect("Schemas: Failed to send ItemCreated action");
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        match action {
+            Action::LoadAllItems => {
+                let service = self.service.clone();
+                let tx = self.action_tx.clone();
+                let item_name = String::from(self.item_name);
+                let _ = tokio::spawn(async move {
+                    let result = service.load_schemas().await;
+                    let action = ItemsLoadingFinished { item_name, result };
+                    tx.send(action)
+                        .expect("Schemas: Failed to send ItemsLoadingFinished action");
+                });
+            }
+            _ => ()
         }
 
         Ok(None)

@@ -1,74 +1,61 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
+
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::ClientDetails;
 use ratatui::layout::Rect;
-use std::cell::RefCell;
-use std::rc::Rc;
 use tokio::sync::mpsc::UnboundedSender;
+
+use Action::LoadAllItems;
 use tui::Frame;
 
-use crate::mode::Mode;
 use crate::{
-    action::{Action, Item},
+    action::Action,
     components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
+        Component, list_with_details::ListWithDetails,
+        tabs::TabComponent,
     },
-    hivemq_rest_client::{fetch_client_details, fetch_client_ids},
     tui,
 };
+use crate::action::Action::ClientDetailsLoadingFinished;
+use crate::components::list_with_details::Features;
+use crate::mode::Mode;
+use crate::repository::{Repository, RepositoryError};
+use crate::services::client_details_service::ClientDetailsService;
 
 pub struct Clients<'a> {
     action_tx: UnboundedSender<Action>,
     hivemq_address: String,
-    list_with_details: ListWithDetails<'a, Option<ClientDetails>>,
+    list_with_details: ListWithDetails<'a, ClientDetails>,
+    service: Arc<ClientDetailsService>,
+    repository: Arc<Repository<ClientDetails>>,
 }
 
-pub struct ClientSelector;
-
-impl ItemSelector<Option<ClientDetails>> for ClientSelector {
-    fn select(&self, item: Item) -> Option<Option<ClientDetails>> {
-        match item {
-            Item::ClientItem(client) => Some(Some(client)),
-            _ => None,
-        }
-    }
-
-    fn select_with_id(&self, item: Item) -> Option<(String, Option<ClientDetails>)> {
-        let Some(item) = self.select(item) else {
-            return None;
-        };
-
-        let Some(details) = &item else {
-            return None;
-        };
-
-        let Some(id) = &details.id else {
-            return None;
-        };
-
-        Some((id.clone(), item))
-    }
-}
-
-impl Clients<'_> {
+impl<'a> Clients<'a> {
     pub fn new(
         action_tx: UnboundedSender<Action>,
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
+        service: Arc<ClientDetailsService>,
+        repository: Arc<Repository<ClientDetails>>,
     ) -> Self {
-        let list_with_details = ListWithDetails::<Option<ClientDetails>>::builder()
+        let list_with_details = ListWithDetails::<ClientDetails>::builder()
             .list_title("Clients")
             .item_name("Client Details")
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
-            .item_selector(Box::new(ClientSelector))
+            .features(Features::builder().build())
+            .repository(repository.clone())
             .build();
         Clients {
             action_tx,
             hivemq_address,
             list_with_details,
+            service,
+            repository,
         }
     }
 }
@@ -83,47 +70,42 @@ impl Component for Clients<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let list_action = self.list_with_details.update(action.clone());
-        match list_action {
-            Ok(Some(Action::SelectedItem(key))) => {
-                if let Some(None) = self.list_with_details.get(key.to_owned()) {
-                    let tx = self.action_tx.clone();
-                    let hivemq_address = self.hivemq_address.clone();
-                    let _ = tokio::spawn(async move {
-                        let result = fetch_client_details(&key, hivemq_address).await;
-                        tx.send(Action::ClientDetailsLoadingFinished(result))
-                            .expect("Failed to send client details loading finished action");
-                    });
-                }
-            }
-            _ => {}
-        }
+        let _ = self.list_with_details.update(action.clone());
 
         match action {
-            Action::LoadAllItems => {
+            LoadAllItems => {
+                let service = self.service.clone();
                 let tx = self.action_tx.clone();
-                let hivemq_address = self.hivemq_address.clone();
-                let _handle = tokio::spawn(async move {
-                    let result = fetch_client_ids(hivemq_address).await;
-                    tx.send(Action::ClientIdsLoadingFinished(result))
-                        .expect("Failed to send client ids loading finished action");
+                let _ = tokio::spawn(async move {
+                    let result = service.load_details().await;
+                    let action = match result {
+                        Ok(_) => ClientDetailsLoadingFinished(Ok(())),
+                        Err(msg) => ClientDetailsLoadingFinished(Err(msg)),
+                    };
+                    tx.send(action)
+                        .expect("Failed to send ClientDetailsLoadingFinished action");
                 });
             }
-            Action::ClientDetailsLoadingFinished(result) => match result {
-                Ok((client_id, details)) => {
-                    self.list_with_details.put(client_id, Some(details));
-                }
-                Err(msg) => {
-                    self.list_with_details.list_error(&msg);
-                }
-            },
-            Action::ClientIdsLoadingFinished(result) => match result {
-                Ok(client_ids) => {
-                    let mut details = Vec::with_capacity(client_ids.len());
-                    for client_id in client_ids {
-                        details.push((client_id, None));
+            ClientDetailsLoadingFinished(result) => match result {
+                Ok(_) => {
+                    let result = self.repository.find_all();
+                    match result {
+                        Ok(mut client_details) => {
+                            let items: Vec<String> = client_details
+                                .into_iter()
+                                .filter(|item| item.id.is_some())
+                                .map(|item| item.id.clone().unwrap())
+                                .collect();
+                            self.list_with_details.set_items(items, None);
+                        }
+                        Err(repo_err) => {
+                            let repo_err = match repo_err {
+                                RepositoryError::SerdeError(err) => err.to_string(),
+                                RepositoryError::SqlError(err) => err.to_string(),
+                            };
+                            self.list_with_details.list_error(&repo_err);
+                        }
                     }
-                    self.list_with_details.set_items(details);
                 }
                 Err(msg) => {
                     self.list_with_details.list_error(&msg);

@@ -5,24 +5,32 @@ use std::sync::Arc;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use hivemq_openapi::models::TraceRecording;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::hivemq_rest_client::create_trace_recording;
-use crate::mode::Mode;
 use crate::{
     action::{Action, Item},
     components::{
-        item_features::ItemSelector, list_with_details::ListWithDetails, tabs::TabComponent,
-        Component,
-    },
-    hivemq_rest_client::{delete_trace_recording, fetch_trace_recordings},
+        Component, item_features::ItemSelector, list_with_details::ListWithDetails,
+        tabs::TabComponent,
+    }
+    ,
     tui::Frame,
 };
+use crate::action::Action::{ItemCreated, ItemDeleted, ItemsLoadingFinished};
+use crate::action::ListWithDetailsAction;
+use crate::components::list_with_details::Features;
+use crate::mode::Mode;
+use crate::repository::Repository;
+use crate::services::trace_recordings_service::TraceRecordingService;
 
 pub struct TraceRecordingsTab<'a> {
     action_tx: UnboundedSender<Action>,
     list_with_details: ListWithDetails<'a, TraceRecording>,
+    service: Arc<TraceRecordingService>,
+    item_name: &'static str,
 }
 
 pub struct TraceRecordingSelector;
@@ -54,20 +62,24 @@ impl TraceRecordingsTab<'_> {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
+        let repository = Repository::<TraceRecording>::init(&Pool::new(SqliteConnectionManager::memory()).unwrap(), "trace_recordings", |val| val.name.clone().unwrap()).unwrap();
+        let repository = Arc::new(repository);
+        let service = Arc::new(TraceRecordingService::new(repository.clone(), &hivemq_address));
+        let item_name = "Trace Recording";
         let list_with_details = ListWithDetails::<TraceRecording>::builder()
             .list_title("Trace Recordings")
-            .item_name("Trace Recording")
+            .item_name(item_name)
             .hivemq_address(hivemq_address.clone())
             .mode(mode)
             .action_tx(action_tx.clone())
-            .create_fn(Arc::new(create_trace_recording))
-            .list_fn(Arc::new(fetch_trace_recordings))
-            .delete_fn(Arc::new(delete_trace_recording))
-            .item_selector(Box::new(TraceRecordingSelector))
+            .repository(repository.clone())
+            .features(Features::builder().deletable().creatable().build())
             .build();
         TraceRecordingsTab {
             action_tx,
             list_with_details,
+            service,
+            item_name,
         }
     }
 }
@@ -82,9 +94,51 @@ impl Component for TraceRecordingsTab<'_> {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        let list_action = self.list_with_details.update(action.clone());
-        if let Ok(Some(action)) = list_action {
-            return Ok(Some(action));
+        if let Ok(Some(action)) = self.list_with_details.update(action.clone()) {
+            let Action::LWD(lwd_action) = action else {
+                return Ok(Some(action));
+            };
+
+            match lwd_action {
+                ListWithDetailsAction::Delete(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.delete_trace_recording(&item).await;
+                        let action = ItemDeleted { item_name, result };
+                        tx.send(action)
+                            .expect("Trace Recordings: Failed to send ItemDeleted action");
+                    });
+                }
+                ListWithDetailsAction::Create(item) => {
+                    let service = self.service.clone();
+                    let tx = self.action_tx.clone();
+                    let item_name = String::from(self.item_name);
+                    let _ = tokio::spawn(async move {
+                        let result = service.create_trace_recording(&item).await;
+                        let action = ItemCreated { item_name, result };
+                        tx.send(action)
+                            .expect("Trace Recordings: Failed to send ItemCreated action");
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        match action {
+            Action::LoadAllItems => {
+                let service = self.service.clone();
+                let tx = self.action_tx.clone();
+                let item_name = String::from(self.item_name);
+                let _ = tokio::spawn(async move {
+                    let result = service.load_trace_recordings().await;
+                    let action = ItemsLoadingFinished { item_name, result };
+                    tx.send(action)
+                        .expect("Trace Recordings: Failed to send ItemsLoadingFinished action");
+                });
+            }
+            _ => ()
         }
 
         Ok(None)

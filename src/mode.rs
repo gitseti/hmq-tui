@@ -14,4 +14,5 @@ pub enum Mode {
     FullTab,
     ErrorPopup,
     ConfirmPopup,
+    FilterPopup,
 }
