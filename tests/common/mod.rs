@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use hivemq_openapi::apis::configuration::Configuration;
 use hmq_tui::repository::Repository;
 use hmq_tui::{action::Action, components::tabs::TabComponent};
-use indoc::indoc;
+
 use lazy_static::lazy_static;
 use pretty_assertions::assert_str_eq;
 use ratatui::{backend::TestBackend, Terminal};

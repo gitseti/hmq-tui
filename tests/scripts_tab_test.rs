@@ -58,7 +58,7 @@ async fn test_scripts_tab() {
     let Action::ItemsLoadingFinished { result, .. } = &action else {
         panic!("'Received wrong action {:?}", action.clone());
     };
-    let scripts = result.clone().unwrap();
+    let _scripts = result.clone().unwrap();
     let script0 = repository.find_by_id("script-0").unwrap();
 
     tab.update(action).unwrap();
