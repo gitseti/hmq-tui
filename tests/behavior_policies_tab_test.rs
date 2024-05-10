@@ -5,7 +5,6 @@ use hmq_tui::services::behavior_policy_service::BehaviorPolicyService;
 use hmq_tui::{
     action::Action,
     components::{tabs::behavior_policies::BehaviorPoliciesTab, Component},
-    repository,
 };
 use indoc::indoc;
 use r2d2::Pool;
@@ -58,7 +57,7 @@ async fn test_behavior_policies_tab() {
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();
-    let Action::ItemsLoadingFinished { item_name, result } = &action else {
+    let Action::ItemsLoadingFinished { item_name: _, result: _ } = &action else {
         panic!("'Received wrong action {:?}", action.clone());
     };
     tab.update(action).unwrap();

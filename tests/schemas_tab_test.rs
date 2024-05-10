@@ -58,7 +58,7 @@ async fn test_schemas_tab() {
     let Action::ItemsLoadingFinished { result, .. } = &action else {
         panic!("'Received wrong action {:?}", action.clone());
     };
-    let schemas = result.clone().unwrap();
+    let _schemas = result.clone().unwrap();
     let schema0 = repository.find_by_id("schema-0").unwrap();
 
     tab.update(action).unwrap();
