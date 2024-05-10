@@ -1,22 +1,27 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
-use hivemq_openapi::models::Schema;
-use hmq_tui::mode::Mode;
-use hmq_tui::{
-    action::Action,
-    components::{
-        item_features::ItemSelector,
-        tabs::schemas::{SchemaSelector, SchemasTab},
-        Component,
-    },
-    hivemq_rest_client::create_schema,
-};
-use indoc::indoc;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use base64::{Engine, prelude::BASE64_STANDARD};
+use hivemq_openapi::models::Schema;
+use indoc::indoc;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
+
+use hmq_tui::{
+    action::Action,
+    components::{
+        Component,
+        tabs::schemas::SchemasTab,
+    },
+};
+use hmq_tui::mode::Mode;
+use hmq_tui::repository::Repository;
+use hmq_tui::services::schema_service::SchemaService;
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -26,13 +31,20 @@ mod common;
 async fn test_schemas_tab() {
     let hivemq = Hivemq::start();
 
+    let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
+    let repository = Repository::<Schema>::init(&sqlite_pool, "schemas", |val| {
+        val.id.clone()
+    }, "createdAt").unwrap();
+    let repository = Arc::new(repository);
+    let service = SchemaService::new(repository.clone(), &hivemq.host.clone());
+
     for i in 0..100 {
         let schema = Schema::new(
             format!("schema-{i}"),
             BASE64_STANDARD.encode("{}"),
             "JSON".to_owned(),
         );
-        create_schema(hivemq.host.clone(), serde_json::to_string(&schema).unwrap())
+        service.create_schema(&serde_json::to_string(&schema).unwrap())
             .await
             .unwrap();
     }
@@ -40,16 +52,16 @@ async fn test_schemas_tab() {
     let (tx, mut rx): (UnboundedSender<Action>, UnboundedReceiver<Action>) =
         mpsc::unbounded_channel();
     let mode = Rc::new(RefCell::new(Mode::Home));
-    let mut tab = SchemasTab::new(tx, hivemq.host, mode.clone());
+    let mut tab = SchemasTab::new(tx, hivemq.host, mode.clone(), &sqlite_pool);
     tab.activate().unwrap();
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();
-    let Action::ItemsLoadingFinished { result } = &action else {
+    let Action::ItemsLoadingFinished { result, .. } = &action else {
         panic!("'Received wrong action {:?}", action.clone());
     };
     let schemas = result.clone().unwrap();
-    let schema0 = SchemaSelector.select(schemas[0].clone().1).unwrap();
+    let schema0 = repository.find_by_id("schema-0").unwrap();
 
     tab.update(action).unwrap();
     assert_draw(
@@ -99,7 +111,7 @@ async fn test_schemas_tab() {
         BASE64_STANDARD.encode("{}"),
         "JSON".to_owned(),
     );
-    let schema = create_item(&mut tab, &mut rx, schema, &SchemaSelector).await;
+    let schema = create_item(&mut tab, &mut rx, schema, &repository).await;
     assert_draw(&mut tab, &indoc! {r#"
             ┌Schemas (101/101)──────────────┐┌Schema───────────────────────────────────────────────────────────┐
             │schema-88                      ││ 1 {                                                             │

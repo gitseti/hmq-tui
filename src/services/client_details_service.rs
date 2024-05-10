@@ -140,7 +140,7 @@ mod tests {
         let repo =
             Repository::<ClientDetails>::init(&connection_pool, "test_values", |client_details| {
                 client_details.id.clone().unwrap()
-            })
+            }, "id")
             .unwrap();
         let repo = Arc::new(repo);
         let service = ClientDetailsService::new(repo.clone(), &broker.base_url());

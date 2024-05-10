@@ -35,7 +35,7 @@ impl BackupsTab<'_> {
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
         let repository =
-            Repository::<Backup>::init(sqlite_pool, "backups", |val| val.id.clone().unwrap())
+            Repository::<Backup>::init(sqlite_pool, "backups", |val| val.id.clone().unwrap(), "createdAt")
                 .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BackupService::new(repository.clone(), &hivemq_address));

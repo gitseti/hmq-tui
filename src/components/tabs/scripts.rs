@@ -37,7 +37,7 @@ impl ScriptsTab<'_> {
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
         let repository =
-            Repository::<Script>::init(sqlite_pool, "scripts", |val| val.id.clone()).unwrap();
+            Repository::<Script>::init(sqlite_pool, "scripts", |val| val.id.clone(), "createdAt").unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(ScriptService::new(repository.clone(), &hivemq_address));
         let item_name = "Script";
