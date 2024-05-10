@@ -11,16 +11,13 @@ use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
-use hmq_tui::{
-    action::Action,
-    components::{
-        Component,
-        tabs::data_policies::DataPoliciesTab,
-    },
-};
 use hmq_tui::mode::Mode;
 use hmq_tui::repository::Repository;
 use hmq_tui::services::data_policy_service::DataPolicyService;
+use hmq_tui::{
+    action::Action,
+    components::{tabs::data_policies::DataPoliciesTab, Component},
+};
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -32,9 +29,13 @@ async fn test_data_policies_tab() {
     hivemq.enable_data_hub_trial().await;
 
     let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-    let repository = Repository::<DataPolicy>::init(&sqlite_pool, "data_policies", |val| {
-        val.id.clone()
-    }, "createdAt").unwrap();
+    let repository = Repository::<DataPolicy>::init(
+        &sqlite_pool,
+        "data_policies",
+        |val| val.id.clone(),
+        "createdAt",
+    )
+    .unwrap();
     let repository = Arc::new(repository);
     let service = DataPolicyService::new(repository.clone(), &hivemq.host.clone());
 
@@ -43,7 +44,8 @@ async fn test_data_policies_tab() {
             format!("data-policy-{i}"),
             DataPolicyMatching::new(format!("topic-{i}")),
         );
-        service.create_data_policy(&serde_json::to_string(&data_policy).unwrap())
+        service
+            .create_data_policy(&serde_json::to_string(&data_policy).unwrap())
             .await
             .unwrap();
     }

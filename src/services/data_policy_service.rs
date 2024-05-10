@@ -153,11 +153,13 @@ mod tests {
     ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo =
-            Repository::<DataPolicy>::init(&connection_pool, "data_policies", |data_policy| {
-                data_policy.id.clone()
-            }, "lastUpdatedAt")
-            .unwrap();
+        let repo = Repository::<DataPolicy>::init(
+            &connection_pool,
+            "data_policies",
+            |data_policy| data_policy.id.clone(),
+            "lastUpdatedAt",
+        )
+        .unwrap();
         let repo = Arc::new(repo);
         let service = DataPolicyService::new(repo.clone(), &broker.base_url());
         (broker, connection_pool, repo, service)

@@ -85,9 +85,12 @@ mod tests {
     ) {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo = Repository::<Backup>::init(&connection_pool, "backups", |backup| {
-            backup.id.clone().unwrap()
-        }, "createdAt")
+        let repo = Repository::<Backup>::init(
+            &connection_pool,
+            "backups",
+            |backup| backup.id.clone().unwrap(),
+            "createdAt",
+        )
         .unwrap();
         let repo = Arc::new(repo);
         let service = BackupService::new(repo.clone(), &broker.base_url());
