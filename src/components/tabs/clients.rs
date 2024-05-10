@@ -39,9 +39,12 @@ impl<'a> Clients<'a> {
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
         let repository = Arc::new(
-            Repository::<ClientDetails>::init(sqlite_pool, "client_details", |details| {
-                details.id.clone().unwrap()
-            }, "id")
+            Repository::<ClientDetails>::init(
+                sqlite_pool,
+                "client_details",
+                |details| details.id.clone().unwrap(),
+                "id",
+            )
             .unwrap(),
         );
         let client_details_service = ClientDetailsService::new(repository.clone(), &hivemq_address);

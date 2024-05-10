@@ -36,11 +36,13 @@ impl BehaviorPoliciesTab<'_> {
         mode: Rc<RefCell<Mode>>,
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository =
-            Repository::<BehaviorPolicy>::init(sqlite_pool, "behavior_policies", |val| {
-                val.id.clone()
-            }, "lastUpdatedAt")
-            .unwrap();
+        let repository = Repository::<BehaviorPolicy>::init(
+            sqlite_pool,
+            "behavior_policies",
+            |val| val.id.clone(),
+            "lastUpdatedAt",
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BehaviorPolicyService::new(
             repository.clone(),

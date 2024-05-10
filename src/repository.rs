@@ -256,14 +256,19 @@ mod tests {
     use crate::repository::{Repository, RepositoryError};
 
     pub fn init_repo(connection_pool: &r2d2::Pool<SqliteConnectionManager>) -> Repository<Value> {
-        Repository::<Value>::init(connection_pool, "test_values", |x| {
-            if let Value::String(val) = x.get("id").unwrap() {
-                val.clone()
-            } else {
-                panic!("id not found")
-            }
-        }, "id")
-            .unwrap()
+        Repository::<Value>::init(
+            connection_pool,
+            "test_values",
+            |x| {
+                if let Value::String(val) = x.get("id").unwrap() {
+                    val.clone()
+                } else {
+                    panic!("id not found")
+                }
+            },
+            "id",
+        )
+        .unwrap()
     }
 
     #[test]

@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use base64::{Engine, prelude::BASE64_STANDARD};
-use hivemq_openapi::models::{Script, script::FunctionType};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use hivemq_openapi::models::{script::FunctionType, Script};
 use indoc::indoc;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -12,16 +12,13 @@ use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
-use hmq_tui::{
-    action::Action,
-    components::{
-        Component,
-        tabs::scripts::ScriptsTab,
-    },
-};
 use hmq_tui::mode::Mode;
 use hmq_tui::repository::Repository;
 use hmq_tui::services::scripts_service::ScriptService;
+use hmq_tui::{
+    action::Action,
+    components::{tabs::scripts::ScriptsTab, Component},
+};
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -32,9 +29,9 @@ async fn test_scripts_tab() {
     let hivemq = Hivemq::start();
 
     let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-    let repository = Repository::<Script>::init(&sqlite_pool, "scripts", |val| {
-        val.id.clone()
-    }, "createdAt").unwrap();
+    let repository =
+        Repository::<Script>::init(&sqlite_pool, "scripts", |val| val.id.clone(), "createdAt")
+            .unwrap();
     let repository = Arc::new(repository);
     let service = ScriptService::new(repository.clone(), &hivemq.host.clone());
 
@@ -44,7 +41,8 @@ async fn test_scripts_tab() {
             format!("script-{i}"),
             BASE64_STANDARD.encode("function transform(publish, context) { return publish; }"),
         );
-        service.create_script(&serde_json::to_string(&script).unwrap())
+        service
+            .create_script(&serde_json::to_string(&script).unwrap())
             .await
             .unwrap();
     }

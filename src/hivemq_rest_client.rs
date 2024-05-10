@@ -43,8 +43,6 @@ pub(crate) mod tests {
     use httpmock::{Method::GET, Mock, MockServer};
     use serde::Serialize;
 
-    
-
     pub fn create_responses<T>(
         url: &str,
         build_list: fn(usize, usize, Option<Option<Box<PaginationCursor>>>) -> T,

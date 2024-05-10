@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use base64::{Engine, prelude::BASE64_STANDARD};
+use base64::{prelude::BASE64_STANDARD, Engine};
 use hivemq_openapi::models::Schema;
 use indoc::indoc;
 use r2d2::Pool;
@@ -12,16 +12,13 @@ use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
-use hmq_tui::{
-    action::Action,
-    components::{
-        Component,
-        tabs::schemas::SchemasTab,
-    },
-};
 use hmq_tui::mode::Mode;
 use hmq_tui::repository::Repository;
 use hmq_tui::services::schema_service::SchemaService;
+use hmq_tui::{
+    action::Action,
+    components::{tabs::schemas::SchemasTab, Component},
+};
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -32,9 +29,9 @@ async fn test_schemas_tab() {
     let hivemq = Hivemq::start();
 
     let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-    let repository = Repository::<Schema>::init(&sqlite_pool, "schemas", |val| {
-        val.id.clone()
-    }, "createdAt").unwrap();
+    let repository =
+        Repository::<Schema>::init(&sqlite_pool, "schemas", |val| val.id.clone(), "createdAt")
+            .unwrap();
     let repository = Arc::new(repository);
     let service = SchemaService::new(repository.clone(), &hivemq.host.clone());
 
@@ -44,7 +41,8 @@ async fn test_schemas_tab() {
             BASE64_STANDARD.encode("{}"),
             "JSON".to_owned(),
         );
-        service.create_schema(&serde_json::to_string(&schema).unwrap())
+        service
+            .create_schema(&serde_json::to_string(&schema).unwrap())
             .await
             .unwrap();
     }

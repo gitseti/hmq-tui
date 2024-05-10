@@ -36,9 +36,13 @@ impl DataPoliciesTab<'_> {
         mode: Rc<RefCell<Mode>>,
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
-        let repository =
-            Repository::<DataPolicy>::init(sqlite_pool, "data_policies", |val| val.id.clone(), "lastUpdatedAt")
-                .unwrap();
+        let repository = Repository::<DataPolicy>::init(
+            sqlite_pool,
+            "data_policies",
+            |val| val.id.clone(),
+            "lastUpdatedAt",
+        )
+        .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(DataPolicyService::new(repository.clone(), &hivemq_address));
         let item_name = "Data Policy";

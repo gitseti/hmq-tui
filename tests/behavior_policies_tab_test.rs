@@ -1,21 +1,22 @@
 use hivemq_openapi::models::{BehaviorPolicy, BehaviorPolicyBehavior, BehaviorPolicyMatching};
 use hmq_tui::mode::Mode;
-use hmq_tui::{action::Action, components::{
-    tabs::behavior_policies::{BehaviorPoliciesTab},
-    Component,
-}, repository};
+use hmq_tui::repository::Repository;
+use hmq_tui::services::behavior_policy_service::BehaviorPolicyService;
+use hmq_tui::{
+    action::Action,
+    components::{tabs::behavior_policies::BehaviorPoliciesTab, Component},
+    repository,
+};
 use indoc::indoc;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
-use hmq_tui::repository::Repository;
-use hmq_tui::services::behavior_policy_service::BehaviorPolicyService;
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -27,9 +28,13 @@ async fn test_behavior_policies_tab() {
     hivemq.enable_data_hub_trial().await;
 
     let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
-    let repository = Repository::<BehaviorPolicy>::init(&sqlite_pool, "behavior_policies", |val| {
-        val.id.clone()
-    }, "lastUpdatedAt").unwrap();
+    let repository = Repository::<BehaviorPolicy>::init(
+        &sqlite_pool,
+        "behavior_policies",
+        |val| val.id.clone(),
+        "lastUpdatedAt",
+    )
+    .unwrap();
     let repository = Arc::new(repository);
     let service = BehaviorPolicyService::new(repository.clone(), &hivemq.host.clone());
 
@@ -39,7 +44,8 @@ async fn test_behavior_policies_tab() {
             format!("behavior-policy-{i}"),
             BehaviorPolicyMatching::new(".*".to_owned()),
         );
-        service.create_behavior_policy(&serde_json::to_string(&behavior_policy).unwrap())
+        service
+            .create_behavior_policy(&serde_json::to_string(&behavior_policy).unwrap())
             .await
             .unwrap();
     }
@@ -56,7 +62,7 @@ async fn test_behavior_policies_tab() {
         panic!("'Received wrong action {:?}", action.clone());
     };
     tab.update(action).unwrap();
-    let behavior_policy= repository.find_by_id("behavior-policy-0").unwrap();
+    let behavior_policy = repository.find_by_id("behavior-policy-0").unwrap();
     assert_draw(
         &mut tab,
         indoc! {"
@@ -105,8 +111,7 @@ async fn test_behavior_policies_tab() {
         "new-behavior-policy".to_owned(),
         BehaviorPolicyMatching::new(".*".to_owned()),
     );
-    let behavior_policy =
-        create_item(&mut tab, &mut rx, behavior_policy, &repository).await;
+    let behavior_policy = create_item(&mut tab, &mut rx, behavior_policy, &repository).await;
     assert_draw(&mut tab, &indoc! {r#"
             ┌Behavior Policies (101/101)────┐┌Behavior Policy──────────────────────────────────────────────────┐
             │behavior-policy-88             ││  1 {                                                            │

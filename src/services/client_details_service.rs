@@ -137,11 +137,13 @@ mod tests {
     async fn test_fetch_client_details_client() {
         let broker = MockServer::start();
         let connection_pool = r2d2::Pool::new(SqliteConnectionManager::memory()).unwrap();
-        let repo =
-            Repository::<ClientDetails>::init(&connection_pool, "test_values", |client_details| {
-                client_details.id.clone().unwrap()
-            }, "id")
-            .unwrap();
+        let repo = Repository::<ClientDetails>::init(
+            &connection_pool,
+            "test_values",
+            |client_details| client_details.id.clone().unwrap(),
+            "id",
+        )
+        .unwrap();
         let repo = Arc::new(repo);
         let service = ClientDetailsService::new(repo.clone(), &broker.base_url());
 
