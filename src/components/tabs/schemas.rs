@@ -37,7 +37,7 @@ impl SchemasTab<'_> {
         sqlite_pool: &Pool<SqliteConnectionManager>,
     ) -> Self {
         let repository =
-            Repository::<Schema>::init(sqlite_pool, "schemas", |val| val.id.clone()).unwrap();
+            Repository::<Schema>::init(sqlite_pool, "schemas", |val| val.id.clone(), "createdAt").unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(SchemaService::new(repository.clone(), &hivemq_address));
         let item_name = "Schema";

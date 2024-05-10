@@ -1,22 +1,27 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
-use hivemq_openapi::models::{script::FunctionType, Script};
-use hmq_tui::mode::Mode;
-use hmq_tui::{
-    action::Action,
-    components::{
-        item_features::ItemSelector,
-        tabs::scripts::{ScriptSelector, ScriptsTab},
-        Component,
-    },
-    hivemq_rest_client::create_script,
-};
-use indoc::indoc;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use base64::{Engine, prelude::BASE64_STANDARD};
+use hivemq_openapi::models::{Script, script::FunctionType};
+use indoc::indoc;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use tokio::sync::{
     mpsc,
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
+
+use hmq_tui::{
+    action::Action,
+    components::{
+        Component,
+        tabs::scripts::ScriptsTab,
+    },
+};
+use hmq_tui::mode::Mode;
+use hmq_tui::repository::Repository;
+use hmq_tui::services::scripts_service::ScriptService;
 
 use crate::common::{assert_draw, create_item, Hivemq};
 
@@ -26,13 +31,20 @@ mod common;
 async fn test_scripts_tab() {
     let hivemq = Hivemq::start();
 
+    let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
+    let repository = Repository::<Script>::init(&sqlite_pool, "scripts", |val| {
+        val.id.clone()
+    }, "createdAt").unwrap();
+    let repository = Arc::new(repository);
+    let service = ScriptService::new(repository.clone(), &hivemq.host.clone());
+
     for i in 0..100 {
         let script = Script::new(
             FunctionType::Transformation,
             format!("script-{i}"),
             BASE64_STANDARD.encode("function transform(publish, context) { return publish; }"),
         );
-        create_script(hivemq.host.clone(), serde_json::to_string(&script).unwrap())
+        service.create_script(&serde_json::to_string(&script).unwrap())
             .await
             .unwrap();
     }
@@ -40,16 +52,16 @@ async fn test_scripts_tab() {
     let (tx, mut rx): (UnboundedSender<Action>, UnboundedReceiver<Action>) =
         mpsc::unbounded_channel();
     let mode = Rc::new(RefCell::new(Mode::Home));
-    let mut tab = ScriptsTab::new(tx, hivemq.host, mode.clone());
+    let mut tab = ScriptsTab::new(tx, hivemq.host, mode.clone(), &sqlite_pool);
     tab.activate().unwrap();
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();
-    let Action::ItemsLoadingFinished { result } = &action else {
+    let Action::ItemsLoadingFinished { result, .. } = &action else {
         panic!("'Received wrong action {:?}", action.clone());
     };
     let scripts = result.clone().unwrap();
-    let script0 = ScriptSelector.select(scripts[0].clone().1).unwrap();
+    let script0 = repository.find_by_id("script-0").unwrap();
 
     tab.update(action).unwrap();
     assert_draw(
@@ -99,7 +111,7 @@ async fn test_scripts_tab() {
         "new-script".to_owned(),
         BASE64_STANDARD.encode("function transform(publish, context) { return publish; }"),
     );
-    let script = create_item(&mut tab, &mut rx, script, &ScriptSelector).await;
+    let script = create_item(&mut tab, &mut rx, script, &repository).await;
     assert_draw(&mut tab, &indoc! {r#"
             ┌Scripts (101/101)──────────────┐┌Script───────────────────────────────────────────────────────────┐
             │script-88                      ││ 1 {                                                             │

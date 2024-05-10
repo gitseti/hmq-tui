@@ -127,7 +127,7 @@ mod tests {
         let broker = MockServer::start();
         let connection_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
         let repo =
-            Repository::<Script>::init(&connection_pool, "scripts", |script| script.id.clone())
+            Repository::<Script>::init(&connection_pool, "scripts", |script| script.id.clone(), "createdAt")
                 .unwrap();
         let repo = Arc::new(repo);
         let service = ScriptService::new(repo.clone(), &broker.base_url());

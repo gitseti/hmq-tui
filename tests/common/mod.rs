@@ -1,15 +1,18 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use hivemq_openapi::apis::configuration::Configuration;
+use indoc::indoc;
 use hmq_tui::{
     action::Action,
-    components::{item_features::ItemSelector, tabs::TabComponent},
+    components::{tabs::TabComponent},
 };
 use lazy_static::lazy_static;
 use pretty_assertions::assert_str_eq;
 use ratatui::{backend::TestBackend, Terminal};
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use testcontainers::{clients::Cli, core::WaitFor, Container, GenericImage};
 use tokio::sync::mpsc::UnboundedReceiver;
+use hmq_tui::repository::Repository;
 
 lazy_static! {
     static ref DOCKER: Cli = Cli::default();
@@ -47,11 +50,11 @@ impl<'a> Hivemq<'a> {
     }
 }
 
-pub async fn create_item<T: TabComponent, I: Serialize>(
+pub async fn create_item<T: TabComponent, I: Serialize + DeserializeOwned>(
     tab: &mut T,
     rx: &mut UnboundedReceiver<Action>,
     item: I,
-    selector: &dyn ItemSelector<I>,
+    repository: &Repository<I>,
 ) -> I {
     let schema_create_json = serde_json::to_string_pretty(&item).unwrap();
     tab.update(Action::NewItem).unwrap();
@@ -61,11 +64,11 @@ pub async fn create_item<T: TabComponent, I: Serialize>(
     }
     tab.update(Action::CreateItem).unwrap();
     let action = rx.recv().await.unwrap();
-    let Action::ItemCreated { result } = &action else {
+    let Action::ItemCreated { result, .. } = &action else {
         panic!("Received wrong action {:?}", action);
     };
     tab.update(action.clone()).unwrap();
-    selector.select(result.clone().unwrap()).unwrap()
+    repository.find_by_id(&result.clone().unwrap()).unwrap()
 }
 
 pub fn assert_draw<T: TabComponent>(tab: &mut T, expected: &str) {

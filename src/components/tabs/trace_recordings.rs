@@ -39,7 +39,7 @@ impl TraceRecordingsTab<'_> {
         let repository =
             Repository::<TraceRecording>::init(sqlite_pool, "trace_recordings", |val| {
                 val.name.clone().unwrap()
-            })
+            }, "startedAt")
             .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(TraceRecordingService::new(

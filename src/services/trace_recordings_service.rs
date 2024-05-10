@@ -109,6 +109,7 @@ mod tests {
             &connection_pool,
             "trace_recordings",
             |trace_recording| trace_recording.name.clone().unwrap(),
+            "startedAt"
         )
         .unwrap();
         let repo = Arc::new(repo);

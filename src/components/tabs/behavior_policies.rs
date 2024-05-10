@@ -39,7 +39,7 @@ impl BehaviorPoliciesTab<'_> {
         let repository =
             Repository::<BehaviorPolicy>::init(sqlite_pool, "behavior_policies", |val| {
                 val.id.clone()
-            })
+            }, "lastUpdatedAt")
             .unwrap();
         let repository = Arc::new(repository);
         let service = Arc::new(BehaviorPolicyService::new(

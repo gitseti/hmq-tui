@@ -24,6 +24,7 @@ pub struct Repository<T: Serialize + DeserializeOwned> {
     connection_pool: r2d2::Pool<SqliteConnectionManager>,
     table_name: String,
     get_id: Box<fn(&T) -> String>,
+    sort_property: String,
 }
 
 impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
@@ -31,11 +32,12 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
         connection_pool: &'a r2d2::Pool<SqliteConnectionManager>,
         table_name: &'a str,
         get_id: fn(&T) -> String,
+        sort_property: &str,
     ) -> Result<Self, RepositoryError> {
         connection_pool.get().unwrap().execute(
             &format!(
                 "
-        CREATE TABLE {table_name}(
+        CREATE TABLE IF NOT EXISTS {table_name}(
             id STRING PRIMARY KEY,
             data JSON
         );
@@ -47,6 +49,7 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
             connection_pool: connection_pool.clone(),
             table_name: table_name.to_string(),
             get_id: Box::new(get_id),
+            sort_property: sort_property.to_owned(),
         })
     }
 
@@ -123,11 +126,14 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
         to_match: &str,
     ) -> Result<Vec<String>, RepositoryError> {
         let binding = self.connection_pool.get().unwrap();
+        let sort_property = &self.sort_property;
         let mut stmt = binding.prepare(&format!(
             "
         SELECT id
         FROM {}
-        WHERE data -> '{}' LIKE '%{}%'",
+        WHERE data -> '{}' LIKE '%{}%'
+        ORDER BY datetime(json_extract(data, '$.{sort_property}')) ASC
+        ",
             &self.table_name, json_path, to_match
         ))?;
 
@@ -150,10 +156,13 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
     pub fn find_all(&self) -> Result<Vec<T>, RepositoryError> {
         let binding = self.connection_pool.get().unwrap();
         let table_name = &self.table_name;
+        let sort_property = &self.sort_property;
         let mut stmt = binding.prepare(&format!(
             "
         SELECT *
-        FROM {table_name}",
+        FROM {table_name}
+        ORDER BY datetime(json_extract(data, '$.{sort_property}')) ASC
+        ",
         ))?;
 
         let items = stmt.query_map([], |row| {
@@ -176,10 +185,13 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
     pub fn find_all_ids(&self) -> Result<Vec<String>, RepositoryError> {
         let binding = self.connection_pool.get().unwrap();
         let table_name = &self.table_name;
+        let sort_property = &self.sort_property;
         let mut stmt = binding.prepare(&format!(
             "
         SELECT id
-        FROM {table_name}",
+        FROM {table_name}
+        ORDER BY datetime(json_extract(data, '$.{sort_property}')) ASC
+        ",
         ))?;
 
         let items = stmt.query_map([], |row| {
@@ -250,8 +262,8 @@ mod tests {
             } else {
                 panic!("id not found")
             }
-        })
-        .unwrap()
+        }, "id")
+            .unwrap()
     }
 
     #[test]

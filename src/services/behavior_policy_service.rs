@@ -164,6 +164,7 @@ mod tests {
             &connection_pool,
             "behavior_policies",
             |behavior_policy| behavior_policy.id.clone(),
+            "lastUpdatedAt"
         )
         .unwrap();
         let repo = Arc::new(repo);
