@@ -40,7 +40,7 @@ impl TraceRecordingsTab<'_> {
             sqlite_pool,
             "trace_recordings",
             |val| val.name.clone().unwrap(),
-            "startedAt",
+            "startAt",
         )
         .unwrap();
         let repository = Arc::new(repository);
