@@ -195,7 +195,7 @@
     },
     "FilterPopup": {
       "extends": [
-        "Home"
+        "EditorReadOnly"
       ],
       "<esc>": {
         "action": "ClosePopup",
