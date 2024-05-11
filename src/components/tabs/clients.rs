@@ -43,7 +43,7 @@ impl<'a> Clients<'a> {
                 sqlite_pool,
                 "client_details",
                 |details| details.id.clone().unwrap(),
-                "id",
+                "connectedAt",
             )
             .unwrap(),
         );
