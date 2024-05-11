@@ -24,8 +24,6 @@ use LoadingState::Loaded;
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::FocusMode::Editing;
 use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
-use crate::components::popup;
-use crate::components::popup::{InputPopup, Popup};
 use crate::repository::Repository;
 use crate::{
     action::{Action, Action::SelectedItem},
@@ -40,6 +38,8 @@ use crate::{
     mode::Mode,
     tui,
 };
+use crate::components::popups;
+use crate::components::popups::filter_popup::Tab;
 
 #[derive(TypedBuilder)]
 pub struct Features {
@@ -161,9 +161,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             focus_mode,
             ..
         } = &mut self.loading_state
-        else {
-            return;
-        };
+            else {
+                return;
+            };
 
         let Some((index, _item)) = items.shift_remove_full(&key) else {
             return;
@@ -204,9 +204,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             items, focus_mode, ..
         } = &self.loading_state
-        else {
-            return None;
-        };
+            else {
+                return None;
+            };
 
         let FocusMode::Scrolling(ref list_state) = focus_mode else {
             return None;
@@ -271,9 +271,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             list, focus_mode, ..
         } = &mut self.loading_state
-        else {
-            return None;
-        };
+            else {
+                return None;
+            };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -321,9 +321,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             focus_mode, items, ..
         } = &mut self.loading_state
-        else {
-            return Ok(());
-        };
+            else {
+                return Ok(());
+            };
 
         if let FocusMode::Scrolling(selected) = focus_mode {
             if let Some(selected) = selected.selected() {
@@ -388,8 +388,20 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             }
             ErrorPopup { .. } => None,
             FilterPopup { popup, .. } => {
-                let result = self.repository.find_ids_by("$", popup.get_text().as_str());
-                self.set_items(result.unwrap(), Some(popup.get_text().to_string()));
+                let (items, filter) = match popup.get_selected_tab() {
+                    Tab::KeywordSearch { text_area, is_regex_checked } => {
+                        let filter = text_area.lines()[0].clone();
+                        let items = self.repository.find_ids_by("$", &filter, *is_regex_checked).unwrap();
+                        (items, filter)
+                    }
+                    Tab::JsonPathSearch { text_area_json_path, text_area_query, is_regex_checked, .. } => {
+                        let json_path = text_area_json_path.lines()[0].clone();
+                        let query = text_area_query.lines()[0].clone();
+                        let items = self.repository.find_ids_by(&json_path, &query, *is_regex_checked).unwrap();
+                        (items, format!("{json_path} -> {query}"))
+                    }
+                };
+                self.set_items(items, Some(filter));
                 self.exit_popup();
                 None
             }
@@ -398,7 +410,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
 
     fn copy_json(&mut self) {
         if let Err(message) = self.copy_details_to_clipboard() {
-            let popup = popup::ErrorPopup {
+            let popup = popups::error_popup::ErrorPopup {
                 title: "Could not copy to clipboard".to_string(),
                 message,
             };
@@ -474,7 +486,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
                     self.exit_popup();
                 }
                 Err(message) => {
-                    let popup = popup::ErrorPopup {
+                    let popup = popups::error_popup::ErrorPopup {
                         title: "Deletion failed".to_string(),
                         message: format!("Failed deletion of item:\n{}", message),
                     };
@@ -489,13 +501,13 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             if self.features.deletable {
                 let item_type = self.item_name.clone();
                 let item_id = id.clone();
-                let popup = popup::ConfirmPopup {
+                let popup = popups::confirm_popup::ConfirmPopup {
                     title: format!("Delete {} '{}'?", item_type, item_id).to_string(),
                     message: format!(
                         "Are you sure you want to delete the {} with id '{}'",
                         item_type, item_id
                     )
-                    .to_string(),
+                        .to_string(),
                 };
                 self.enter_popup(DeletePopup { popup, item_id })
             }
@@ -503,7 +515,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
     }
 
     pub fn popup_filter(&mut self) {
-        let popup = InputPopup::new("Filter Items");
+        let popup = popups::filter_popup::FilterPopup::new();
         self.enter_popup(FilterPopup { popup })
     }
 
@@ -517,7 +529,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         }
     }
 
-    pub fn error_popup(&mut self, popup: popup::ErrorPopup) {
+    pub fn error_popup(&mut self, popup: popups::error_popup::ErrorPopup) {
         self.enter_popup(ErrorPopup { popup });
     }
 
@@ -687,7 +699,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         }
 
         if let Some(popup) = &mut self.popup {
-            let popup: &mut dyn Popup = match popup {
+            let popup: &mut dyn popups::Popup = match popup {
                 DeletePopup { popup, .. } => popup,
                 ErrorPopup { popup, .. } => popup,
                 FilterPopup { popup } => popup,
@@ -820,13 +832,13 @@ impl<T: Serialize + DeserializeOwned> Component for ListWithDetails<'_, T> {
 
 enum ListPopup<'a> {
     DeletePopup {
-        popup: popup::ConfirmPopup,
+        popup: popups::confirm_popup::ConfirmPopup,
         item_id: String,
     },
     ErrorPopup {
-        popup: popup::ErrorPopup,
+        popup: popups::error_popup::ErrorPopup,
     },
     FilterPopup {
-        popup: popup::InputPopup<'a>,
+        popup: popups::filter_popup::FilterPopup<'a>,
     },
 }

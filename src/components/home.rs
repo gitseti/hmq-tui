@@ -3,8 +3,6 @@ use std::rc::Rc;
 
 use color_eyre::eyre::{Ok, Result};
 use crossterm::event::{KeyEvent, MouseEvent};
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -13,12 +11,13 @@ use crate::{
     components::tabs::{
         backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
         data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
-        trace_recordings::TraceRecordingsTab, TabComponent,
+        TabComponent, trace_recordings::TraceRecordingsTab,
     },
     config::Config,
     mode::Mode,
     tui::Event,
 };
+use crate::sqlite::init_sqlite;
 
 use super::{Component, Frame};
 
@@ -37,7 +36,7 @@ impl Home {
         hivemq_address: String,
         mode: Rc<RefCell<Mode>>,
     ) -> Self {
-        let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
+        let sqlite_pool = init_sqlite();
         return Home {
             action_tx: action_tx.clone(),
             config,

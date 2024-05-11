@@ -11,7 +11,7 @@ pub mod editor;
 pub mod fps;
 pub mod home;
 pub mod list_with_details;
-pub mod popup;
+pub mod popups;
 pub mod tabs;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.

@@ -124,17 +124,23 @@ impl<'a, T: Serialize + DeserializeOwned> Repository<T> {
         &self,
         json_path: &str,
         to_match: &str,
+        is_regex: bool,
     ) -> Result<Vec<String>, RepositoryError> {
         let binding = self.connection_pool.get().unwrap();
         let sort_property = &self.sort_property;
+        let table_name = &self.table_name;
+        let where_clause = if is_regex {
+            format!("WHERE data -> '{}' REGEXP '{}'", json_path, to_match)
+        } else {
+            format!("WHERE data -> '{}' LIKE '%{}%'", json_path, to_match)
+        };
         let mut stmt = binding.prepare(&format!(
             "
         SELECT id
-        FROM {}
-        WHERE data -> '{}' LIKE '%{}%'
+        FROM {table_name}
+        {where_clause}
         ORDER BY datetime(json_extract(data, '$.{sort_property}')) ASC
         ",
-            &self.table_name, json_path, to_match
         ))?;
 
         let items = stmt.query_map([], |row| {
@@ -268,7 +274,7 @@ mod tests {
             },
             "id",
         )
-        .unwrap()
+            .unwrap()
     }
 
     #[test]
