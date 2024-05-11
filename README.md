@@ -25,10 +25,10 @@ brew install gitseti/tap/hmq-tui
 
 #### x86_64
 
-[Download](https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-x86_64-pc-windows-msvc.zip)
+[Download](https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-x86_64-pc-windows-msvc.zip)
 
 #### Arm64
-[Download](https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-aarch64-pc-windows-msvc.zip)
+[Download](https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-aarch64-pc-windows-msvc.zip)
 
 ---
 
@@ -36,14 +36,14 @@ brew install gitseti/tap/hmq-tui
 
 #### x86_64
 ```bash
-wget https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-x86_64-unknown-linux-gnu.deb
-sudo apt install ./hmq-tui-0.2.0-x86_64-unknown-linux-gnu.deb
+wget https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-x86_64-unknown-linux-gnu.deb
+sudo apt install ./hmq-tui-0.3.0-x86_64-unknown-linux-gnu.deb
 ```
 
 #### Arm64
 ```bash
-wget https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-aarch64-unknown-linux-gnu.deb
-sudo apt install ./hmq-tui-0.2.0-aarch64-unknown-linux-gnu.deb
+wget https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-aarch64-unknown-linux-gnu.deb
+sudo apt install ./hmq-tui-0.3.0-aarch64-unknown-linux-gnu.deb
 ```
 
 ---
@@ -52,10 +52,10 @@ sudo apt install ./hmq-tui-0.2.0-aarch64-unknown-linux-gnu.deb
 
 #### x86_64
 ```bash
-sudo yum install -y https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-x86_64-unknown-linux-gnu.rpm
+sudo yum install -y https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-x86_64-unknown-linux-gnu.rpm
 ```
 
 #### Arm64
 ```bash
-sudo yum install -y https://github.com/gitseti/hmq-tui/releases/download/0.2.0/hmq-tui-0.2.0-aarch64-unknown-linux-gnu.rpm
+sudo yum install -y https://github.com/gitseti/hmq-tui/releases/download/0.3.0/hmq-tui-0.3.0-aarch64-unknown-linux-gnu.rpm
 ```
