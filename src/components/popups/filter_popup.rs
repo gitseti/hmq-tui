@@ -1,19 +1,17 @@
-use std::ops::Not;
-use std::vec;
-use color_eyre::owo_colors::OwoColorize;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use itertools::Itertools;
-use ratatui::layout::Alignment::Center;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::prelude::{Color, Span, Style, Stylize};
-use ratatui::style::Styled;
-use ratatui::symbols;
-use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
-use tui_textarea::{CursorMove, TextArea};
 use crate::action::Action;
 use crate::components::popups::filter_popup::Tab::{JsonPathSearch, KeywordSearch};
 use crate::components::popups::Popup;
 use crate::tui::Frame;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+use ratatui::layout::Alignment::Center;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::prelude::{Color, Style, Stylize};
+
+use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
+use std::ops::Not;
+use std::vec;
+use tui_textarea::{CursorMove, TextArea};
 
 pub struct FilterPopup<'a> {
     title: &'static str,
@@ -116,21 +114,28 @@ impl<'a> FilterPopup<'a> {
         }
 
         match &mut self.tabs[self.selected] {
-            KeywordSearch { text_area, is_regex_checked, .. } => {
+            KeywordSearch {
+                text_area,
+                is_regex_checked,
+                ..
+            } => {
                 if key.code == KeyCode::F(1) {
                     *is_regex_checked = is_regex_checked.not();
                 } else {
                     text_area.input(key);
                 }
             }
-            JsonPathSearch { selected_text_area, is_regex_checked, text_area_json_path, text_area_query } => {
+            JsonPathSearch {
+                selected_text_area,
+                is_regex_checked,
+                text_area_json_path,
+                text_area_query,
+            } => {
                 match key.code {
-                    KeyCode::Up => *selected_text_area = {
-                        0
-                    },
+                    KeyCode::Up => *selected_text_area = 0,
                     KeyCode::Down => *selected_text_area = 1,
                     KeyCode::F(1) => *is_regex_checked = is_regex_checked.not(),
-                    _ => ()
+                    _ => (),
                 };
 
                 let (focus_text_area, dimmed_text_area) = if *selected_text_area == 0 {
@@ -159,7 +164,7 @@ impl<'a> Popup for FilterPopup<'a> {
     fn draw_popup(&mut self, f: &mut Frame<'_>, popup_area: Rect) -> color_eyre::Result<()> {
         let selected_tab = &self.tabs[self.selected];
         let block = Block::default()
-            .title(self.title.clone())
+            .title(self.title)
             .title_alignment(Center)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Blue));
@@ -176,13 +181,15 @@ impl<'a> Popup for FilterPopup<'a> {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .horizontal_margin(1)
-            .constraints(vec![Constraint::Min(1), Constraint::Min(1), Constraint::Percentage(100), Constraint::Min(1)])
+            .constraints(vec![
+                Constraint::Min(1),
+                Constraint::Min(1),
+                Constraint::Percentage(100),
+                Constraint::Min(1),
+            ])
             .split(inner);
         let tab_layout = layout[0];
-        f.render_widget(
-            Block::default().borders(Borders::BOTTOM).dim(),
-            layout[1],
-        );
+        f.render_widget(Block::default().borders(Borders::BOTTOM).dim(), layout[1]);
         let popup_body = layout[2];
         let popup_footer = layout[3];
 
@@ -195,9 +202,13 @@ impl<'a> Popup for FilterPopup<'a> {
         f.render_widget(block, popup_area);
 
         match selected_tab {
-            KeywordSearch { text_area, is_regex_checked, .. } => {
-                let keyword_search_layout = Layout::vertical(Constraint::from_lengths([3, 2]))
-                    .split(popup_body);
+            KeywordSearch {
+                text_area,
+                is_regex_checked,
+                ..
+            } => {
+                let keyword_search_layout =
+                    Layout::vertical(Constraint::from_lengths([3, 2])).split(popup_body);
 
                 f.render_widget(text_area.widget(), keyword_search_layout[0]);
 
@@ -209,9 +220,14 @@ impl<'a> Popup for FilterPopup<'a> {
 
                 f.render_widget(regex_checkbox, keyword_search_layout[1]);
             }
-            JsonPathSearch { text_area_json_path, text_area_query, is_regex_checked, .. } => {
-                let json_path_search_layout = Layout::vertical(Constraint::from_lengths([7, 2]))
-                    .split(popup_body);
+            JsonPathSearch {
+                text_area_json_path,
+                text_area_query,
+                is_regex_checked,
+                ..
+            } => {
+                let json_path_search_layout =
+                    Layout::vertical(Constraint::from_lengths([7, 2])).split(popup_body);
 
                 let filter_layout = Layout::vertical(Constraint::from_lengths([3, 1, 3]))
                     .split(json_path_search_layout[0]);

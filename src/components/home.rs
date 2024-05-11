@@ -6,18 +6,18 @@ use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::sqlite::init_sqlite;
 use crate::{
     action::Action,
     components::tabs::{
         backups::BackupsTab, behavior_policies::BehaviorPoliciesTab, clients::Clients,
         data_policies::DataPoliciesTab, schemas::SchemasTab, scripts::ScriptsTab,
-        TabComponent, trace_recordings::TraceRecordingsTab,
+        trace_recordings::TraceRecordingsTab, TabComponent,
     },
     config::Config,
     mode::Mode,
     tui::Event,
 };
-use crate::sqlite::init_sqlite;
 
 use super::{Component, Frame};
 
