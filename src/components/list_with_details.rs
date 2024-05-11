@@ -24,6 +24,8 @@ use LoadingState::Loaded;
 use crate::action::ListWithDetailsAction;
 use crate::components::list_with_details::FocusMode::Editing;
 use crate::components::list_with_details::ListPopup::{DeletePopup, ErrorPopup};
+use crate::components::popups;
+use crate::components::popups::filter_popup::Tab;
 use crate::repository::Repository;
 use crate::{
     action::{Action, Action::SelectedItem},
@@ -38,8 +40,6 @@ use crate::{
     mode::Mode,
     tui,
 };
-use crate::components::popups;
-use crate::components::popups::filter_popup::Tab;
 
 #[derive(TypedBuilder)]
 pub struct Features {
@@ -161,9 +161,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             focus_mode,
             ..
         } = &mut self.loading_state
-            else {
-                return;
-            };
+        else {
+            return;
+        };
 
         let Some((index, _item)) = items.shift_remove_full(&key) else {
             return;
@@ -204,9 +204,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             items, focus_mode, ..
         } = &self.loading_state
-            else {
-                return None;
-            };
+        else {
+            return None;
+        };
 
         let FocusMode::Scrolling(ref list_state) = focus_mode else {
             return None;
@@ -271,9 +271,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             list, focus_mode, ..
         } = &mut self.loading_state
-            else {
-                return None;
-            };
+        else {
+            return None;
+        };
 
         match focus_mode {
             FocusMode::Scrolling(list_state) => {
@@ -321,9 +321,9 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
         let Loaded {
             focus_mode, items, ..
         } = &mut self.loading_state
-            else {
-                return Ok(());
-            };
+        else {
+            return Ok(());
+        };
 
         if let FocusMode::Scrolling(selected) = focus_mode {
             if let Some(selected) = selected.selected() {
@@ -389,15 +389,29 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
             ErrorPopup { .. } => None,
             FilterPopup { popup, .. } => {
                 let (items, filter) = match popup.get_selected_tab() {
-                    Tab::KeywordSearch { text_area, is_regex_checked } => {
+                    Tab::KeywordSearch {
+                        text_area,
+                        is_regex_checked,
+                    } => {
                         let filter = text_area.lines()[0].clone();
-                        let items = self.repository.find_ids_by("$", &filter, *is_regex_checked).unwrap();
+                        let items = self
+                            .repository
+                            .find_ids_by("$", &filter, *is_regex_checked)
+                            .unwrap();
                         (items, filter)
                     }
-                    Tab::JsonPathSearch { text_area_json_path, text_area_query, is_regex_checked, .. } => {
+                    Tab::JsonPathSearch {
+                        text_area_json_path,
+                        text_area_query,
+                        is_regex_checked,
+                        ..
+                    } => {
                         let json_path = text_area_json_path.lines()[0].clone();
                         let query = text_area_query.lines()[0].clone();
-                        let items = self.repository.find_ids_by(&json_path, &query, *is_regex_checked).unwrap();
+                        let items = self
+                            .repository
+                            .find_ids_by(&json_path, &query, *is_regex_checked)
+                            .unwrap();
                         (items, format!("{json_path} -> {query}"))
                     }
                 };
@@ -507,7 +521,7 @@ impl<'a, T: Serialize + DeserializeOwned> ListWithDetails<'a, T> {
                         "Are you sure you want to delete the {} with id '{}'",
                         item_type, item_id
                     )
-                        .to_string(),
+                    .to_string(),
                 };
                 self.enter_popup(DeletePopup { popup, item_id })
             }

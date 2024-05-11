@@ -7,6 +7,6 @@ pub mod hivemq_rest_client;
 pub mod mode;
 pub mod repository;
 pub mod services;
+pub mod sqlite;
 pub mod tui;
 pub mod utils;
-pub mod sqlite;

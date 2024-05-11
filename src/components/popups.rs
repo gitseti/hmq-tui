@@ -12,7 +12,6 @@ pub mod confirm_popup;
 pub mod error_popup;
 pub mod filter_popup;
 
-
 pub trait Popup {
     fn draw_popup(&mut self, f: &mut Frame<'_>, popup_area: Rect) -> Result<()>;
 
@@ -75,7 +74,7 @@ fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
                 Constraint::Percentage(percent_y),
                 Constraint::Percentage((100 - percent_y) / 2),
             ]
-                .as_ref(),
+            .as_ref(),
         )
         .split(r);
 
@@ -87,7 +86,7 @@ fn popup_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
                 Constraint::Percentage(percent_x),
                 Constraint::Percentage((100 - percent_x) / 2),
             ]
-                .as_ref(),
+            .as_ref(),
         )
         .split(popup_layout[1])[1]
 }

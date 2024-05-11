@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use color_eyre::eyre::{Ok, Result};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
 use rusqlite::functions::FunctionFlags;
-use color_eyre::eyre::{Ok, Result};
 use rusqlite::Error;
+use std::sync::Arc;
 
 pub fn init_sqlite() -> Pool<SqliteConnectionManager> {
     let sqlite_pool = Pool::new(SqliteConnectionManager::memory()).unwrap();
@@ -19,9 +19,8 @@ fn add_regexp_function(db: &Pool<SqliteConnectionManager>) -> rusqlite::Result<(
         FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
         move |ctx| {
             assert_eq!(ctx.len(), 2, "called with unexpected number of arguments");
-            let regexp: Arc<Regex> = ctx.get_or_create_aux(0, |vr| -> Result<Regex> {
-                Ok(Regex::new(vr.as_str()?)?)
-            })?;
+            let regexp: Arc<Regex> =
+                ctx.get_or_create_aux(0, |vr| -> Result<Regex> { Ok(Regex::new(vr.as_str()?)?) })?;
             let is_match = {
                 let text = ctx
                     .get_raw(1)

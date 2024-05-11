@@ -274,7 +274,7 @@ mod tests {
             },
             "id",
         )
-            .unwrap()
+        .unwrap()
     }
 
     #[test]

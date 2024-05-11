@@ -57,7 +57,11 @@ async fn test_behavior_policies_tab() {
 
     tab.update(Action::LoadAllItems).unwrap();
     let action = rx.recv().await.unwrap();
-    let Action::ItemsLoadingFinished { item_name: _, result: _ } = &action else {
+    let Action::ItemsLoadingFinished {
+        item_name: _,
+        result: _,
+    } = &action
+    else {
         panic!("'Received wrong action {:?}", action.clone());
     };
     tab.update(action).unwrap();
